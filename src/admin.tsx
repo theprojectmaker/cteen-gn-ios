@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, T } from './theme';
 import { EVENT_ICONS, Icon } from './icons';
@@ -10,7 +10,7 @@ import { Button, Card, Chips, Field, IconTile, Toggle, s as u } from './ui';
 type Opt = { v: string; l: string };
 type Spec = { k: string; label: string; t: 'text' | 'long' | 'pick' | 'bool' | 'lines'; opts?: Opt[]; hint?: string; ph?: string; show?: (d: Draft) => boolean };
 type Draft = Record<string, string | boolean>;
-type Section = 'Posts' | 'Events' | 'Challenges' | 'Live banner' | 'Info' | 'Sign-ups' | 'Inbox';
+type Section = 'Posts' | 'Events' | 'Challenges' | 'Photos' | 'Live banner' | 'Info' | 'Sign-ups' | 'Inbox';
 type ListKey = 'posts' | 'events' | 'challenges' | 'info';
 
 const cap = (v: string) => v[0].toUpperCase() + v.slice(1);
@@ -52,13 +52,17 @@ function specs(key: ListKey, c: Content, isNew: boolean): Spec[] {
     { k: 'price', label: 'Price (optional)', t: 'text', ph: 'Free' },
     { k: 'icon', label: 'Cover icon', t: 'pick', opts: ICONS },
     { k: 'color', label: 'Cover color', t: 'pick', opts: COLORS },
+    { k: 'gender', label: 'Who can see it', t: 'pick', opts: [{ v: 'all', l: 'Everyone' }, { v: 'girls', l: 'Girls only' }, { v: 'boys', l: 'Boys only' }] },
+    { k: 'minAge', label: 'Youngest age (optional)', t: 'text', ph: '13', hint: 'Teens younger than this will not see the event.' },
+    { k: 'maxAge', label: 'Oldest age (optional)', t: 'text', ph: '18' },
     { k: 'who', label: "Who it's for (optional)", t: 'text' },
     { k: 'about', label: 'Details', t: 'long' },
     ...notify,
   ];
   if (key === 'challenges') return [
     { k: 'title', label: 'Challenge name', t: 'text', ph: 'Tefillin Challenge' },
-    { k: 'active', label: 'Live (shows as a banner on Home)', t: 'bool' },
+    { k: 'active', label: 'Live (shows on Home)', t: 'bool' },
+    { k: 'photo', label: 'Check in with a photo (you can review them in Photos)', t: 'bool' },
     { k: 'every', label: 'Check in', t: 'pick', opts: [{ v: 'day', l: 'Once a day' }, { v: 'week', l: 'Once a week' }] },
     { k: 'goal', label: 'Goal (number of check-ins)', t: 'text', ph: '30' },
     { k: 'about', label: 'How it works', t: 'long' },
@@ -76,8 +80,8 @@ function specs(key: ListKey, c: Content, isNew: boolean): Spec[] {
 
 const BLANK: Record<ListKey, Draft> = {
   posts: { title: '', body: '', kind: 'News', pinned: false, eventId: '', challengeId: '', photos: '', linkLabel: '', linkUrl: '', _notify: false },
-  events: { title: '', scope: 'gn', signup: 'app', url: '', payUrl: '', start: '', end: '', time: '', place: '', price: '', icon: 'star', color: 'blue', who: '', about: '', image: '', _notify: false },
-  challenges: { title: '', icon: 'trophy', color: 'purple', every: 'day', goal: '30', about: '', rewards: '', active: true, _notify: false },
+  events: { title: '', scope: 'gn', signup: 'app', url: '', payUrl: '', start: '', end: '', time: '', place: '', price: '', icon: 'star', color: 'blue', who: '', about: '', image: '', gender: 'all', minAge: '', maxAge: '', _notify: false },
+  challenges: { title: '', icon: 'trophy', color: 'purple', every: 'day', goal: '30', about: '', rewards: '', active: true, photo: false, _notify: false },
   info: { icon: 'star', title: '', body: '' },
 };
 
@@ -99,7 +103,11 @@ function fromDraft(key: ListKey, d: Draft): any {
     out.photos = String(d.photos).split('\n').map((x) => x.trim()).filter(Boolean);
     out.at = d.at || todayIso();
   }
-  if (key === 'events') out.end = d.end || d.start;
+  if (key === 'events') {
+    out.end = d.end || d.start;
+    out.minAge = String(d.minAge).trim() ? Number(d.minAge) : null;
+    out.maxAge = String(d.maxAge).trim() ? Number(d.maxAge) : null;
+  }
   if (key === 'challenges') {
     out.goal = Number(d.goal) || 1;
     out.rewards = String(d.rewards).split('\n').map((line) => /^\s*(\d+)\s*[=:\-]\s*(.+)$/.exec(line)).filter(Boolean).map((m) => ({ at: Number(m![1]), prize: m![2].trim() }));
@@ -145,7 +153,7 @@ const LISTS: Record<'Posts' | 'Events' | 'Challenges' | 'Info', { key: ListKey; 
   Challenges: { key: 'challenges', one: 'challenge', prefix: 'c' },
   Info: { key: 'info', one: 'info card', prefix: 'i' },
 };
-const SECTIONS = ['Posts', 'Events', 'Challenges', 'Live banner', 'Info', 'Sign-ups', 'Inbox'] as const;
+const SECTIONS = ['Posts', 'Events', 'Challenges', 'Photos', 'Live banner', 'Info', 'Sign-ups', 'Inbox'] as const;
 const DURATIONS = [{ l: '1 hour', h: 1 }, { l: 'Today', h: 12 }, { l: '3 days', h: 72 }, { l: '1 week', h: 168 }, { l: 'Until I turn it off', h: 0 }];
 
 export function AdminPanel() {
@@ -257,7 +265,7 @@ export function AdminPanel() {
               {rows.map((r, i) => (
                 <View key={i} style={st.signRow}>
                   <Text style={[T.h3, { flex: 1 }]}>{r.name}</Text>
-                  <Text style={T.small}>{r.grade ? `Grade ${r.grade}` : ''}</Text>
+                  <Text style={T.small}>{[r.grade ? `Grade ${r.grade}` : '', r.age ? `Age ${r.age}` : '', r.gender === 'girl' ? 'Girl' : r.gender === 'boy' ? 'Boy' : ''].filter(Boolean).join(' · ')}</Text>
                 </View>
               ))}
             </Card>
@@ -265,6 +273,8 @@ export function AdminPanel() {
         }) : null}
       </View>
     );
+  } else if (section === 'Photos') {
+    body = <PhotoReview />;
   } else if (section === 'Inbox') {
     body = (
       <View style={{ gap: 12 }}>
@@ -372,7 +382,43 @@ export function AdminPanel() {
   );
 }
 
+// Check-in photos from the last 7 days, per photo challenge. Photos load one at a time when tapped.
+function PhotoReview() {
+  const { content, loadPhotos, loadPhoto } = useStore();
+  const photoChallenges = content.challenges.filter((c) => c.photo);
+  const [cid, setCid] = useState(photoChallenges[0]?.id ?? '');
+  const [rows, setRows] = useState<{ key: string; name: string; at: string; day: string }[] | null>(null);
+  const [shown, setShown] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!cid) return;
+    setRows(null);
+    loadPhotos(cid).then((r) => setRows(r ?? []));
+  }, [cid]);
+  if (!photoChallenges.length) return <Text style={T.small}>No challenge uses photo check-ins. Turn on "Check in with a photo" on a challenge first.</Text>;
+  const ch = photoChallenges.find((c) => c.id === cid);
+  return (
+    <View style={{ gap: 12 }}>
+      {photoChallenges.length > 1 ? <Chips wrap options={photoChallenges.map((c) => c.title)} value={ch?.title ?? ''} onChange={(l) => setCid(photoChallenges.find((c) => c.title === l)!.id)} /> : null}
+      <Text style={T.small}>Photos are deleted automatically after 30 days. Only leaders can see them.</Text>
+      {rows === null ? <Text style={T.small}>Loading photos…</Text> : rows.length === 0 ? <Text style={T.small}>No photos in the last 7 days.</Text> : null}
+      {(rows ?? []).map((p) => (
+        <Card key={p.key} style={{ padding: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={T.h3}>{p.name}</Text>
+              <Text style={T.small}>{new Date(p.at).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</Text>
+            </View>
+            {!shown[p.key] ? <Button small kind="ghost" icon="camera" label="Show" onPress={async () => { const img = await loadPhoto(p.key); if (img) setShown((s) => ({ ...s, [p.key]: img })); }} /> : null}
+          </View>
+          {shown[p.key] ? <Image source={{ uri: 'data:image/jpeg;base64,' + shown[p.key] }} style={st.photo} resizeMode="cover" accessibilityLabel={`Check-in photo from ${p.name}`} /> : null}
+        </Card>
+      ))}
+    </View>
+  );
+}
+
 const st = StyleSheet.create({
+  photo: { width: '100%', aspectRatio: 3 / 4, borderRadius: 14, marginTop: 12, backgroundColor: C.line },
   root: { flex: 1, backgroundColor: C.bg },
   col: { width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 20 },
   top: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },

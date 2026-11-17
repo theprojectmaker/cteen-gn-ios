@@ -110,12 +110,14 @@ preview misses. `dist/` is ignored by git.
 
 | Path | What it is |
 | --- | --- |
-| `app/_layout.tsx` | Tab bar: Apple's own on iPhone (real Liquid Glass on iOS 26, live banner in its bottom accessory), `src/webTabs.tsx` on web |
-| `app/index.tsx`, `events.tsx`, `feed.tsx`, `chapter.tsx` | One file per tab (expo-router); each wraps a screen from `src/screens.tsx` |
-| `src/shell.tsx` | Glass header, top live banner (older iOS and web), over-the-air update check |
+| `app/_layout.tsx` | Root stack: the tabs, plus the challenge and account pages that slide in on top; event sheet, leader panel, first-launch welcome |
+| `app/(tabs)/_layout.tsx` | Tab bar: Apple's own on iPhone (real Liquid Glass on iOS 26, Feed badge, live banner in its bottom accessory); `src/webTabs.tsx` imitates it on web |
+| `app/(tabs)/index.tsx`, `events.tsx`, `feed.tsx`, `chapter.tsx` | One file per tab (expo-router); each wraps a screen from `src/screens.tsx` |
+| `app/challenge/[id].tsx`, `app/account.tsx` | Challenge page (`src/rewards.tsx`, photo check-ins via `src/photo.ts`) and account page (`src/account.tsx`) |
+| `src/shell.tsx` | Glass header with the Events and account buttons, top live banner (older iOS and web), over-the-air update check |
 | `src/screens.tsx` | Home, Events, Feed and Chapter tabs, event sheet |
-| `src/rewards.tsx` | Challenge banners, join/check-in sheet, leaderboard |
-| `src/admin.tsx` | Leader panel (posts, events, challenges, live banner, sign-ups, inbox) |
+| `src/rewards.tsx` | Challenge cards, challenge page with photo streaks, leaderboard |
+| `src/admin.tsx` | Leader panel (posts, events with audiences, challenges, check-in photos, live banner, sign-ups, inbox) |
 | `src/store.tsx` | All data: server calls, saved state on the phone, date helpers |
 | `src/ui.tsx`, `src/glass.tsx`, `src/icons.tsx`, `src/theme.ts` | Shared pieces, glass surface, icons, colors |
 | `src/push.ts` | Notifications and challenge reminders |

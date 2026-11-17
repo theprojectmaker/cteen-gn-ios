@@ -107,6 +107,13 @@ export function SaveHeart({ id }: { id: string }) {
   );
 }
 
+// 'Girls only · Ages 13-15', or '' for everyone.
+export function audienceLabel(e: EventItem) {
+  const who = e.gender === 'girls' ? 'Girls only' : e.gender === 'boys' ? 'Boys only' : '';
+  const ages = e.minAge != null && e.maxAge != null ? `Ages ${e.minAge}-${e.maxAge}` : e.minAge != null ? `Ages ${e.minAge}+` : e.maxAge != null ? `Up to age ${e.maxAge}` : '';
+  return [who, ages].filter(Boolean).join(' · ');
+}
+
 export function EventMeta({ e }: { e: EventItem }) {
   const { going } = useStore();
   const mine = going.includes(e.id);
@@ -114,6 +121,7 @@ export function EventMeta({ e }: { e: EventItem }) {
     <Text style={s.meta} numberOfLines={1}>
       <Text style={{ color: mine ? C.green : C.sub }}>{mine ? "You're signed up" : dateLabel(e)}</Text>
       {e.price ? <Text style={{ color: C.ink }}> · {e.price}</Text> : null}
+      {audienceLabel(e) ? <Text style={{ color: C.blueDeep }}> · {audienceLabel(e)}</Text> : null}
     </Text>
   );
 }

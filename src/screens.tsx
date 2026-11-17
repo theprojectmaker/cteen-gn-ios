@@ -1,35 +1,34 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { C, R, T } from './theme';
 import { Icon } from './icons';
-import { CHAPTER, calendarUrl, countdown, dateLabel, greeting, open, upcoming, useShabbat, useStore, type ColorKey, type EventItem, type Post } from './store';
-import { Button, Card, Chips, Cover, Empty, EventCard, EventMeta, Field, IconTile, ScopeBadge, SectionHead, Sheet, s as u } from './ui';
+import { CHAPTER, calendarUrl, countdown, dateLabel, open, upcoming, useShabbat, useStore, type ColorKey, type EventItem, type Post } from './store';
+import { audienceLabel, Button, Card, Chips, Cover, Empty, EventCard, EventMeta, Field, IconTile, ScopeBadge, SectionHead, Sheet, s as u } from './ui';
 import { ChallengeBanner, NameGate } from './rewards';
 
 // ───────────────────────── Home ─────────────────────────
+// One thing per section, lots of room: who you are, what's next, your challenge,
+// the newest post, Shabbat, then the shortcuts at the bottom.
 export function Home() {
-  const { content, go, openEvent, name, push, turnOnPush } = useStore();
-  const up = upcoming(content.events);
+  const { content, go, openEvent, name, push, turnOnPush, fits } = useStore();
+  const up = upcoming(content.events).filter(fits);
   const next = up.find((e) => e.scope === 'gn') ?? up[0];
-  const rest = up.filter((e) => e !== next);
   const live = content.challenges.filter((c) => c.active);
+  const latest = sortPosts(content.posts)[0];
   const first = name.split(' ')[0];
+  const h = new Date().getHours();
+  const hello = h < 12 ? 'Good morning' : h < 18 ? 'Hey' : 'Good evening';
   return (
     <>
-      <Text style={T.eyebrow}>{greeting()}{first ? `, ${first}` : ''}</Text>
-      <Text style={[T.h1, { marginTop: 6 }]}>{up.length === 0 ? "What's happening in Great Neck" : `${up.length} thing${up.length === 1 ? '' : 's'} coming up in Great Neck`}</Text>
-
-      {live.length ? (
-        <View style={{ gap: 10, marginTop: 18 }}>
-          {live.map((c) => <ChallengeBanner key={c.id} ch={c} />)}
-        </View>
-      ) : null}
+      <Text style={st.hello}>{hello}{first ? `, ${first}` : ''}</Text>
+      <Text style={st.helloSub}>Here's what's happening at CTeen Great Neck.</Text>
 
       {next ? (
         <Pressable onPress={() => openEvent(next.id)} style={({ pressed }) => [st.hero, pressed && u.pressed]} accessibilityRole="button" accessibilityLabel={next.title}>
           <Cover e={next} style={u.fill} iconSize={150} />
           <View style={[u.fill, { backgroundColor: next.image ? 'rgba(13,60,110,0.5)' : 'rgba(19,32,44,0.18)' }]} />
-          <ScopeBadge scope={next.scope} style={{ position: 'absolute', left: 16, top: 16 }} />
+          <ScopeBadge scope={next.scope} style={{ position: 'absolute', left: 18, top: 18 }} />
           <Text style={st.heroKicker}>Up next · {countdown(next)}</Text>
           <Text style={st.heroTitle}>{next.title}</Text>
           <Text style={st.heroDate}>{dateLabel(next)}{next.time ? ` · ${next.time}` : ''}</Text>
@@ -40,9 +39,28 @@ export function Home() {
         </Pressable>
       ) : null}
 
+      {live.length ? (
+        <>
+          <Text style={st.section}>{live.length === 1 ? 'Your challenge' : 'Your challenges'}</Text>
+          <View style={{ gap: 12 }}>
+            {live.map((c) => <ChallengeBanner key={c.id} ch={c} />)}
+          </View>
+        </>
+      ) : null}
+
+      {latest ? (
+        <>
+          <SectionHead title="New from Rabbi Zevy" action="Feed" onAction={() => go('Feed')} />
+          <PostCard post={latest} />
+        </>
+      ) : null}
+
+      <Text style={st.section}>This Shabbat</Text>
+      <ShabbatCard />
+
       {push === 'off' ? (
         <Card style={st.notify} onPress={turnOnPush} label="Turn on notifications">
-          <IconTile icon="bell" size={42} />
+          <IconTile icon="bell" size={44} />
           <View style={{ flex: 1 }}>
             <Text style={T.h3}>Turn on notifications</Text>
             <Text style={T.small}>Hear it first when Rabbi Zevy posts or an event opens.</Text>
@@ -51,27 +69,12 @@ export function Home() {
         </Card>
       ) : null}
 
-      <View style={st.quickRow}>
+      <Text style={st.section}>Quick links</Text>
+      <View style={st.quickGrid}>
         <Quick icon="ticket" color="blue" label="Events" onPress={() => go('Events')} />
         <Quick icon="chat" color="purple" label="Feed" onPress={() => go('Feed')} />
         <Quick icon="camera" color="pink" label="Instagram" onPress={() => open(CHAPTER.instagram)} />
         <Quick icon="heart" color="green" label="Hours" onPress={() => open('https://myportal.cteen.com/service')} />
-      </View>
-
-      <ShabbatCard />
-
-      {rest.length ? (
-        <>
-          <SectionHead title="Also coming up" action="See all" onAction={() => go('Events')} />
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20 }} contentContainerStyle={{ paddingHorizontal: 20, gap: 14 }}>
-            {rest.map((e) => <EventCard key={e.id} e={e} width={250} />)}
-          </ScrollView>
-        </>
-      ) : null}
-
-      <SectionHead title="Latest from the chapter" action="Open feed" onAction={() => go('Feed')} />
-      <View style={{ gap: 12 }}>
-        {sortPosts(content.posts).slice(0, 2).map((p) => <PostCard key={p.id} post={p} />)}
       </View>
     </>
   );
@@ -80,8 +83,9 @@ export function Home() {
 function Quick({ icon, color, label, onPress }: { icon: string; color: ColorKey; label: string; onPress: () => void }) {
   return (
     <Card style={st.quick} onPress={onPress} label={label}>
-      <IconTile icon={icon} color={color} size={40} />
+      <IconTile icon={icon} color={color} size={46} />
       <Text style={st.quickLabel}>{label}</Text>
+      <Icon name="right" size={16} color={C.faint} stroke={2.4} />
     </Card>
   );
 }
@@ -116,9 +120,9 @@ function ShabbatCard() {
 const EVENT_FILTERS = ['All', 'Great Neck', 'International', 'Saved'] as const;
 
 export function Events() {
-  const { saved, content } = useStore();
+  const { saved, content, fits } = useStore();
   const [f, setF] = useState<(typeof EVENT_FILTERS)[number]>('All');
-  const list = upcoming(content.events).filter((e) => (f === 'All' ? true : f === 'Saved' ? saved.includes(e.id) : f === 'Great Neck' ? e.scope === 'gn' : e.scope === 'intl'));
+  const list = upcoming(content.events).filter(fits).filter((e) => (f === 'All' ? true : f === 'Saved' ? saved.includes(e.id) : f === 'Great Neck' ? e.scope === 'gn' : e.scope === 'intl'));
   return (
     <>
       <Text style={T.eyebrow}>Events</Text>
@@ -148,6 +152,7 @@ export function EventSheet() {
       <View style={{ padding: 18, paddingBottom: 28 }}>
         <Card style={{ padding: 0 }}>
           <Row icon="calendar" label="When" value={dateLabel(e) + (e.time ? ` · ${e.time}` : '')} first />
+          {audienceLabel(e) ? <Row icon="users" label="For" value={audienceLabel(e)} /> : null}
           {e.place ? <Row icon="pin" label="Where" value={e.place} /> : null}
           {e.price ? <Row icon="ticket" label="Price" value={e.price} /> : null}
           <Row icon="clock" label="Starts" value={countdown(e)} />
@@ -248,8 +253,9 @@ const FEED_FILTERS = ['All', 'News', 'Events', 'Photos', 'Rewards'] as const;
 const sortPosts = (posts: Post[]) => [...posts].sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || b.at.localeCompare(a.at));
 
 export function Feed() {
-  const { content, leader, setAdminOpen } = useStore();
+  const { content, leader, setAdminOpen, markFeedSeen } = useStore();
   const [f, setF] = useState<(typeof FEED_FILTERS)[number]>('All');
+  useFocusEffect(useCallback(() => { markFeedSeen(); }, [markFeedSeen]));
   const list = sortPosts(content.posts).filter((p) => f === 'All' || p.kind === f);
   return (
     <>
@@ -337,8 +343,7 @@ function PostCard({ post }: { post: Post }) {
 
 // ───────────────────────── Chapter ─────────────────────────
 export function Chapter() {
-  const { content, name, grade, leader, setAdminOpen, online, push, turnOnPush } = useStore();
-  const [editMe, setEditMe] = useState(false);
+  const { content, name, grade, age, account, leader, setAdminOpen, online, push, turnOnPush } = useStore();
   return (
     <>
       <Text style={T.eyebrow}>Your chapter</Text>
@@ -356,17 +361,17 @@ export function Chapter() {
       </View>
 
       <SectionHead title="You" />
-      {editMe ? <Card><NameGate title="Your info" onDone={() => setEditMe(false)} /></Card> : (
+      {(
         <Card style={{ padding: 0 }}>
-          <Pressable onPress={() => setEditMe(true)} style={st.linkRow} accessibilityRole="button" accessibilityLabel="Edit your name and grade">
+          <Pressable onPress={() => router.push('/account')} style={st.linkRow} accessibilityRole="button" accessibilityLabel="Your account">
             <View style={st.meAvatar}>
               {name ? <Text style={st.meInitial}>{name[0].toUpperCase()}</Text> : <Icon name="user" size={20} color={C.white} />}
             </View>
             <View style={{ flex: 1 }}>
               <Text style={T.h3}>{name || 'Add your name'}</Text>
-              <Text style={T.small}>{grade ? `Grade ${grade}` : 'Used for sign-ups and the leaderboard'}</Text>
+              <Text style={T.small}>{[grade ? `Grade ${grade}` : '', age ? `Age ${age}` : '', account?.google ? 'Linked with Google' : ''].filter(Boolean).join(' · ') || 'Set up your account'}</Text>
             </View>
-            <Text style={u.link}>Edit</Text>
+            <Icon name="right" size={17} color={C.faint} stroke={2.4} />
           </Pressable>
           <Pressable onPress={push === 'off' ? turnOnPush : undefined} disabled={push !== 'off'} style={[st.linkRow, st.rule]} accessibilityRole="button" accessibilityLabel="Notifications">
             <IconTile icon="bell" size={40} />
@@ -468,17 +473,21 @@ function LinkRow({ icon, title, sub, url, first }: { icon: string; title: string
 }
 
 const st = StyleSheet.create({
-  hero: { marginTop: 14, borderRadius: 26, overflow: 'hidden', minHeight: 250, justifyContent: 'flex-end', padding: 20, backgroundColor: C.blueDeep },
+  hello: { fontSize: 32, lineHeight: 37, fontWeight: '900', color: C.ink, letterSpacing: -0.6 },
+  helloSub: { fontSize: 16, lineHeight: 22, color: C.sub, marginTop: 6 },
+  section: { fontSize: 20, fontWeight: '900', color: C.ink, letterSpacing: -0.2, marginTop: 38, marginBottom: 14 },
+  quickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  hero: { marginTop: 24, borderRadius: 28, overflow: 'hidden', minHeight: 280, justifyContent: 'flex-end', padding: 20, backgroundColor: C.blueDeep },
   heroKicker: { color: 'rgba(255,255,255,0.92)', fontSize: 13, fontWeight: '800' },
   heroTitle: { color: C.white, fontSize: 28, lineHeight: 32, fontWeight: '900', letterSpacing: -0.4, marginTop: 4 },
   heroDate: { color: C.white, fontSize: 14, fontWeight: '700', marginTop: 6 },
   heroBtn: { marginTop: 16, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: C.white, borderRadius: R.pill, paddingHorizontal: 18, height: 42 },
   heroBtnText: { color: C.ink, fontSize: 15, fontWeight: '800' },
-  notify: { marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
+  notify: { marginTop: 24, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
   quickRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
-  quick: { flex: 1, alignItems: 'center', paddingVertical: 14, paddingHorizontal: 2 },
-  quickLabel: { fontSize: 12, fontWeight: '700', color: C.ink, marginTop: 8 },
-  shabbat: { marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 14 },
+  quick: { width: '47%', flexGrow: 1, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 16, paddingHorizontal: 14 },
+  quickLabel: { flex: 1, fontSize: 16, fontWeight: '800', color: C.ink },
+  shabbat: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   shabbatTimes: { flexDirection: 'row', alignItems: 'center', gap: 18, marginTop: 8 },
   timeBig: { fontSize: 20, fontWeight: '900', color: C.ink, letterSpacing: -0.3 },
   timeRule: { width: 1, height: 30, backgroundColor: C.line },

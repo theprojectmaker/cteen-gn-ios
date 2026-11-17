@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { AppState, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import * as Updates from 'expo-updates';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { C } from './theme';
 import { Icon } from './icons';
 import { Glass, LIQUID } from './glass';
-import { CHAPTER, useStore, type Alert } from './store';
+import { CHAPTER, upcoming, useStore, type Alert } from './store';
 
 // Over-the-air updates: every push to main publishes one. The app checks when it opens or comes
 // back to the front, downloads quietly, and switches to it the next time it is opened.
@@ -56,11 +56,29 @@ export function Screen({ children }: { children: React.ReactNode }) {
               <Text style={st.topEyebrow}>YOUR CHAPTER</Text>
               <Text style={st.topName}>{CHAPTER.name}, NY</Text>
             </View>
+            <HeaderButtons />
           </Glass>
           {/* On iOS 26 the live banner lives in the tab bar's accessory instead. */}
           {liveAlert && !LIQUID ? <TopAlert alert={liveAlert} /> : null}
         </View>
       </View>
+    </View>
+  );
+}
+
+// Top-right of the header: Events (with how many are coming up) and your account.
+function HeaderButtons() {
+  const { content, fits, go, name } = useStore();
+  const n = upcoming(content.events).filter(fits).length;
+  return (
+    <View style={st.hBtns}>
+      <Pressable onPress={() => go('Events')} style={({ pressed }) => [st.hBtn, pressed && { opacity: 0.6 }]} hitSlop={6} accessibilityRole="button" accessibilityLabel={`Events, ${n} coming up`}>
+        <Icon name="ticket" size={20} color={C.ink} stroke={2} />
+        {n > 0 ? <View style={st.hCount}><Text style={st.hCountText}>{n}</Text></View> : null}
+      </Pressable>
+      <Pressable onPress={() => router.push('/account')} style={({ pressed }) => [st.hAvatar, pressed && { opacity: 0.6 }]} hitSlop={6} accessibilityRole="button" accessibilityLabel="Your account">
+        {name ? <Text style={st.hAvatarText}>{name[0].toUpperCase()}</Text> : <Icon name="user" size={18} color={C.white} stroke={2.2} />}
+      </Pressable>
     </View>
   );
 }
@@ -122,6 +140,12 @@ const st = StyleSheet.create({
   alertTitle: { fontSize: 14, lineHeight: 18, fontWeight: '800', color: C.ink },
   alertText: { fontSize: 13, lineHeight: 17, color: C.sub, marginTop: 1 },
   alertClose: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
+  hBtns: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  hBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(19,32,44,0.06)', alignItems: 'center', justifyContent: 'center' },
+  hCount: { position: 'absolute', top: -3, right: -3, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: C.blue, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, borderWidth: 2, borderColor: C.white },
+  hCountText: { color: C.white, fontSize: 10, fontWeight: '900' },
+  hAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: C.blue, alignItems: 'center', justifyContent: 'center' },
+  hAvatarText: { color: C.white, fontSize: 16, fontWeight: '900' },
   acc: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingLeft: 16, paddingRight: 4 },
   accTitle: { fontSize: 14, fontWeight: '800', color: C.ink },
   accText: { fontSize: 12, color: C.sub },

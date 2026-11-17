@@ -33,7 +33,16 @@
           "color": "#159FDC"
         }
       ],
-      "expo-router"
+      "expo-router",
+      "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "CTeen GN uses the camera so you can snap your tefillin photo for the challenge.",
+          "photosPermission": "CTeen GN lets you pick a photo for a challenge check-in.",
+          "microphonePermission": false
+        }
+      ]
     ],
     "owner": "solomonsasson",
     "extra": {

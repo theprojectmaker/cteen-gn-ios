@@ -14,8 +14,9 @@ export type EventItem = {
   id: string; title: string; icon: string; color: ColorKey; image?: string; scope: 'gn' | 'intl';
   start: string; end: string; time?: string; place?: string; price?: string; who?: string; about?: string;
   signup: 'app' | 'link'; url?: string; payUrl?: string;
+  gender?: 'all' | 'boys' | 'girls'; minAge?: number | null; maxAge?: number | null;
 };
-export type Challenge = { id: string; title: string; icon: string; color: ColorKey; every: 'day' | 'week'; goal: number; about: string; active: boolean; rewards: { at: number; prize: string }[] };
+export type Challenge = { id: string; title: string; icon: string; color: ColorKey; every: 'day' | 'week'; goal: number; about: string; active: boolean; photo?: boolean; rewards: { at: number; prize: string }[] };
 export type Post = { id: string; kind: 'News' | 'Events' | 'Photos' | 'Rewards'; pinned?: boolean; title: string; body: string; eventId?: string; challengeId?: string; photos?: string[]; linkLabel?: string; linkUrl?: string; at: string };
 export type Info = { id: string; icon: string; title: string; body: string };
 export type Alert = { id: string; on: boolean; title: string; text: string; target: Target; until: string };
@@ -24,7 +25,10 @@ export type Tab = 'Home' | 'Events' | 'Feed' | 'Chapter';
 const TAB_PATH = { Home: '/', Events: '/events', Feed: '/feed', Chapter: '/chapter' } as const;
 export type BoardRow = { name: string; count: number };
 export type Question = { id: string; name: string; text: string; at: string };
-export type SignupRow = { name: string; grade: string; at: string };
+export type SignupRow = { name: string; grade: string; age?: number | null; gender?: string; at: string };
+export type Gender = '' | 'boy' | 'girl';
+export type Account = { id: string; token: string; google: { email: string } | null };
+export type PhotoRow = { key: string; name: string; at: string; day: string };
 
 export const CHAPTER = {
   name: 'CTeen Great Neck',
@@ -36,8 +40,8 @@ export const CHAPTER = {
   portal: 'https://myportal.cteen.com/',
   join: 'https://www.chabadgn.com/article.asp?aid=6581881',
   donate: 'https://www.chabadgn.com/donate',
-  instagram: 'https://www.instagram.com/cteenofgreatneck/',
-  instagramHandle: '@cteenofgreatneck',
+  instagram: 'https://www.instagram.com/_cteengn/',
+  instagramHandle: '@_cteengn',
   facebook: 'https://www.facebook.com/chabadgnteens/',
 };
 
@@ -49,13 +53,15 @@ export const IMAGES: Record<string, ImageSourcePropType> = {
 
 // ───────── device-local state ─────────
 type Local = {
-  device: string; name: string; grade: string;
+  device: string; name: string; grade: string; age: number | null; gender: Gender;
+  account: Account | null; onboarded: boolean;
+  seenPosts: string[]; seenInit: boolean;
   saved: string[]; liked: string[]; going: string[]; joined: string[]; dismissed: string[];
   checks: Record<string, string[]>; // challenge id -> period keys checked in
   counts: Record<string, number>;
   reminders: Record<string, number>; // challenge id -> hour of day
 };
-const blank: Local = { device: '', name: '', grade: '', saved: [], liked: [], going: [], joined: [], dismissed: [], checks: {}, counts: {}, reminders: {} };
+const blank: Local = { device: '', name: '', grade: '', age: null, gender: '', account: null, onboarded: false, seenPosts: [], seenInit: false, saved: [], liked: [], going: [], joined: [], dismissed: [], checks: {}, counts: {}, reminders: {} };
 const KEY = 'cteengn.v3';
 const CACHE = 'cteengn.content.v3';
 
@@ -65,13 +71,18 @@ type Ctx = Local & {
   refresh: () => Promise<void>;
   toggleSaved: (id: string) => void; toggleLiked: (id: string) => void;
   setProfile: (name: string, grade: string) => void;
+  saveProfile: (p: { name: string; grade: string; age: number | null; gender: Gender }) => Promise<string | null>;
+  finishOnboarding: () => void;
+  googleReady: boolean; linkGoogle: () => Promise<string | null>; signOut: () => void;
+  unreadFeed: number; markFeedSeen: () => void;
+  fits: (e: EventItem) => boolean;
   activeEvent: EventItem | null; openEvent: (id: string | null) => void;
-  activeChallenge: Challenge | null; openChallenge: (id: string | null) => void;
+  openChallenge: (id: string | null) => void;
   openTarget: (t: Target) => void;
   liveAlert: Alert | null; dismissAlert: () => void;
   signup: (id: string, on: boolean) => Promise<string | null>;
   join: (id: string, reminderHour: number | null) => void; leave: (id: string) => void;
-  checkin: (id: string) => Promise<{ error?: string; already?: boolean; board?: BoardRow[] }>;
+  checkin: (id: string, photo?: string) => Promise<{ error?: string; already?: boolean; board?: BoardRow[] }>;
   ask: (text: string) => Promise<string | null>;
   push: PushState; turnOnPush: () => Promise<void>;
   leader: string | null; adminOpen: boolean; setAdminOpen: (v: boolean) => void;
@@ -81,7 +92,11 @@ type Ctx = Local & {
   sendPush: (title: string, text: string, target: Target) => Promise<string>;
   loadSignups: () => Promise<{ signups: Record<string, SignupRow[]>; phones: number } | null>;
   loadInbox: () => Promise<Question[] | null>; removeQuestion: (id: string) => Promise<void>;
+  loadPhotos: (challengeId: string) => Promise<PhotoRow[] | null>; loadPhoto: (key: string) => Promise<string | null>;
 };
+
+// Who is acting: the signed-in account, or the phone's own id before there is one.
+const who = (me: Local) => (me.account ? { id: me.account.id, token: me.account.token } : { device: me.device, name: me.name, grade: me.grade });
 
 const StoreCtx = createContext<Ctx>(null as unknown as Ctx);
 export const useStore = () => useContext(StoreCtx);
@@ -117,7 +132,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [content, setContent] = useState<Content>(SEED as Content);
   const [online, setOnline] = useState<boolean | null>(null);
   const [eventId, setEventId] = useState<string | null>(null);
-  const [challengeId, setChallengeId] = useState<string | null>(null);
+  const [googleReady, setGoogleReady] = useState(false);
   const [leader, setLeader] = useState<string | null>(null);
   const [adminOpen, setAdminOpen] = useState(false);
   const [push, setPush] = useState<PushState>('unsupported');
@@ -159,6 +174,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         if (cached) setContent({ ...(SEED as Content), ...JSON.parse(cached) });
       } catch {}
       refresh();
+      api<{ google: boolean }>('/auth/config').then((r) => setGoogleReady(!!r.google)).catch(() => {});
       const state = await pushState();
       setPush(state);
       if (state === 'on') enablePush(registerToken); // keeps the server's token fresh
@@ -172,11 +188,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     };
   }, [refresh, registerToken]);
 
+  // Mark everything that is there on the very first launch as already seen.
+  useEffect(() => {
+    if (!local.device || local.seenInit || online !== true) return;
+    patch((s) => ({ ...s, seenInit: true, seenPosts: content.posts.map((p) => p.id) }));
+  }, [local.device, local.seenInit, online, content.posts, patch]);
+
   const openTarget = useCallback((t: Target) => {
     if (!t) return;
     tap();
     if (t.type === 'event') setEventId(t.id);
-    else setChallengeId(t.id);
+    else router.push(`/challenge/${t.id}`);
   }, []);
   useEffect(() => onNotificationTap((t) => openTarget(t as Target)), [openTarget]);
 
@@ -188,24 +210,78 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const a = content.alert;
   const liveAlert = a && a.on && a.title && !local.dismissed.includes(a.id) && (!a.until || a.until > new Date().toISOString()) ? a : null;
 
+  const unreadFeed = local.seenInit ? content.posts.filter((p) => !local.seenPosts.includes(p.id)).length : 0;
+  const saveProfile = async (p: { name: string; grade: string; age: number | null; gender: Gender }) => {
+    const me = ref.current;
+    ref.current = { ...me, name: p.name.trim(), grade: p.grade, age: p.age, gender: p.gender };
+    patch((s) => ({ ...s, name: p.name.trim(), grade: p.grade, age: p.age, gender: p.gender }));
+    try {
+      const r = await api<{ account: { id: string; google: { email: string } | null }; token: string | null }>('/account', { method: 'POST', body: { ...p, id: me.account?.id, token: me.account?.token } });
+      const account = { id: r.account.id, token: r.token ?? me.account!.token, google: r.account.google };
+      ref.current = { ...ref.current, account };
+      patch((s) => ({ ...s, account }));
+      return null;
+    } catch (e) {
+      return msg(e);
+    }
+  };
+
   const value = useMemo<Ctx>(() => ({
-    ...local, content, online, refresh, openTarget, liveAlert, push,
+    ...local, content, online, refresh, openTarget, liveAlert, push, googleReady, unreadFeed, saveProfile,
+    finishOnboarding: () => patch((s) => ({ ...s, onboarded: true })),
+    markFeedSeen: () => {
+      if (!unreadFeed) return;
+      patch((s) => ({ ...s, seenPosts: [...new Set([...s.seenPosts, ...content.posts.map((p) => p.id)])].slice(-400) }));
+    },
+    fits: (e) => {
+      const me = ref.current;
+      if (e.gender === 'boys' && me.gender === 'girl') return false;
+      if (e.gender === 'girls' && me.gender === 'boy') return false;
+      if (me.age != null && e.minAge != null && me.age < e.minAge) return false;
+      if (me.age != null && e.maxAge != null && me.age > e.maxAge) return false;
+      return true;
+    },
+    linkGoogle: async () => {
+      // Opens Google in a secure browser sheet; the server hands back a one-time ticket.
+      try {
+        const WebBrowser = await import('expo-web-browser');
+        const Linking2 = await import('expo-linking');
+        const back = Linking2.createURL('auth');
+        const res = await WebBrowser.openAuthSessionAsync(`${API}/auth/google/start?app=${encodeURIComponent(back)}`, back);
+        if (res.type !== 'success') return null;
+        const q = Linking2.parse(res.url).queryParams ?? {};
+        if (q.error || !q.ticket) return q.error === 'cancelled' ? null : 'Google sign-in did not finish. Try again.';
+        const me = ref.current;
+        const r = await api<{ account: { id: string; name: string; grade: string; age: number | null; gender: Gender; google: { email: string } | null }; token: string }>('/auth/redeem', { method: 'POST', body: { ticket: q.ticket, id: me.account?.id, token: me.account?.token } });
+        const account = { id: r.account.id, token: r.token, google: r.account.google };
+        const next = { account, name: r.account.name || me.name, grade: r.account.grade || me.grade, age: r.account.age ?? me.age, gender: r.account.gender || me.gender, onboarded: true };
+        ref.current = { ...ref.current, ...next };
+        patch((s) => ({ ...s, ...next }));
+        tap(true);
+        return null;
+      } catch (e) {
+        return msg(e);
+      }
+    },
+    signOut: () => {
+      ref.current = { ...ref.current, account: null };
+      patch((s) => ({ ...s, account: null }));
+    },
     go: (t) => { tap(); router.navigate(TAB_PATH[t]); },
     toggleSaved: (id) => flip('saved', id),
     toggleLiked: (id) => flip('liked', id),
     setProfile: (name, grade) => {
-      ref.current = { ...ref.current, name: name.trim(), grade }; // so an action fired right after sees it
-      patch((s) => ({ ...s, name: name.trim(), grade }));
+      const me = ref.current;
+      saveProfile({ name, grade, age: me.age, gender: me.gender }); // ref is updated first, so an action fired right after sees it
     },
     activeEvent: content.events.find((e) => e.id === eventId) ?? null,
     openEvent: (id) => { tap(); setEventId(id); },
-    activeChallenge: content.challenges.find((c) => c.id === challengeId) ?? null,
-    openChallenge: (id) => { tap(); setChallengeId(id); },
+    openChallenge: (id) => { if (id) { tap(); router.push(`/challenge/${id}`); } },
     dismissAlert: () => patch((s) => ({ ...s, dismissed: [...s.dismissed.slice(-20), a.id] })),
     signup: async (id, on) => {
       const me = ref.current;
       try {
-        await api(`/events/${id}/${on ? 'signup' : 'cancel'}`, { method: 'POST', body: { name: me.name, grade: me.grade, device: me.device } });
+        await api(`/events/${id}/${on ? 'signup' : 'cancel'}`, { method: 'POST', body: who(me) });
         patch((s) => ({ ...s, going: on ? [...new Set([...s.going, id])] : s.going.filter((x) => x !== id) }));
         if (on) tap(true);
         return null;
@@ -231,10 +307,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       patch((s) => ({ ...s, joined: s.joined.filter((x) => x !== id) }));
       setReminder(id, '', 'day', null);
     },
-    checkin: async (id) => {
+    checkin: async (id, photo) => {
       const me = ref.current;
       try {
-        const r = await api<{ already: boolean; count: number; period: string; board: BoardRow[] }>(`/challenges/${id}/checkin`, { method: 'POST', body: { name: me.name, device: me.device } });
+        const r = await api<{ already: boolean; count: number; period: string; board: BoardRow[] }>(`/challenges/${id}/checkin`, { method: 'POST', body: { ...who(me), photo } });
         patch((s) => ({ ...s, counts: { ...s.counts, [id]: r.count }, checks: { ...s.checks, [id]: [...new Set([...(s.checks[id] ?? []), r.period])] } }));
         if (!r.already) tap(true);
         return { already: r.already, board: r.board };
@@ -294,7 +370,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     loadSignups: () => api<{ signups: Record<string, SignupRow[]>; phones: number }>('/admin/signups', { leader }).catch(() => null),
     loadInbox: () => api<{ inbox: Question[] }>('/admin/inbox', { leader }).then((r) => r.inbox).catch(() => null),
     removeQuestion: (id) => api('/admin/inbox/remove', { method: 'POST', body: { id }, leader }).then(() => {}).catch(() => {}),
-  }), [local, content, online, eventId, challengeId, leader, adminOpen, push, liveAlert, flip, patch, refresh, keep, openTarget, registerToken]);
+    loadPhotos: (cid) => api<{ photos: PhotoRow[] }>(`/admin/photos?challenge=${cid}`, { leader }).then((r) => r.photos).catch(() => null),
+    loadPhoto: (key) => api<{ photo: string }>(`/admin/photo?key=${encodeURIComponent(key)}`, { leader }).then((r) => r.photo).catch(() => null),
+  }), [local, content, online, eventId, leader, adminOpen, push, liveAlert, googleReady, unreadFeed, flip, patch, refresh, keep, openTarget, registerToken]);
 
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>;
 }
