@@ -32,7 +32,8 @@
         {
           "color": "#159FDC"
         }
-      ]
+      ],
+      "expo-router"
     ],
     "owner": "solomonsasson",
     "extra": {

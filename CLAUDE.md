@@ -110,7 +110,9 @@ preview misses. `dist/` is ignored by git.
 
 | Path | What it is |
 | --- | --- |
-| `App.tsx` | App shell: glass header, live banner, floating tab bar |
+| `app/_layout.tsx` | Tab bar: Apple's own on iPhone (real Liquid Glass on iOS 26, live banner in its bottom accessory), `src/webTabs.tsx` on web |
+| `app/index.tsx`, `events.tsx`, `feed.tsx`, `chapter.tsx` | One file per tab (expo-router); each wraps a screen from `src/screens.tsx` |
+| `src/shell.tsx` | Glass header, top live banner (older iOS and web), over-the-air update check |
 | `src/screens.tsx` | Home, Events, Feed and Chapter tabs, event sheet |
 | `src/rewards.tsx` | Challenge banners, join/check-in sheet, leaderboard |
 | `src/admin.tsx` | Leader panel (posts, events, challenges, live banner, sign-ups, inbox) |

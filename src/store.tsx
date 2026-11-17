@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Linking, Platform, type ImageSourcePropType } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import SEED from '../shared/seed.json';
 import { API } from './config';
@@ -20,6 +21,7 @@ export type Info = { id: string; icon: string; title: string; body: string };
 export type Alert = { id: string; on: boolean; title: string; text: string; target: Target; until: string };
 export type Content = { alert: Alert; events: EventItem[]; challenges: Challenge[]; posts: Post[]; info: Info[] };
 export type Tab = 'Home' | 'Events' | 'Feed' | 'Chapter';
+const TAB_PATH = { Home: '/', Events: '/events', Feed: '/feed', Chapter: '/chapter' } as const;
 export type BoardRow = { name: string; count: number };
 export type Question = { id: string; name: string; text: string; at: string };
 export type SignupRow = { name: string; grade: string; at: string };
@@ -59,7 +61,7 @@ const CACHE = 'cteengn.content.v3';
 
 type Ctx = Local & {
   content: Content; online: boolean | null;
-  tab: Tab; go: (t: Tab) => void;
+  go: (t: Tab) => void;
   refresh: () => Promise<void>;
   toggleSaved: (id: string) => void; toggleLiked: (id: string) => void;
   setProfile: (name: string, grade: string) => void;
@@ -114,7 +116,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [local, setLocal] = useState<Local>(blank);
   const [content, setContent] = useState<Content>(SEED as Content);
   const [online, setOnline] = useState<boolean | null>(null);
-  const [tab, setTab] = useState<Tab>('Home');
   const [eventId, setEventId] = useState<string | null>(null);
   const [challengeId, setChallengeId] = useState<string | null>(null);
   const [leader, setLeader] = useState<string | null>(null);
@@ -188,8 +189,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const liveAlert = a && a.on && a.title && !local.dismissed.includes(a.id) && (!a.until || a.until > new Date().toISOString()) ? a : null;
 
   const value = useMemo<Ctx>(() => ({
-    ...local, content, online, tab, refresh, openTarget, liveAlert, push,
-    go: (t) => { tap(); setTab(t); },
+    ...local, content, online, refresh, openTarget, liveAlert, push,
+    go: (t) => { tap(); router.navigate(TAB_PATH[t]); },
     toggleSaved: (id) => flip('saved', id),
     toggleLiked: (id) => flip('liked', id),
     setProfile: (name, grade) => {
@@ -293,7 +294,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     loadSignups: () => api<{ signups: Record<string, SignupRow[]>; phones: number }>('/admin/signups', { leader }).catch(() => null),
     loadInbox: () => api<{ inbox: Question[] }>('/admin/inbox', { leader }).then((r) => r.inbox).catch(() => null),
     removeQuestion: (id) => api('/admin/inbox/remove', { method: 'POST', body: { id }, leader }).then(() => {}).catch(() => {}),
-  }), [local, content, online, tab, eventId, challengeId, leader, adminOpen, push, liveAlert, flip, patch, refresh, keep, openTarget, registerToken]);
+  }), [local, content, online, eventId, challengeId, leader, adminOpen, push, liveAlert, flip, patch, refresh, keep, openTarget, registerToken]);
 
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>;
 }
