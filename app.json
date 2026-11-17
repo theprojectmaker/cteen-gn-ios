@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "CTeen GN",
+    "slug": "cteen-gn",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "cteengn",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#F3F6F9",
+    "icon": "./assets/icon.png",
+    "ios": {
+      "bundleIdentifier": "com.solyapps.cteengn",
+      "supportsTablet": false,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleDisplayName": "CTeen GN",
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
+      }
+    },
+    "android": {
+      "package": "com.solyapps.cteengn"
+    },
+    "web": {
+      "output": "single",
+      "backgroundColor": "#F3F6F9"
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "color": "#159FDC"
+        }
+      ]
+    ],
+    "owner": "solomonsasson",
+    "extra": {
+      "eas": {
+        "projectId": "8774da51-84c9-4f4e-aea6-c0a80b5ccaf0"
+      }
+    }
+  }
+}

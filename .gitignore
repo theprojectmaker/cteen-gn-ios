@@ -1,0 +1,18 @@
+node_modules/
+.expo/
+dist/
+web-build/
+*.log
+.claude/
+.secrets/
+/ios/
+/android/
+*.ipa
+.env
+.env.local
+build/
+# backend secrets and local state
+server/.dev.vars
+server/.wrangler/
+server/LEADER-PASSCODE.txt
+server/.pass.tmp

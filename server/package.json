@@ -1,0 +1,7 @@
+{
+  "name": "cteen-gn-api",
+  "private": true,
+  "scripts": {
+    "dev": "node ../../classroom-bot/node_modules/wrangler/bin/wrangler.js pages dev --port 8789"
+  }
+}
