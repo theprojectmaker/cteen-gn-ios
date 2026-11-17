@@ -28,7 +28,7 @@ export type Question = { id: string; name: string; text: string; at: string };
 export type SignupRow = { name: string; grade: string; age?: number | null; gender?: string; school?: string; at: string };
 export type Gender = '' | 'boy' | 'girl';
 export type Profile = { name: string; grade: string; age: number | null; gender: Gender; school: string };
-export type Account = { id: string; token: string; google: { email: string } | null };
+export type Account = { id: string; token: string; google: { email: string } | null; apple?: boolean };
 export type WallComment = { name: string; text: string; at: string; leader?: boolean };
 export type PhotoRow = { key: string; name: string; at: string; day: string; status?: string; comments?: WallComment[] };
 export type WallPost = { key: string; name: string; at: string; status: string; mine: boolean; comments: WallComment[]; url: string };
@@ -58,13 +58,13 @@ export const IMAGES: Record<string, ImageSourcePropType> = {
 type Local = {
   device: string; name: string; grade: string; age: number | null; gender: Gender; school: string;
   account: Account | null; onboarded: boolean;
-  seenPosts: string[]; seenInit: boolean;
+  seenPosts: string[]; seenInit: boolean; seenEvents: string[]; tipSeen: boolean;
   saved: string[]; liked: string[]; going: string[]; joined: string[]; dismissed: string[];
   checks: Record<string, string[]>; // challenge id -> period keys checked in
   counts: Record<string, number>;
   reminders: Record<string, number>; // challenge id -> hour of day
 };
-const blank: Local = { device: '', name: '', grade: '', age: null, gender: '', school: '', account: null, onboarded: false, seenPosts: [], seenInit: false, saved: [], liked: [], going: [], joined: [], dismissed: [], checks: {}, counts: {}, reminders: {} };
+const blank: Local = { device: '', name: '', grade: '', age: null, gender: '', school: '', account: null, onboarded: false, seenPosts: [], seenInit: false, seenEvents: [], tipSeen: false, saved: [], liked: [], going: [], joined: [], dismissed: [], checks: {}, counts: {}, reminders: {} };
 const KEY = 'cteengn.v3';
 const CACHE = 'cteengn.content.v3';
 
@@ -75,9 +75,11 @@ type Ctx = Local & {
   toggleSaved: (id: string) => void; toggleLiked: (id: string) => void;
   setProfile: (name: string, grade: string) => void;
   saveProfile: (p: Partial<Profile>) => Promise<string | null>;
-  finishOnboarding: () => void;
+  finishOnboarding: () => void; restartOnboarding: () => void;
   googleReady: boolean; linkGoogle: () => Promise<string | null>; signOut: () => void;
   unreadFeed: number; markFeedSeen: () => void;
+  newEvents: number; markEventsSeen: () => void; hideTip: () => void;
+  appleReady: boolean; signInWithApple: () => Promise<string | null>;
   fits: (e: EventItem) => boolean;
   openEvent: (id: string | null) => void;
   openChallenge: (id: string | null) => void;
@@ -140,6 +142,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [content, setContent] = useState<Content>(SEED as Content);
   const [online, setOnline] = useState<boolean | null>(null);
   const [googleReady, setGoogleReady] = useState(false);
+  const [appleReady, setAppleReady] = useState(false);
   const [leader, setLeader] = useState<string | null>(null);
   const [adminOpen, setAdminOpen] = useState(false);
   const [push, setPush] = useState<PushState>('unsupported');
@@ -182,6 +185,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       } catch {}
       refresh();
       api<{ google: boolean }>('/auth/config').then((r) => setGoogleReady(!!r.google)).catch(() => {});
+      if (Platform.OS === 'ios') import('expo-apple-authentication').then((A) => A.isAvailableAsync()).then(setAppleReady).catch(() => {});
       const state = await pushState();
       setPush(state);
       if (state === 'on') enablePush(registerToken); // keeps the server's token fresh
@@ -198,7 +202,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   // Mark everything that is there on the very first launch as already seen.
   useEffect(() => {
     if (!local.device || local.seenInit || online !== true) return;
-    patch((s) => ({ ...s, seenInit: true, seenPosts: content.posts.map((p) => p.id) }));
+    patch((s) => ({ ...s, seenInit: true, seenPosts: content.posts.map((p) => p.id), seenEvents: content.events.map((e) => e.id) }));
   }, [local.device, local.seenInit, online, content.posts, patch]);
 
   const openTarget = useCallback((t: Target) => {
@@ -218,6 +222,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const liveAlert = a && a.on && a.title && !local.dismissed.includes(a.id) && (!a.until || a.until > new Date().toISOString()) ? a : null;
 
   const unreadFeed = local.seenInit ? content.posts.filter((p) => !local.seenPosts.includes(p.id)).length : 0;
+  const fitsNow = (e: EventItem) => {
+    if (e.gender === 'boys' && local.gender === 'girl') return false;
+    if (e.gender === 'girls' && local.gender === 'boy') return false;
+    if (local.age != null && e.minAge != null && local.age < e.minAge) return false;
+    if (local.age != null && e.maxAge != null && local.age > e.maxAge) return false;
+    return true;
+  };
+  const newEvents = local.seenInit ? upcoming(content.events).filter(fitsNow).filter((e) => !local.seenEvents.includes(e.id)).length : 0;
   const saveProfile = async (part: Partial<Profile>) => {
     const me = ref.current;
     const p: Profile = { name: (part.name ?? me.name).trim(), grade: part.grade ?? me.grade, age: part.age !== undefined ? part.age : me.age, gender: part.gender ?? me.gender, school: part.school ?? me.school };
@@ -236,8 +248,36 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   };
 
   const value: Ctx = useMemo<Ctx>(() => ({
-    ...local, content, online, refresh, openTarget, liveAlert, push, googleReady, unreadFeed, saveProfile,
+    ...local, content, online, refresh, openTarget, liveAlert, push, googleReady, unreadFeed, saveProfile, newEvents, appleReady,
+    markEventsSeen: () => {
+      if (!newEvents) return;
+      patch((s) => ({ ...s, seenEvents: [...new Set([...s.seenEvents, ...content.events.map((e) => e.id)])].slice(-300) }));
+    },
+    hideTip: () => patch((s) => ({ ...s, tipSeen: true })),
+    signInWithApple: async () => {
+      try {
+        const A = await import('expo-apple-authentication');
+        const cred = await A.signInAsync({ requestedScopes: [A.AppleAuthenticationScope.FULL_NAME] });
+        if (!cred.identityToken) return 'Apple sign-in did not finish. Try again.';
+        // Apple shares the name only the very first time; keep it as "First L."
+        const given = cred.fullName?.givenName?.trim() ?? '';
+        const family = cred.fullName?.familyName?.trim() ?? '';
+        const name = given ? `${given}${family ? ' ' + family[0].toUpperCase() + '.' : ''}` : '';
+        const me = ref.current;
+        const r = await api<{ account: { id: string; name: string; grade: string; age: number | null; gender: Gender; school?: string; google: { email: string } | null; apple?: boolean }; token: string }>('/auth/apple', { method: 'POST', body: { identityToken: cred.identityToken, name, id: me.account?.id, token: me.account?.token } });
+        const account = { id: r.account.id, token: r.token, google: r.account.google, apple: true };
+        const next = { account, name: r.account.name || name || me.name, grade: r.account.grade || me.grade, age: r.account.age ?? me.age, gender: r.account.gender || me.gender };
+        ref.current = { ...ref.current, ...next };
+        patch((s) => ({ ...s, ...next }));
+        tap(true);
+        return null;
+      } catch (e: any) {
+        if (e?.code === 'ERR_REQUEST_CANCELED') return null;
+        return msg(e);
+      }
+    },
     finishOnboarding: () => patch((s) => ({ ...s, onboarded: true })),
+    restartOnboarding: () => patch((s) => ({ ...s, onboarded: false })),
     markFeedSeen: () => {
       if (!unreadFeed) return;
       patch((s) => ({ ...s, seenPosts: [...new Set([...s.seenPosts, ...content.posts.map((p) => p.id)])].slice(-400) }));
@@ -415,7 +455,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     removeQuestion: (id) => api('/admin/inbox/remove', { method: 'POST', body: { id }, leader }).then(() => {}).catch(() => {}),
     loadPhotos: (cid) => api<{ photos: PhotoRow[] }>(`/admin/photos?challenge=${cid}`, { leader }).then((r) => r.photos).catch(() => null),
     loadPhoto: (key) => api<{ photo: string }>(`/admin/photo?key=${encodeURIComponent(key)}`, { leader }).then((r) => r.photo).catch(() => null),
-  }), [local, content, online, leader, adminOpen, push, liveAlert, googleReady, unreadFeed, flip, patch, refresh, keep, openTarget, registerToken]);
+  }), [local, content, online, leader, adminOpen, push, liveAlert, googleReady, appleReady, unreadFeed, newEvents, flip, patch, refresh, keep, openTarget, registerToken]);
 
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>;
 }

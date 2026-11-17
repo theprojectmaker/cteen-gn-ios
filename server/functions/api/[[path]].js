@@ -7,6 +7,7 @@
 //   GET  /api/auth/google/start?app=...    begins "Link with Google" (redirects to Google)
 //   GET  /api/auth/google/callback         Google returns here; redirects back to the app with a ticket
 //   POST /api/auth/redeem                  { ticket, id?, token? } -> links Google to the account, or signs in
+//   POST /api/auth/apple                   { identityToken, name?, id?, token? } -> Sign in with Apple
 //   POST /api/events/:id/signup|cancel     { id, token } (or legacy { device, name, grade })
 //   POST /api/challenges/:id/checkin       { id, token, photo? } one per day or week; photo is a small JPEG (base64)
 //   GET  /api/challenges/:id/board         top names + counts
@@ -84,7 +85,7 @@ async function getAccount(env, id, token) {
   if (!acc || !(await sameSecret(await sha(token), acc.tokenHash))) return null;
   return acc;
 }
-const publicAccount = (a) => ({ id: a.id, name: a.name, grade: a.grade, age: a.age, gender: a.gender, school: a.school || '', google: a.google ? { email: a.google.email } : null });
+const publicAccount = (a) => ({ id: a.id, name: a.name, grade: a.grade, age: a.age, gender: a.gender, school: a.school || '', apple: !!a.apple, google: a.google ? { email: a.google.email } : null });
 function profileFields(b) {
   const age = Number(b.age);
   return {
@@ -184,6 +185,30 @@ async function pushAll(env, title, body, data) {
   return { phones: tokens.length, sent };
 }
 
+// ───────── Sign in with Apple ─────────
+const APPLE_AUD = 'com.solyapps.cteengn';
+const b64url = (s) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4)), (c) => c.charCodeAt(0));
+// Checks the token Apple gave the phone: Apple's signature, our app, not expired. Returns its claims or null.
+async function verifyApple(env, jwt) {
+  const parts = String(jwt || '').split('.');
+  if (parts.length !== 3) return null;
+  let header, claims;
+  try { header = JSON.parse(new TextDecoder().decode(b64url(parts[0]))); claims = JSON.parse(new TextDecoder().decode(b64url(parts[1]))); } catch { return null; }
+  let keys = await env.CTEEN.get('apple:jwks', 'json');
+  if (!keys || !keys.find((k) => k.kid === header.kid)) {
+    const r = await fetch('https://appleid.apple.com/auth/keys').then((x) => x.json()).catch(() => null);
+    if (!r || !r.keys) return null;
+    keys = r.keys;
+    await env.CTEEN.put('apple:jwks', JSON.stringify(keys), { expirationTtl: 86400 });
+  }
+  const jwk = keys.find((k) => k.kid === header.kid);
+  if (!jwk || header.alg !== 'RS256') return null;
+  const key = await crypto.subtle.importKey('jwk', jwk, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
+  const ok = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, b64url(parts[2]), new TextEncoder().encode(parts[0] + '.' + parts[1]));
+  if (!ok || claims.iss !== 'https://appleid.apple.com' || claims.aud !== APPLE_AUD || !(claims.exp * 1000 > Date.now()) || !claims.sub) return null;
+  return claims;
+}
+
 // Only app links of this app may receive a sign-in ticket.
 const APP_RETURN = /^(cteengn:\/\/|exp:\/\/|exps:\/\/|https?:\/\/localhost(:\d+)?\/)/;
 
@@ -275,6 +300,25 @@ export async function onRequest({ request, env, params }) {
       acc.tokenHash = await sha(token); // a fresh key for this phone
       await env.CTEEN.put('account:' + acc.id, JSON.stringify(acc));
       return json({ account: publicAccount(acc), token });
+    }
+
+    if (path === 'auth/apple' && method === 'POST') {
+      const claims = await verifyApple(env, body.identityToken);
+      if (!claims) return bad('Apple sign-in did not work. Try again.', 401);
+      const existingId = await env.CTEEN.get('apple:' + claims.sub);
+      const current = body.id ? await getAccount(env, body.id, body.token) : null;
+      let acc;
+      if (existingId) acc = await env.CTEEN.get('account:' + existingId, 'json');
+      if (!acc) {
+        acc = current || { id: newId('u'), created: new Date().toISOString(), name: clean(body.name, 40), grade: '', age: null, gender: '' };
+        if (!acc.name && body.name) acc.name = clean(body.name, 40);
+        acc.apple = { sub: claims.sub };
+        await env.CTEEN.put('apple:' + claims.sub, acc.id);
+      }
+      const token = randomToken();
+      acc.tokenHash = await sha(token);
+      await env.CTEEN.put('account:' + acc.id, JSON.stringify(acc));
+      return json({ account: { ...publicAccount(acc), apple: true }, token });
     }
 
     // ── events ──

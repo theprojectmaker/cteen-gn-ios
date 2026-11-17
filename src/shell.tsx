@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { AppState, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Animated, AppState, Easing, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import * as Updates from 'expo-updates';
@@ -7,7 +7,7 @@ import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { C } from './theme';
 import { Icon } from './icons';
 import { Glass, LIQUID } from './glass';
-import { CHAPTER, doneThisPeriod, open, upcoming, useStore, type Alert } from './store';
+import { CHAPTER, doneThisPeriod, open, useStore, type Alert } from './store';
 
 // Over-the-air updates: every push to main publishes one. The app checks when it opens or comes
 // back to the front, downloads quietly, and switches to it the next time it is opened.
@@ -71,29 +71,56 @@ export function Screen({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Top-right: one glass capsule with Challenges, Events and your account, like iOS 26 toolbars.
+// Top-right: a pulsing trophy that opens the Tefillin Challenge (with a one-time tip under it)
+// and your account, in one glass capsule like iOS 26 toolbars. Events live in the tab bar.
 function HeaderButtons() {
-  const { content, fits, go, name, checks, joined } = useStore();
-  const n = upcoming(content.events).filter(fits).length;
+  const { content, name, checks, joined, tipSeen, hideTip } = useStore();
   const live = content.challenges.filter((c) => c.active);
-  const todo = live.filter((c) => joined.includes(c.id) && !doneThisPeriod(c, checks)).length; // red dot: a check-in still to do
-  const openChallenges = () => (live.length === 1 ? router.push(`/challenge/${live[0].id}`) : router.push('/challenges'));
+  const main = live.find((c) => c.id === 'tefillin') ?? live[0];
+  const due = !!main && (!joined.includes(main.id) || !doneThisPeriod(main, checks));
+  const pulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!due) { pulse.stopAnimation(); pulse.setValue(0); return; }
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(pulse, { toValue: 1, duration: 1100, easing: Easing.out(Easing.quad), useNativeDriver: Platform.OS !== 'web' }),
+      Animated.delay(500),
+    ]));
+    pulse.setValue(0);
+    loop.start();
+    return () => loop.stop();
+  }, [due]);
+  useEffect(() => {
+    if (!main || tipSeen) return;
+    const timer = setTimeout(hideTip, 9000);
+    return () => clearTimeout(timer);
+  }, [main?.id, tipSeen]);
+  const openIt = () => { hideTip(); if (main) router.push(`/challenge/${main.id}`); };
+  const ringScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.9] });
+  const ringOpacity = pulse.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0, 0.55, 0] });
+  const iconScale = pulse.interpolate({ inputRange: [0, 0.25, 0.5, 1], outputRange: [1, 1.14, 1, 1] });
   return (
-    <Glass style={st.hGroup} interactive>
-      {live.length ? (
-        <Pressable onPress={openChallenges} style={({ pressed }) => [st.hBtn, pressed && { opacity: 0.55 }]} hitSlop={4} accessibilityRole="button" accessibilityLabel="Challenges">
-          <Icon name="trophy" size={21} color={C.ink} stroke={2} />
-          {todo > 0 ? <View style={st.hDot} /> : null}
+    <View>
+      <Glass style={st.hGroup} interactive>
+        {main ? (
+          <Pressable onPress={openIt} style={({ pressed }) => [st.hBtn, pressed && { opacity: 0.55 }]} hitSlop={4} accessibilityRole="button" accessibilityLabel={main.title}>
+            {due ? <Animated.View pointerEvents="none" style={[st.ring, { opacity: ringOpacity, transform: [{ scale: ringScale }] }]} /> : null}
+            <Animated.View style={{ transform: [{ scale: iconScale }] }}>
+              <Icon name="trophy" size={22} color={due ? '#C7841F' : C.ink} stroke={2.1} />
+            </Animated.View>
+            {due ? <View style={st.hDot} /> : null}
+          </Pressable>
+        ) : null}
+        <Pressable onPress={() => router.push('/account')} style={({ pressed }) => [st.hAvatar, pressed && { opacity: 0.6 }]} hitSlop={4} accessibilityRole="button" accessibilityLabel="Your account">
+          {name ? <Text style={st.hAvatarText}>{name[0].toUpperCase()}</Text> : <Icon name="user" size={17} color={C.white} stroke={2.2} />}
+        </Pressable>
+      </Glass>
+      {main && !tipSeen ? (
+        <Pressable onPress={openIt} style={st.tip} accessibilityRole="button" accessibilityLabel={`New: ${main.title}`}>
+          <View style={st.tipArrow} />
+          <Text style={st.tipText}>{main.title}</Text>
         </Pressable>
       ) : null}
-      <Pressable onPress={() => go('Events')} style={({ pressed }) => [st.hBtn, pressed && { opacity: 0.55 }]} hitSlop={4} accessibilityRole="button" accessibilityLabel={`Events, ${n} coming up`}>
-        <Icon name="ticket" size={21} color={C.ink} stroke={2} />
-        {n > 0 ? <View style={st.hCount}><Text style={st.hCountText}>{n}</Text></View> : null}
-      </Pressable>
-      <Pressable onPress={() => router.push('/account')} style={({ pressed }) => [st.hAvatar, pressed && { opacity: 0.6 }]} hitSlop={4} accessibilityRole="button" accessibilityLabel="Your account">
-        {name ? <Text style={st.hAvatarText}>{name[0].toUpperCase()}</Text> : <Icon name="user" size={17} color={C.white} stroke={2.2} />}
-      </Pressable>
-    </Glass>
+    </View>
   );
 }
 
@@ -173,6 +200,10 @@ const st = StyleSheet.create({
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 9, borderRadius: 26, paddingLeft: 10, paddingRight: 16, height: 52, overflow: 'hidden' },
   hGroup: { flexDirection: 'row', alignItems: 'center', gap: 2, borderRadius: 26, paddingHorizontal: 6, height: 52, overflow: 'hidden' },
+  ring: { position: 'absolute', width: 40, height: 40, borderRadius: 20, backgroundColor: '#F5B81F' },
+  tip: { position: 'absolute', top: 60, right: 0, backgroundColor: C.ink, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, minWidth: 140 },
+  tipArrow: { position: 'absolute', top: -5, right: 58, width: 12, height: 12, backgroundColor: C.ink, transform: [{ rotate: '45deg' }] },
+  tipText: { color: C.white, fontSize: 13, fontWeight: '800' },
   hDot: { position: 'absolute', top: 7, right: 7, width: 9, height: 9, borderRadius: 5, backgroundColor: '#E0445C', borderWidth: 1.5, borderColor: C.white },
   footer: { marginTop: 48, alignItems: 'center' },
   footRule: { width: 40, height: 4, borderRadius: 2, backgroundColor: C.line, marginBottom: 22 },

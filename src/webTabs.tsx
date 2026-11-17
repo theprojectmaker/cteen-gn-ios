@@ -21,7 +21,7 @@ const PAD = 6;
 const NATIVE = Platform.OS !== 'web';
 
 function GlassBar({ state, navigation }: BarProps) {
-  const { unreadFeed } = useStore();
+  const { unreadFeed, newEvents } = useStore();
   const routes = state.routes.filter((r) => ITEMS[r.name]);
   const [rowW, setRowW] = useState(0);
   const slot = rowW ? rowW / routes.length : 0;
@@ -84,7 +84,7 @@ function GlassBar({ state, navigation }: BarProps) {
           {routes.map((r, i) => {
             const item = ITEMS[r.name];
             const on = state.index === i;
-            const badge = r.name === 'feed' && unreadFeed > 0 ? unreadFeed : 0;
+            const badge = r.name === 'feed' ? unreadFeed : r.name === 'events' ? newEvents : 0;
             // Icons swell as the lens passes over them, like looking through a drop of water.
             const mag = slot
               ? x.interpolate({ inputRange: [(i - 1) * slot, i * slot, (i + 1) * slot], outputRange: [1, 1.22, 1], extrapolate: 'clamp' })

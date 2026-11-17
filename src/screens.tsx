@@ -113,7 +113,8 @@ function ShabbatCard() {
 const EVENT_FILTERS = ['All', 'Great Neck', 'International', 'Saved'] as const;
 
 export function Events() {
-  const { saved, content, fits } = useStore();
+  const { saved, content, fits, markEventsSeen } = useStore();
+  useFocusEffect(useCallback(() => { markEventsSeen(); }, [markEventsSeen]));
   const [f, setF] = useState<(typeof EVENT_FILTERS)[number]>('All');
   const list = upcoming(content.events).filter(fits).filter((e) => (f === 'All' ? true : f === 'Saved' ? saved.includes(e.id) : f === 'Great Neck' ? e.scope === 'gn' : e.scope === 'intl'));
   return (

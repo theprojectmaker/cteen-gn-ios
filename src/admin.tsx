@@ -267,7 +267,7 @@ export function AdminPanel() {
               {rows.map((r, i) => (
                 <View key={i} style={st.signRow}>
                   <Text style={[T.h3, { flex: 1 }]}>{r.name}</Text>
-                  <Text style={T.small}>{[r.grade ? `Grade ${r.grade}` : '', r.age ? `Age ${r.age}` : '', r.gender === 'girl' ? 'Girl' : r.gender === 'boy' ? 'Boy' : '', r.school || ''].filter(Boolean).join(' · ')}</Text>
+                  <Text style={T.small}>{[r.grade ? `Grade ${r.grade}` : '', r.age ? `Age ${r.age}` : '', r.gender === 'girl' ? 'Girl' : r.gender === 'boy' ? 'Boy' : ''].filter(Boolean).join(' · ')}</Text>
                 </View>
               ))}
             </Card>

@@ -5,20 +5,11 @@ import { C, R } from './theme';
 import { Icon } from './icons';
 import { tap, useStore, type Gender } from './store';
 
-// First-launch setup: one question per screen, big tap targets, a progress bar, and a
-// finish screen. Everything can be changed later from the account page.
-const SCHOOLS = [
-  'Great Neck North High',
-  'Great Neck South High',
-  'North Shore Hebrew Academy',
-  'Village School',
-  'Great Neck North Middle',
-  'Great Neck South Middle',
-  'Another school',
-];
+// First-launch setup (required to use the app): one question per screen, big tap targets,
+// a progress bar, and a finish screen. Everything can be changed later from the account page.
 const GRADES = ['8', '9', '10', '11', '12'];
 const AGES = [12, 13, 14, 15, 16, 17, 18];
-const STEPS = 5; // questions after the welcome screen: name, school, you, notifications, done
+const STEPS = 4; // after the welcome screen: name, about you, notifications, done
 
 function Progress({ step }: { step: number }) {
   return (
@@ -58,10 +49,9 @@ function Pill({ label, on, onPress }: { label: string; on: boolean; onPress: () 
 export function Setup() {
   const insets = useSafeAreaInsets();
   const store = useStore();
-  const { device, onboarded, name: savedName, finishOnboarding, saveProfile, push, turnOnPush, googleReady, linkGoogle } = store;
+  const { device, onboarded, name: savedName, finishOnboarding, saveProfile, push, turnOnPush, googleReady, linkGoogle, appleReady, signInWithApple } = store;
   const [step, setStep] = useState(0);
   const [name, setName] = useState(savedName);
-  const [school, setSchool] = useState(store.school);
   const [grade, setGrade] = useState(store.grade);
   const [age, setAge] = useState<number | null>(store.age);
   const [gender, setGender] = useState<Gender>(store.gender);
@@ -70,13 +60,13 @@ export function Setup() {
   const fade = useRef(new Animated.Value(1)).current;
   const slide = useRef(new Animated.Value(0)).current;
 
-  // Opens on first launch and stays open until the teen finishes or skips, even after the name is saved.
-  const [open, setOpen] = useState(false);
+  // Required: shows until the last screen sets onboarded. Someone who skipped setup in an older
+  // version (onboarded but no name) is sent through it again.
   useEffect(() => {
-    if (onboarded) setOpen(false);
-    else if (device && !savedName) setOpen(true);
+    if (device && onboarded && !savedName) store.restartOnboarding();
   }, [device, onboarded, savedName]);
-  const show = open;
+  const done = () => finishOnboarding();
+  const show = !!device && !onboarded;
   useEffect(() => {
     fade.setValue(0); slide.setValue(24);
     Animated.parallel([
@@ -90,20 +80,20 @@ export function Setup() {
   const go = (n: number) => { setErr(null); tap(); setStep(n); };
   const saveAndNext = async () => {
     setBusy(true); setErr(null);
-    const e = await saveProfile({ name, school, grade, age, gender });
+    const e = await saveProfile({ name, grade, age, gender });
     setBusy(false);
     if (e) return setErr(e);
-    go(4);
+    go(3);
   };
 
-  const canNext = [true, name.trim().length >= 2, !!school && !!grade, age != null && !!gender, true, true][step];
+  const canNext = [true, name.trim().length >= 2, !!grade && age != null && !!gender, true, true][step];
   let body: React.ReactNode;
   let cta = 'Continue';
   let onCta: () => void = () => go(step + 1);
 
   if (step === 0) {
     return (
-      <Modal visible animationType="fade" onRequestClose={finishOnboarding} statusBarTranslucent>
+      <Modal visible animationType="fade" onRequestClose={() => {}} statusBarTranslucent>
         <View style={[st.hero, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}>
           <View style={[st.blob, { backgroundColor: '#5fd6ff', top: -120, right: -100 }]} />
           <View style={[st.blob, { backgroundColor: '#0a4f86', bottom: -140, left: -120 }]} />
@@ -118,9 +108,26 @@ export function Setup() {
             </View>
           </Animated.View>
           <View style={st.heroBottom}>
-            <Pressable onPress={() => go(1)} style={({ pressed }) => [st.heroBtn, pressed && { opacity: 0.9 }]} accessibilityRole="button">
-              <Text style={st.heroBtnText}>Get started</Text>
-              <Icon name="arrow" size={18} color={C.blueDeep} stroke={2.4} />
+            {appleReady ? (
+              <Pressable
+                onPress={async () => {
+                  setErr(null);
+                  const e = await signInWithApple();
+                  if (e) return setErr(e);
+                  const n = store.name || '';
+                  setName((cur) => cur || n);
+                  go(n.trim().length >= 2 ? 2 : 1);
+                }}
+                style={({ pressed }) => [st.appleBtn, pressed && { opacity: 0.9 }]}
+                accessibilityRole="button"
+                accessibilityLabel="Continue with Apple">
+                <Text style={st.appleLogo}>{'\uF8FF'}</Text>
+                <Text style={st.appleText}>Continue with Apple</Text>
+              </Pressable>
+            ) : null}
+            <Pressable onPress={() => go(1)} style={({ pressed }) => [st.heroBtn, appleReady && { marginTop: 12, backgroundColor: 'rgba(255,255,255,0.18)' }, pressed && { opacity: 0.9 }]} accessibilityRole="button">
+              <Text style={[st.heroBtnText, appleReady && { color: C.white }]}>{appleReady ? 'Sign up with your name' : 'Get started'}</Text>
+              <Icon name="arrow" size={18} color={appleReady ? C.white : C.blueDeep} stroke={2.4} />
             </Pressable>
             {googleReady && Platform.OS !== 'web' ? (
               <Pressable onPress={async () => { const e = await linkGoogle(); if (e) setErr(e); }} hitSlop={8} style={{ marginTop: 16 }} accessibilityRole="button">
@@ -154,26 +161,16 @@ export function Setup() {
       </>
     );
   } else if (step === 2) {
-    body = (
-      <>
-        <Text style={st.q}>Where do you go{first ? `, ${first}` : ''}?</Text>
-        <Text style={st.qSub}>So we can plan things at your school and with your friends.</Text>
-        <View style={{ gap: 10, marginTop: 22 }}>
-          {SCHOOLS.map((s) => <Choice key={s} label={s} on={school === s} onPress={() => setSchool(s)} />)}
-        </View>
-        <Text style={st.label}>Grade</Text>
-        <View style={st.pills}>
-          {GRADES.map((g) => <Pill key={g} label={`${g}th`} on={grade === g} onPress={() => setGrade(g)} />)}
-        </View>
-      </>
-    );
-  } else if (step === 3) {
     cta = busy ? 'Saving…' : 'Continue';
     onCta = saveAndNext;
     body = (
       <>
-        <Text style={st.q}>A bit about you</Text>
+        <Text style={st.q}>A bit about you{first ? `, ${first}` : ''}</Text>
         <Text style={st.qSub}>Some events are for a certain age, or are a girls' or boys' night. This makes sure you see the right ones.</Text>
+        <Text style={st.label}>Grade</Text>
+        <View style={st.pills}>
+          {GRADES.map((g) => <Pill key={g} label={`${g}th`} on={grade === g} onPress={() => setGrade(g)} />)}
+        </View>
         <Text style={st.label}>Age</Text>
         <View style={st.pills}>
           {AGES.map((a) => <Pill key={a} label={a === 18 ? '18+' : String(a)} on={age === a} onPress={() => setAge(a)} />)}
@@ -189,10 +186,10 @@ export function Setup() {
         </View>
       </>
     );
-  } else if (step === 4) {
+  } else if (step === 3) {
     const native = push !== 'unsupported';
     cta = native && push === 'off' ? 'Turn on notifications' : 'Continue';
-    onCta = native && push === 'off' ? async () => { await turnOnPush(); go(5); } : () => go(5);
+    onCta = native && push === 'off' ? async () => { await turnOnPush(); go(4); } : () => go(4);
     body = (
       <View style={{ alignItems: 'center', paddingTop: 24 }}>
         <View style={st.bellWrap}>
@@ -206,7 +203,7 @@ export function Setup() {
     );
   } else {
     cta = "Let's go";
-    onCta = () => { tap(true); finishOnboarding(); };
+    onCta = () => { tap(true); done(); };
     body = (
       <View style={{ alignItems: 'center', paddingTop: 24 }}>
         <View style={[st.bellWrap, { backgroundColor: C.green }]}>
@@ -215,7 +212,7 @@ export function Setup() {
         <Text style={[st.q, { textAlign: 'center', marginTop: 28 }]}>You're in{first ? `, ${first}` : ''}</Text>
         <Text style={[st.qSub, { textAlign: 'center' }]}>Welcome to CTeen Great Neck. Here's your profile.</Text>
         <View style={st.summary}>
-          {[name.trim(), school, grade ? `${grade}th grade` : '', age ? `Age ${age === 18 ? '18+' : age}` : ''].filter(Boolean).map((t) => (
+          {[name.trim(), grade ? `${grade}th grade` : '', age ? `Age ${age === 18 ? '18+' : age}` : ''].filter(Boolean).map((t) => (
             <View key={t} style={st.tag}><Text style={st.tagText}>{t}</Text></View>
           ))}
         </View>
@@ -225,16 +222,14 @@ export function Setup() {
   }
 
   return (
-    <Modal visible animationType="fade" onRequestClose={finishOnboarding}>
+    <Modal visible animationType="fade" onRequestClose={() => step > 1 && step < 4 && go(step - 1)}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: C.bg }}>
         <View style={[st.top, { paddingTop: insets.top + 10 }]}>
-          <Pressable onPress={() => go(step - 1)} hitSlop={10} style={st.back} accessibilityRole="button" accessibilityLabel="Back" disabled={step >= 5}>
-            {step < 5 ? <Icon name="right" size={20} color={C.ink} stroke={2.4} /> : null}
+          <Pressable onPress={() => go(step - 1)} hitSlop={10} style={st.back} accessibilityRole="button" accessibilityLabel="Back" disabled={step >= 4}>
+            {step < 4 ? <Icon name="right" size={20} color={C.ink} stroke={2.4} /> : null}
           </Pressable>
           <Progress step={step} />
-          <Pressable onPress={finishOnboarding} hitSlop={10} accessibilityRole="button" style={{ width: 44, alignItems: 'flex-end' }}>
-            {step < 5 ? <Text style={st.skip}>Skip</Text> : null}
-          </Pressable>
+          <View style={{ width: 44 }} />
         </View>
         <ScrollView contentContainerStyle={st.scroll} keyboardShouldPersistTaps="handled">
           <Animated.View style={{ opacity: fade, transform: [{ translateX: slide }] }}>{body}</Animated.View>
@@ -244,8 +239,8 @@ export function Setup() {
           <Pressable onPress={onCta} disabled={!canNext || busy} style={({ pressed }) => [st.cta, (!canNext || busy) && { opacity: 0.4 }, pressed && { opacity: 0.85 }]} accessibilityRole="button" accessibilityState={{ disabled: !canNext || busy }}>
             <Text style={st.ctaText}>{cta}</Text>
           </Pressable>
-          {step === 4 && push === 'off' ? (
-            <Pressable onPress={() => go(5)} hitSlop={8} style={{ alignSelf: 'center', marginTop: 14 }} accessibilityRole="button">
+          {step === 3 && push === 'off' ? (
+            <Pressable onPress={() => go(4)} hitSlop={8} style={{ alignSelf: 'center', marginTop: 14 }} accessibilityRole="button">
               <Text style={st.skip}>Not now</Text>
             </Pressable>
           ) : null}
@@ -276,6 +271,9 @@ const st = StyleSheet.create({
   featureText: { flex: 1, color: C.white, fontSize: 16, fontWeight: '700' },
   heroBottom: { alignItems: 'center', maxWidth: 480, width: '100%', alignSelf: 'center' },
   heroBtn: { width: '100%', minHeight: 56, borderRadius: R.pill, backgroundColor: C.white, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  appleBtn: { width: '100%', minHeight: 56, borderRadius: R.pill, backgroundColor: '#000', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  appleLogo: { color: '#fff', fontSize: 22, marginTop: -3 },
+  appleText: { color: '#fff', fontSize: 18, fontWeight: '800' },
   heroBtnText: { color: C.blueDeep, fontSize: 18, fontWeight: '900' },
   heroLink: { color: C.white, fontSize: 15, fontWeight: '700', textDecorationLine: 'underline' },
   top: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingBottom: 6, maxWidth: 600, width: '100%', alignSelf: 'center' },

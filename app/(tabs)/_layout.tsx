@@ -10,7 +10,7 @@ import { WebTabs } from '../../src/webTabs';
 // The tab bar is Apple's own (UITabBarController): real Liquid Glass on iOS 26, with the
 // sliding selection, and it shrinks while you scroll down. The web preview draws its own.
 export default function TabsLayout() {
-  const { liveAlert, unreadFeed } = useStore();
+  const { liveAlert, unreadFeed, newEvents } = useStore();
   if (Platform.OS === 'web') return <WebTabs />;
   return (
     <NativeTabs tintColor={C.blue} minimizeBehavior="onScrollDown" labelStyle={{ fontWeight: '600' }}>
@@ -26,6 +26,7 @@ export default function TabsLayout() {
       <NativeTabs.Trigger name="events">
         <NativeTabs.Trigger.Icon sf={{ default: 'ticket', selected: 'ticket.fill' }} />
         <NativeTabs.Trigger.Label>Events</NativeTabs.Trigger.Label>
+        {newEvents > 0 ? <NativeTabs.Trigger.Badge>{String(newEvents)}</NativeTabs.Trigger.Badge> : null}
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="feed">
         <NativeTabs.Trigger.Icon sf={{ default: 'bubble.left.and.bubble.right', selected: 'bubble.left.and.bubble.right.fill' }} />

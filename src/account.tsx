@@ -7,7 +7,6 @@ import { useStore, type Gender } from './store';
 import { Button, Card, Field, s as u } from './ui';
 
 const GRADES = ['8', '9', '10', '11', '12'];
-const SCHOOL_OPTS = ['GN North High', 'GN South High', 'NSHA', 'Village School', 'GN North Middle', 'GN South Middle', 'Another school'].map((l, i) => ({ v: ['Great Neck North High', 'Great Neck South High', 'North Shore Hebrew Academy', 'Village School', 'Great Neck North Middle', 'Great Neck South Middle', 'Another school'][i], l }));
 const AGES = [12, 13, 14, 15, 16, 17, 18];
 const GENDERS: { v: Gender; l: string }[] = [{ v: 'boy', l: 'Boy' }, { v: 'girl', l: 'Girl' }];
 
@@ -32,18 +31,17 @@ function ChipRow<V extends string | number>({ label, options, value, onChange, h
 
 // Name, grade, age and gender. Age and gender decide which special events (like a girls' night) you see.
 export function ProfileForm({ cta, onSaved }: { cta: string; onSaved?: () => void }) {
-  const { name, grade, age, gender, school, saveProfile } = useStore();
+  const { name, grade, age, gender, saveProfile } = useStore();
   const [n, setN] = useState(name);
   const [g, setG] = useState(grade);
   const [a, setA] = useState<number | null>(age);
   const [s, setS] = useState<Gender>(gender);
-  const [sc, setSc] = useState(school);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  useEffect(() => { setN(name); setG(grade); setA(age); setS(gender); setSc(school); }, [name, grade, age, gender, school]);
+  useEffect(() => { setN(name); setG(grade); setA(age); setS(gender); }, [name, grade, age, gender]);
   const save = async () => {
     setBusy(true); setErr(null);
-    const e = await saveProfile({ name: n, grade: g, age: a, gender: s, school: sc });
+    const e = await saveProfile({ name: n, grade: g, age: a, gender: s });
     setBusy(false);
     if (e) return setErr(e);
     onSaved?.();
@@ -51,7 +49,6 @@ export function ProfileForm({ cta, onSaved }: { cta: string; onSaved?: () => voi
   return (
     <View>
       <Field label="Your name" value={n} onChange={setN} placeholder="Like: Noah S." hint="First name and last initial is perfect." />
-      <ChipRow label="School" options={SCHOOL_OPTS} value={sc || null} onChange={setSc} />
       <ChipRow label="Grade" options={GRADES.map((x) => ({ v: x, l: `${x}th` }))} value={g || null} onChange={setG} />
       <ChipRow label="Age" options={AGES.map((x) => ({ v: x, l: x === 18 ? '18+' : String(x) }))} value={a} onChange={setA} />
       <ChipRow label="I'm a" options={GENDERS} value={s || null} onChange={setS} hint="Used only to show you events made for you, like a girls' or boys' night." />
@@ -59,6 +56,31 @@ export function ProfileForm({ cta, onSaved }: { cta: string; onSaved?: () => voi
       <View style={{ marginTop: 24 }}>
         <Button label={busy ? 'Saving…' : cta} disabled={busy || n.trim().length < 2} onPress={save} />
       </View>
+    </View>
+  );
+}
+
+function AppleRow() {
+  const { account, appleReady, signInWithApple } = useStore();
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  if (!appleReady) return null;
+  if (account?.apple) {
+    return (
+      <View style={[st.row, { marginBottom: 16 }]}>
+        <View style={[st.gBadge, { backgroundColor: '#000' }]}><Text style={[st.gLetter, { color: '#fff' }]}>{''}</Text></View>
+        <Text style={[T.h3, { flex: 1 }]}>Signed in with Apple</Text>
+        <Icon name="check" size={20} color={C.green} />
+      </View>
+    );
+  }
+  return (
+    <View style={{ marginBottom: 16 }}>
+      <Pressable onPress={async () => { setBusy(true); setErr(await signInWithApple()); setBusy(false); }} disabled={busy} style={({ pressed }) => [st.gButton, { backgroundColor: '#000', borderColor: '#000' }, pressed && u.pressed]} accessibilityRole="button" accessibilityLabel="Sign in with Apple">
+        <Text style={{ color: '#fff', fontSize: 20, marginTop: -2 }}>{''}</Text>
+        <Text style={[st.gText, { color: '#fff' }]}>{busy ? 'Opening…' : 'Sign in with Apple'}</Text>
+      </Pressable>
+      {err ? <Text style={st.err}>{err}</Text> : null}
     </View>
   );
 }
@@ -116,6 +138,7 @@ export function AccountPage() {
       </Card>
       <Text style={st.section}>Sign in</Text>
       <Card style={{ padding: 20 }}>
+        <AppleRow />
         <GoogleRow />
       </Card>
       {account ? (
