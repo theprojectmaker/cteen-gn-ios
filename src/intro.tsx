@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Image, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Image, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { C, PREFS } from './theme';
 
 // Opening animation (about 2 seconds, tap to skip): the CTeen tile drops in with a glow,
@@ -35,9 +35,8 @@ export function Intro() {
   const skip = () => {
     Animated.timing(out, { toValue: 1, duration: 240, useNativeDriver: ND }).start(() => setDone(true));
   };
-  // In its own see-through window so it also plays above the first-launch setup.
+  // A plain overlay above the app (no second window, so it can never clash with another sheet).
   return (
-    <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={skip}>
     <Animated.View
       style={[StyleSheet.absoluteFill, st.root, { opacity: out.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }), transform: [{ scale: out.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] }) }] }]}>
       <Pressable style={StyleSheet.absoluteFill} onPress={skip} accessibilityRole="button" accessibilityLabel="Skip intro" />
@@ -76,7 +75,6 @@ export function Intro() {
         </View>
       </View>
     </Animated.View>
-    </Modal>
   );
 }
 

@@ -1,17 +1,25 @@
-import React from 'react';
-import { Appearance, Platform } from 'react-native';
+import React, { useEffect } from 'react';
+import { Appearance, Platform, Pressable, Text, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { C, IS_DARK, PREFS } from '../src/theme';
-import { StoreProvider } from '../src/store';
+import { StoreProvider, useStore } from '../src/store';
 import { AdminPanel } from '../src/admin';
 import { Setup } from '../src/setup';
 import { Intro } from '../src/intro';
 import { useOtaUpdates } from '../src/shell';
 
-// Make Apple's own pieces (tab bar, sheets, keyboard) follow Settings > Appearance too.
-if (Platform.OS !== 'web') {
-  try { Appearance.setColorScheme(PREFS.theme === 'system' ? 'unspecified' : PREFS.theme); } catch {}
+// If anything throws while drawing, show this instead of closing the app.
+export function ErrorBoundary({ error, retry }: { error: Error; retry: () => Promise<void> }) {
+  return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 30, backgroundColor: C.bg }}>
+      <Text style={{ fontSize: 22, fontWeight: '900', color: C.ink, textAlign: 'center' }}>Something went wrong</Text>
+      <Text style={{ fontSize: 14, color: C.sub, textAlign: 'center', marginTop: 8 }}>{String(error?.message || error).slice(0, 200)}</Text>
+      <Pressable onPress={() => { retry(); }} style={{ marginTop: 22, paddingHorizontal: 26, height: 48, borderRadius: 24, backgroundColor: C.blue, justifyContent: 'center' }} accessibilityRole="button">
+        <Text style={{ color: '#fff', fontWeight: '800', fontSize: 16 }}>Try again</Text>
+      </Pressable>
+    </View>
+  );
 }
 
 const page = { headerTransparent: true, headerTitle: '', headerBackTitle: 'Back', headerTintColor: C.ink } as const;
@@ -19,6 +27,12 @@ const page = { headerTransparent: true, headerTitle: '', headerBackTitle: 'Back'
 // Tabs at the bottom; other pages slide in on top with a native back button (swipe from the edge to go back).
 function Root() {
   useOtaUpdates();
+  const { onboarded, device } = useStore();
+  // Make Apple's own pieces (tab bar, sheets, keyboard) follow Settings > Appearance, after the first frame.
+  useEffect(() => {
+    if (Platform.OS === 'web' || PREFS.theme === 'system') return;
+    try { Appearance.setColorScheme(PREFS.theme); } catch {}
+  }, []);
   return (
     <>
       <StatusBar style={IS_DARK ? 'light' : 'dark'} />
@@ -34,7 +48,7 @@ function Root() {
       </Stack>
       <AdminPanel />
       <Setup />
-      <Intro />
+      {device && onboarded ? <Intro /> : null}
     </>
   );
 }
