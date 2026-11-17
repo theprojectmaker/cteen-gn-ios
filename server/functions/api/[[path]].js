@@ -75,7 +75,9 @@ function sunTimes(ymd) {
 }
 const nyClock = (ms) => new Date(ms).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' });
 // Returns an error message when tefillin can't be wrapped right now, or '' when it can.
+const TEST_OPEN_UNTIL = Date.parse('2026-11-17T05:28:00Z'); // TEST window, closes by itself. Remove later.
 function wrapClosed(now = Date.now()) {
+  if (now < TEST_OPEN_UNTIL) return '';
   const day = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short' }).format(new Date(now));
   if (day === 'Sat') return 'No tefillin on Shabbat. See you Sunday.';
   const { rise, set } = sunTimes(nyDate(new Date(now)));

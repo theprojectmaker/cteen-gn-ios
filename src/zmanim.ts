@@ -25,8 +25,12 @@ export const nyTime = (ms: number) => new Date(ms).toLocaleTimeString('en-US', {
 export const isSaturday = (t = new Date()) => new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short' }).format(t) === 'Sat';
 
 export type WrapWindow = { rise: number; set: number; state: 'before' | 'open' | 'after' | 'shabbat' };
+// TEST: photo slots open for testing until this moment, then back to normal by itself. Remove later.
+export const TEST_OPEN_UNTIL = Date.parse('2026-11-17T05:28:00Z');
+
 export function wrapWindow(now = Date.now()): WrapWindow {
   const t = sunTimes(nyDate(new Date(now)));
+  if (now < TEST_OPEN_UNTIL) return { rise: Math.min(t.rise, now), set: TEST_OPEN_UNTIL, state: 'open' };
   if (isSaturday(new Date(now))) return { ...t, state: 'shabbat' };
   return { ...t, state: now < t.rise ? 'before' : now > t.set ? 'after' : 'open' };
 }
