@@ -13,6 +13,8 @@ Remove your line when it ships.
 
 ## Log
 
+- 2026-11-17 · Solomon · WHY BUILD 16 LOOKED OLD: build 16 was made from db93523; the next two pushes (f489adf, 27e8a70) had their builds replaced by the icon push (build 17 = e211e10, has everything). Build 15 looked newer only because it kept pulling OTAs (all builds 13-16 share runtime 2e12f331...), and a freshly installed build always opens with its own built-in code first. Fix: useOtaUpdates now reloads straight into a newer update if it downloads within 8 s of opening. Lesson: when telling the user which build to install, check which commit it was made from (gh run view, "HEAD is now at").
+
 - 2026-11-17 · Solomon · New app icon (assets/icon.png): deep navy, the CTeen logo centered, small spaced GREAT NECK. Native change, so it needs this TestFlight build (OTA cannot change icons).
 
 - 2026-11-17 · Solomon · Streak flame is now Apple's SF Symbol (expo-symbols flame.fill multicolor, bounce on lighting; unlit = grey outline) instead of the drawn fire. Live banner is a card at the top of every page (LIVE tag, event photo, tap to open), no longer in the tab bar accessory; banners and notifications can link to an event. Leader panel Simple home rebuilt: Live now (turn off banner/pop-up), Share grid (New post opens the composer, Notification, Live banner, Event, Food, Pop-up, From WhatsApp), Manage list; new notification-only task. Inbox in Settings (app/inbox.tsx, server log broadcasts: notifications, banners, pop-ups, new posts/events). Chapter page rebuilt (photo header, Call/Directions/Instagram/Ask, Minyan, tidy lists). Server deployed.

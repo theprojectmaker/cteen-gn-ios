@@ -21,6 +21,7 @@ export function useOtaUpdates() {
     if (__DEV__ || !Updates.isEnabled) return;
     let ready = false;
     let busy = false;
+    const openedAt = Date.now();
     const check = async () => {
       if (ready) { Updates.reloadAsync().catch(() => {}); return; }
       if (busy) return;
@@ -28,6 +29,10 @@ export function useOtaUpdates() {
       try {
         const r = await Updates.checkForUpdateAsync();
         if (r.isAvailable) ready = (await Updates.fetchUpdateAsync()).isNew;
+        // Fresh install or long gap: if the newer code arrives in the first few seconds (while the
+        // opening animation plays), switch to it right away instead of waiting for the next open.
+        // Otherwise a newly installed TestFlight build shows its older built-in code first.
+        if (ready && Date.now() - openedAt < 8000) { Updates.reloadAsync().catch(() => {}); return; }
       } catch { /* offline: try again next time */ }
       busy = false;
     };
