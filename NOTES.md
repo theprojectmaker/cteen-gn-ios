@@ -13,6 +13,7 @@ Remove your line when it ships.
 
 ## Log
 
+- 2026-11-17 · Solomon · Autosave: after every Claude reply, scripts/autosave.cjs uploads the whole folder (unfinished edits too) to branch autosave/<git name>; it never touches main, so nothing ships. whats-new.cjs tells the other person when that snapshot changes.
 - 2026-11-17 · Solomon · Personal invitations: content.invites (title, message with {name}, details, eventId, image, audience, until, remind). Home + Events (event-linked) show an invite card until answered (src/invites.tsx); app/invite/[id].tsx is the letter-style card with I'm in / Not this time; yes also RSVPs to the linked event; answers saved per device (Local.invites) and on the server (inviteans:<id>, POST /api/invites/:id/respond, GET /api/admin/invite-responses). New invitation = push You're invited + inbox. Reminders 10 AM + 6 PM until answered, scheduled on the phone (inv-* ids). Leader panel > Invitation (InviteForm in src/leaderEvents.tsx) with who said yes/no and an on/off switch. Fewer decorative icons (Chapter lists and Home rows are text only). Server deployed.
 
 - 2026-11-17 · Solomon · Background is now a light cyan-tinted white #F2F6F9 (was beige). Chapter page: logo with no white box, This Shabbat card (Teen Minyan time big, countdown, candle lighting / Shabbat ends), Rabbi Zevy & Shani card (Call, Ask), next event at the Chabad house, iOS Settings-style lists with colored icon squares (Directions, Call, Instagram, Shul schedule; About CTeen; More). Events title matches Feed (big Events + subtitle).

@@ -39,6 +39,12 @@ message. It keeps this folder on the newest code:
 - **Unsaved edits:** it changes nothing and says so. Commit, then `git pull --rebase origin main`.
 - **Builds:** it reads the public builds repo and reports builds and OTA updates that started,
   finished, failed, or were replaced because two pushes landed close together.
+- **Work in progress:** after every Claude reply, `scripts/autosave.cjs` (Stop hook) uploads a
+  snapshot of this whole folder, unfinished edits included, to the branch `autosave/<git name>`.
+  It never touches `main`, your files or your commits, so it never ships anything. The other
+  person's Claude is told when that snapshot changes and which files differ from `main`
+  (`git diff origin/main origin/autosave/<name>` shows the code). Finished work still ships the
+  normal way: checks, NOTES.md line, push to `main`.
 
 **Whenever it prints anything, stop and tell your human what it says (what the other person
 changed, a clash, two builds at once, a failed build) before doing anything else.** If you opened
@@ -132,6 +138,7 @@ preview misses. `dist/` is ignored by git.
 | `server/` | The chapter server (Cloudflare). Only Solomon can deploy it |
 | `.github/workflows/trigger-build.yml` | Hands each push on `main` to the public build repo (OTA + TestFlight) |
 | `scripts/whats-new.cjs` | Auto-pulls/merges the other person's work and reports builds |
+| `scripts/autosave.cjs` | Uploads unfinished work to `autosave/<name>` after every Claude reply |
 
 Design: light theme, CTeen cyan `#0BAFE6` + orange `#FF7A2F` (C.orange for actions) on light cyan-white `#F2F6F9`, headlines in Bricolage Grotesque (`fontFamily: F.display`
 from `src/theme.ts`, no `fontWeight` with it), body in Apple's system font, white cards on a pale

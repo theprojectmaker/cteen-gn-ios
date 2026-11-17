@@ -86,8 +86,25 @@ function syncCode() {
 
   if (!quiet && ahead && !behind) out.push(`This folder has ${plural(ahead, 'commit')} not on GitHub yet. Pushing to main sends an OTA update and a TestFlight build.`);
 
+  // The other person's unfinished work, uploaded by scripts/autosave.cjs after each Claude reply.
+  const me = (tryGit(['config', 'user.name']) || '').toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
+  const remote = tryGit(['branch', '-r', '--no-merged', 'origin/main']).split('\n').map((b) => b.trim()).filter((b) => b && !b.includes('->'));
+  const saves = remote.filter((b) => b.startsWith('origin/autosave/') && b !== `origin/autosave/${me}`);
+  const seenFile = path.join(gitDir, 'whats-new-autosave.json');
+  let seenSaves = {};
+  try { seenSaves = JSON.parse(fs.readFileSync(seenFile, 'utf8')); } catch { /* first run */ }
+  for (const b of saves) {
+    const sha = tryGit(['rev-parse', b]);
+    if (quiet && seenSaves[b] === sha) continue;
+    seenSaves[b] = sha;
+    const when = tryGit(['log', '-1', '--format=%ar', b]);
+    const changed = tryGit(['diff', '--stat', '--stat-width=100', 'origin/main', b]).split('\n').slice(-10).join('\n');
+    out.push(`[CTeen GN] ${b.replace('origin/autosave/', '')}'s work in progress (autosaved ${when}, not shipped yet), compared with main:\n${changed || '  (same as main)'}\nTo look at it: git diff origin/main ${b}. Tell your human what they are working on.`);
+  }
+  fs.writeFileSync(seenFile, JSON.stringify(seenSaves));
+
   if (!quiet) {
-    const others = tryGit(['branch', '-r', '--no-merged', 'origin/main']).split('\n').map((b) => b.trim()).filter((b) => b && !b.includes('->'));
+    const others = remote.filter((b) => !b.startsWith('origin/autosave/'));
     if (others.length) out.push('Branches on GitHub not merged into main yet: ' + others.join(', '));
     let notes = '';
     try { notes = git(['show', 'origin/main:NOTES.md']); } catch { /* no notes yet */ }
