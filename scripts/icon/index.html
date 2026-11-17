@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CTeen GN icon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@700&display=block" rel="stylesheet">
+<style>
+  :root { --bg: #eef2f6; --ink: #13202c; }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--ink); font: 14px system-ui, sans-serif; }
+  .row { display: flex; gap: 24px; align-items: flex-end; flex-wrap: wrap; }
+  #big { width: min(512px, 100%); height: auto; border-radius: 22.37%; box-shadow: 0 8px 30px rgba(0,0,0,.18); }
+  #small { width: 60px; height: 60px; border-radius: 13px; }
+  #mid { width: 120px; height: 120px; border-radius: 27px; }
+  button { margin-top: 16px; font: 600 15px system-ui; padding: 10px 18px; border-radius: 10px; border: 0; background: #159fdc; color: #fff; }
+</style>
+</head>
+<body>
+<div class="row">
+  <canvas id="c" width="1024" height="1024" hidden></canvas>
+  <img id="big" alt="Icon, large">
+  <img id="mid" alt="Icon, medium">
+  <img id="small" alt="Icon, home-screen size">
+</div>
+<button id="save">Save to assets/icon.png</button>
+<p id="status"></p>
+<script>
+// Layout of the icon (1024 x 1024). The CTeen logo's blue and tan panels are
+// stretched edge to edge; "GREAT NECK" sits above the big C.
+const BLUE = 'rgb(43,199,247)';
+const TAN = 'rgb(234,181,122)';
+const TEXT = 'GREAT NECK';
+
+async function draw() {
+  await document.fonts.load('700 120px Fredoka');
+  const logo = new Image();
+  logo.src = '/logo.png';
+  await logo.decode();
+
+  // Find where the logo turns from blue to tan (first tan row near the left edge).
+  const probe = document.createElement('canvas');
+  probe.width = logo.width; probe.height = logo.height;
+  const pc = probe.getContext('2d');
+  pc.drawImage(logo, 0, 0);
+  const px = pc.getImageData(0, 0, logo.width, logo.height).data;
+  const at = (x, y) => px.slice((y * logo.width + x) * 4, (y * logo.width + x) * 4 + 3);
+  let split = 0;
+  for (let y = 20; y < logo.height; y++) { const [r, g, b] = at(12, y); if (r > 180 && b < 160) { split = y; break; } }
+
+  // Top of the white C (first row with white pixels in the blue panel).
+  let cTop = 0;
+  for (let y = 12; y < split && !cTop; y++) for (let x = 20; x < logo.width - 20; x++) { const [r, g, b] = at(x, y); if (r > 230 && g > 230 && b > 230) { cTop = y; break; } }
+
+  const c = document.getElementById('c');
+  const ctx = c.getContext('2d');
+  const S = 1024;
+  const cropBottom = logo.height - 10, cropL = 3, cropR = logo.width - 3; // skip the logo's rounded corners
+  const W = cropR - cropL;
+
+  // Tan "teen" band, full width along the bottom
+  const tScale = 1.5;
+  const bandTop = S - (cropBottom - split) * tScale;
+
+  // Blue panel with the C: scaled on its own so it fits between the text and the band
+  const cSrcTop = Math.max(12, cTop - 6);
+  const cDestTop = 318;
+  const cScale = (bandTop - cDestTop) / (split - cSrcTop);
+  const oy = cDestTop;
+
+  ctx.fillStyle = BLUE; ctx.fillRect(0, 0, S, S);
+  ctx.fillStyle = TAN; ctx.fillRect(0, bandTop, S, S - bandTop);
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(logo, cropL, cSrcTop, W, split - cSrcTop, (S - W * cScale) / 2, cDestTop, W * cScale, bandTop - cDestTop);
+  ctx.fillStyle = TAN; ctx.fillRect(0, bandTop - 2, S, S - bandTop + 2); // clean straight seam
+  ctx.drawImage(logo, cropL, split, W, cropBottom - split, (S - W * tScale) / 2, bandTop, W * tScale, S - bandTop);
+
+  // "GREAT NECK" above the C
+  let size = 150;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  ctx.letterSpacing = '6px';
+  do { ctx.font = `700 ${size}px Fredoka`; size -= 2; } while (ctx.measureText(TEXT).width > 800);
+  const baseline = 262;
+  ctx.fillStyle = 'rgba(12, 94, 158, 0.28)';
+  ctx.fillText(TEXT, S / 2, baseline + 7);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(TEXT, S / 2, baseline);
+
+  const url = c.toDataURL('image/png');
+  for (const id of ['big', 'mid', 'small']) document.getElementById(id).src = url;
+  window.__icon = { url, split, bandTop, oy, size };
+  return window.__icon;
+}
+
+document.getElementById('save').onclick = async () => {
+  const r = await fetch('/save', { method: 'POST', body: window.__icon.url });
+  document.getElementById('status').textContent = await r.text();
+};
+window.__ready = draw();
+</script>
+</body>
+</html>
