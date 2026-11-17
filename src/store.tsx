@@ -11,7 +11,9 @@ import { enablePush, onNotificationTap, pushState, setReminder, type PushState }
 
 // ───────── content model (mirrors server/functions/api/[[path]].js) ─────────
 export type ColorKey = 'blue' | 'orange' | 'purple' | 'green' | 'pink' | 'yellow';
-export type Target = { type: 'event' | 'challenge' | 'post'; id: string } | null;
+export type Target = { type: 'event' | 'challenge' | 'post' | 'invite'; id: string } | null;
+export type Invite = { id: string; on: boolean; title: string; message: string; details: string; eventId: string; image: string; audience: 'all' | 'boys' | 'girls'; until: string; remind: boolean; at: string };
+export type InviteResponse = { name: string; answer: 'yes' | 'no'; at: string };
 export type EventItem = {
   id: string; title: string; icon: string; color: ColorKey; image?: string; scope: 'gn' | 'intl';
   start: string; end: string; time?: string; place?: string; price?: string; who?: string; about?: string;
@@ -29,7 +31,7 @@ export type MinyanRow = { label: string; time: string };
 export type Minyan = { weekday: MinyanRow[]; shabbat: MinyanRow[]; note: string };
 export type PostComment = { name: string; text: string; at: string };
 export type Broadcast = { id: string; kind: 'notification' | 'banner' | 'popup' | 'post' | 'event'; title: string; text: string; target: Target; at: string };
-export type Content = { alert: Alert; events: EventItem[]; challenges: Challenge[]; posts: Post[]; info: Info[]; popup?: Popup; minyan?: Minyan };
+export type Content = { alert: Alert; events: EventItem[]; challenges: Challenge[]; posts: Post[]; info: Info[]; popup?: Popup; minyan?: Minyan; invites?: Invite[] };
 // Events and challenges Solomon sets in shared/managed.json (shipped by OTA) win over the server copy.
 export function withManaged(c: Content): Content {
   const ev = ((MANAGED as { events?: EventItem[] }).events ?? []) as EventItem[];
@@ -85,7 +87,7 @@ export const IMAGES: Record<string, ImageSourcePropType> = {
 // ───────── device-local state ─────────
 type Local = {
   device: string; name: string; grade: string; age: number | null; gender: Gender; school: string;
-  account: Account | null; onboarded: boolean; inboxSeen?: string; tourSeen?: boolean;
+  account: Account | null; onboarded: boolean; inboxSeen?: string; tourSeen?: boolean; invites?: Record<string, 'yes' | 'no'>;
   seenPosts: string[]; seenInit: boolean; seenEvents: string[]; tipSeen: boolean;
   saved: string[]; liked: string[]; going: string[]; joined: string[]; dismissed: string[];
   checks: Record<string, string[]>; // challenge id -> period keys checked in
@@ -140,6 +142,8 @@ type Ctx = Local & {
   loadBroadcasts: () => Promise<Broadcast[] | null>;
   markInboxSeen: () => void;
   markTourSeen: () => void;
+  respondInvite: (id: string, answer: 'yes' | 'no') => Promise<string | null>;
+  loadInviteResponses: () => Promise<Record<string, InviteResponse[]> | null>;
   inboxUnread: number;
   aiDraft: (text: string) => Promise<AiDraft | { error: string }>;
   minyanFromText: (text: string) => Promise<Minyan | { error: string }>;
@@ -283,6 +287,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     tap();
     if (t.type === 'event') router.push(`/event/${t.id}`);
     else if (t.type === 'post') router.push(`/post/${t.id}`);
+    else if (t.type === 'invite') router.push(`/invite/${t.id}`);
     else router.push(`/challenge/${t.id}`);
   }, []);
   useEffect(() => onNotificationTap((t) => openTarget(t as Target)), [openTarget]);
@@ -556,6 +561,22 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     },
     markInboxSeen: () => patch((s) => ({ ...s, inboxSeen: new Date().toISOString() })),
     markTourSeen: () => patch((s) => ({ ...s, tourSeen: true })),
+    respondInvite: async (id, answer) => {
+      const me = ref.current;
+      patch((s) => ({ ...s, invites: { ...(s.invites || {}), [id]: answer } }));
+      tap(answer === 'yes');
+      try {
+        await api(`/invites/${id}/respond`, { method: 'POST', body: { ...who(me), answer } });
+        const inv = (content.invites || []).find((v) => v.id === id);
+        const ev = inv?.eventId ? content.events.find((e) => e.id === inv.eventId) : undefined;
+        if (ev && ev.signup === 'app') {
+          await api(`/events/${ev.id}/${answer === 'yes' ? 'signup' : 'cancel'}`, { method: 'POST', body: who(me) }).catch(() => {});
+          patch((s) => ({ ...s, going: answer === 'yes' ? [...new Set([...s.going, ev.id])] : s.going.filter((x) => x !== ev.id) }));
+        }
+        return null;
+      } catch (e) { return msg(e); }
+    },
+    loadInviteResponses: () => api<{ responses: Record<string, InviteResponse[]> }>('/admin/invite-responses', { leader }).then((r) => r.responses).catch(() => null),
     inboxUnread: broadcasts.filter((b) => !local.inboxSeen || b.at > local.inboxSeen).length,
     setPhotoAlerts: async (on) => {
       try { await api('/push/prefs', { method: 'POST', body: { device: ref.current.device, photos: on } }); } catch {}

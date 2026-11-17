@@ -196,12 +196,95 @@ export function AiPlanner({ onDone }: { onDone: (msg: string) => void }) {
   );
 }
 
+// ── Personal invitation: a card on everyone's Home until they answer, reminders twice a day ──
+export function InviteForm({ onDone }: { onDone: (msg: string) => void }) {
+  const { content, saveContent, uploadPhoto, loadInviteResponses } = useStore();
+  const upcomingEvents = content.events.filter((e) => e.end >= iso(new Date()));
+  const [title, setTitle] = useState('');
+  const [message, setMessage] = useState("Hey {name}, we'd love to see you there. It won't be the same without you!");
+  const [details, setDetails] = useState('');
+  const [eventId, setEventId] = useState('');
+  const [who, setWho] = useState<'Everyone' | 'Boys' | 'Girls'>('Everyone');
+  const [days, setDays] = useState<'3 days' | '1 week' | '2 weeks'>('1 week');
+  const [remind, setRemind] = useState(true);
+  const [poster, setPoster] = useState<Snap[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [responses, setResponses] = useState<Record<string, { name: string; answer: 'yes' | 'no' }[]> | null>(null);
+  React.useEffect(() => { loadInviteResponses().then((r) => setResponses(r ?? {})); }, []);
+  const opts = [{ v: '', l: 'No event' }, ...upcomingEvents.map((e) => ({ v: e.id, l: e.title }))];
+  const pickEvent = (id: string) => {
+    setEventId(id);
+    const ev = content.events.find((e) => e.id === id);
+    if (ev && !title.trim()) setTitle(ev.title);
+  };
+  const send = async () => {
+    if (title.trim().length < 2) return setErr('What are you inviting them to?');
+    setBusy(true); setErr(null);
+    const urls = await publishPhotos(poster, uploadPhoto);
+    if (typeof urls === 'string') { setBusy(false); return setErr(urls); }
+    const ev = content.events.find((e) => e.id === eventId);
+    const end = new Date(); end.setDate(end.getDate() + (days === '3 days' ? 3 : days === '1 week' ? 7 : 14));
+    const until = ev && ev.end < iso(end) ? ev.end : iso(end);
+    const invite = { id: 'i-' + Date.now().toString(36), on: true, title: title.trim(), message: message.trim(), details: details.trim(), eventId, image: urls[0] || ev?.poster || '', audience: (who === 'Boys' ? 'boys' : who === 'Girls' ? 'girls' : 'all') as 'all' | 'boys' | 'girls', until, remind, at: new Date().toISOString() };
+    const e = await saveContent({ ...content, invites: [invite, ...(content.invites || [])] });
+    setBusy(false);
+    if (e) return setErr(e);
+    onDone(`Invitation sent. It sits on everyone's Home until they answer${remind ? ', with a reminder twice a day' : ''}.`);
+  };
+  const toggle = async (id: string, on: boolean) => {
+    await saveContent({ ...content, invites: (content.invites || []).map((v) => (v.id === id ? { ...v, on } : v)) });
+  };
+  return (
+    <View>
+      <Text style={st.h}>Invitation</Text>
+      <Text style={st.sub}>A personal invite on everyone's Home with their name on it. It stays until they say yes or no.</Text>
+      <Text style={[u.fieldLabel, { marginTop: 14 }]}>For an event (optional)</Text>
+      <Chips wrap options={opts.map((o) => o.l)} value={opts.find((o) => o.v === eventId)?.l ?? 'No event'} onChange={(l) => pickEvent(opts.find((o) => o.l === l)?.v ?? '')} />
+      <Field label="What it's for" value={title} onChange={setTitle} placeholder="Like: Bake shop night" />
+      <Field label="Your message" value={message} onChange={setMessage} multiline hint="{name} turns into each teen's first name." />
+      <Field label="More info (optional)" value={details} onChange={setDetails} multiline placeholder="What to bring, who's coming, anything else" />
+      <PhotoPicker photos={poster} onChange={(p) => setPoster(p.slice(-1))} />
+      <Text style={[u.fieldLabel, { marginTop: 14 }]}>Who gets it</Text>
+      <Chips options={['Everyone', 'Boys', 'Girls'] as const} value={who} onChange={setWho} />
+      <Text style={[u.fieldLabel, { marginTop: 14 }]}>Keep it up for</Text>
+      <Chips options={['3 days', '1 week', '2 weeks'] as const} value={days} onChange={setDays} />
+      <Switch title="Remind twice a day" sub="10 AM and 6 PM, until they answer" value={remind} onChange={setRemind} />
+      <View style={{ marginTop: 20 }}><Button label={busy ? 'Sending…' : 'Send the invitation'} disabled={busy} onPress={send} /></View>
+      {err ? <Text style={st.err}>{err}</Text> : null}
+
+      {(content.invites || []).length ? (
+        <View style={{ marginTop: 28 }}>
+          <Text style={st.listHead}>Your invitations</Text>
+          {(content.invites || []).map((v) => {
+            const r = responses?.[v.id] ?? [];
+            const yes = r.filter((x) => x.answer === 'yes'), no = r.filter((x) => x.answer === 'no');
+            return (
+              <View key={v.id} style={st.invRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={st.switchTitle}>{v.title}</Text>
+                  <Text style={T.small}>{responses === null ? 'Loading…' : `${yes.length} in · ${no.length} not this time`}</Text>
+                  {yes.length ? <Text style={st.names} numberOfLines={2}>{yes.map((x) => x.name.split(' ')[0]).join(', ')}</Text> : null}
+                </View>
+                <Toggle value={v.on} onChange={(on) => toggle(v.id, on)} label={`${v.title} is up`} />
+              </View>
+            );
+          })}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 const st = StyleSheet.create({
   h: { fontSize: 22, fontFamily: F.display, color: C.ink, letterSpacing: -0.3 },
   sub: { fontSize: 14, lineHeight: 20, color: C.sub, marginTop: 4 },
   switch: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12, padding: 14, borderRadius: 16, backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
   switchTitle: { fontSize: 15, fontWeight: '800', color: C.ink },
   err: { color: '#C0303F', marginTop: 12, fontSize: 14, fontWeight: '700' },
+  listHead: { fontSize: 13, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase', color: C.sub, marginBottom: 8 },
+  invRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 16, backgroundColor: C.card, borderWidth: 1, borderColor: C.line, marginBottom: 8 },
+  names: { fontSize: 13, color: C.ink, marginTop: 4 },
   back: { fontSize: 15, fontWeight: '800', color: C.blue },
   aiHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   aiIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: '#7C5CFC', alignItems: 'center', justifyContent: 'center' },

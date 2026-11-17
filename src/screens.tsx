@@ -7,6 +7,7 @@ import { CHAPTER, calendarUrl, challengeFits, countdown, dateLabel, open, sortPo
 import { audienceLabel, Button, Card, Chips, Cover, Empty, EventCard, EventMeta, Field, IconTile, ScopeBadge, SectionHead, Sheet, s as u } from './ui';
 import { ChallengeBanner, NameGate } from './rewards';
 import { PostCard, timeAgo } from './feed';
+import { InviteCards } from './invites';
 import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Rect, Stop } from 'react-native-svg';
 import { MINYAN_FALLBACK, MinyanCard, minyanTime } from './minyan';
 import { greetingNow } from './shell';
@@ -30,6 +31,7 @@ export function Home() {
         <Text style={st.helloSmall} numberOfLines={1} accessibilityRole="header">{greetingNow()}{first ? `, ${first}` : ''}</Text>
         <Text style={st.todaySmall}>{today}</Text>
       </View>
+      <InviteCards />
 
       {food ? (
         <Pressable onPress={() => router.push(`/post/${food.id}`)} style={({ pressed }) => [st.food, pressed && u.pressed]} accessibilityRole="button" accessibilityLabel={`On the menu: ${food.title}`}>
@@ -62,7 +64,7 @@ export function Home() {
           <View style={st.latest}>
             {posts.slice(0, 2).map((p, i) => (
               <Pressable key={p.id} onPress={() => router.push(`/post/${p.id}`)} style={({ pressed }) => [st.latestRow, i > 0 && st.rule, pressed && { backgroundColor: C.bg }]} accessibilityRole="button" accessibilityLabel={p.title}>
-                <View style={st.latestDot}><Icon name={p.kind === 'Events' ? 'calendar' : p.kind === 'Photos' ? 'camera' : p.kind === 'Rewards' ? 'gift' : 'megaphone'} size={18} color={C.blueDeep} stroke={2} /></View>
+                
                 <View style={{ flex: 1 }}>
                   <Text style={T.h3} numberOfLines={1}>{p.title}</Text>
                   <Text style={T.small} numberOfLines={1}>{p.pinned ? 'Pinned · ' : ''}{p.kind} · {timeAgo(p.at)}</Text>
@@ -130,6 +132,7 @@ export function Events() {
     <>
       <Text style={T.h1}>Events</Text>
       <Text style={[T.small, { marginTop: 4, marginBottom: 14 }]}>What's coming up in Great Neck and around CTeen</Text>
+      <InviteCards eventOnly />
       <Chips options={EVENT_FILTERS} value={f} onChange={setF} />
       <View style={{ gap: 26, marginTop: 18 }}>
         {list.map((e) => <EventCard key={e.id} e={e} />)}
@@ -493,7 +496,6 @@ function GroupLabel({ text }: { text: string }) {
 function GRow({ icon, tile, title, sub, value, onPress, chevron, first }: { icon?: string; tile?: string; title: string; sub?: string; value?: string; onPress?: () => void; chevron?: 'right' | 'down'; first?: boolean }) {
   const body = (
     <>
-      {icon ? <View style={[st.gTile, { backgroundColor: tile ?? C.sub }]}><Icon name={icon} size={16} color="#FFFFFF" stroke={2.1} /></View> : null}
       <View style={[st.gBody, !first && st.gRule]}>
         <View style={{ flex: 1 }}>
           <Text style={st.gTitle}>{title}</Text>
@@ -513,7 +515,6 @@ function InfoRow({ icon, title, body, first }: { icon: string; title: string; bo
   const [open, setOpen] = useState(false);
   return (
     <Pressable onPress={() => setOpen((o) => !o)} style={({ pressed }) => [st.gRow, { alignItems: 'flex-start' }, pressed && { backgroundColor: C.bg }]} accessibilityRole="button" accessibilityState={{ expanded: open }}>
-      <View style={[st.gTile, { backgroundColor: C.blue, marginTop: 12 }]}><Icon name={icon || 'star'} size={16} color="#FFFFFF" stroke={2.1} /></View>
       <View style={[st.gBody, !first && st.gRule, { alignItems: 'flex-start' }]}>
         <View style={{ flex: 1 }}>
           <Text style={st.gTitle}>{title}</Text>
@@ -622,7 +623,7 @@ const st = StyleSheet.create({
   nextCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, paddingRight: 14, borderRadius: 18, backgroundColor: C.card },
   nextImg: { width: 64, height: 64, borderRadius: 12 },
   nextTitle: { fontSize: 16, fontWeight: '800', color: C.ink },
-  gRow: { flexDirection: 'row', alignItems: 'center', paddingLeft: 14 },
+  gRow: { flexDirection: 'row', alignItems: 'center', paddingLeft: 16 },
   gTile: { width: 30, height: 30, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   gBody: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingRight: 14, minHeight: 52 },
   gRule: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line },

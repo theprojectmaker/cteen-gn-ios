@@ -13,6 +13,8 @@ Remove your line when it ships.
 
 ## Log
 
+- 2026-11-17 · Solomon · Personal invitations: content.invites (title, message with {name}, details, eventId, image, audience, until, remind). Home + Events (event-linked) show an invite card until answered (src/invites.tsx); app/invite/[id].tsx is the letter-style card with I'm in / Not this time; yes also RSVPs to the linked event; answers saved per device (Local.invites) and on the server (inviteans:<id>, POST /api/invites/:id/respond, GET /api/admin/invite-responses). New invitation = push You're invited + inbox. Reminders 10 AM + 6 PM until answered, scheduled on the phone (inv-* ids). Leader panel > Invitation (InviteForm in src/leaderEvents.tsx) with who said yes/no and an on/off switch. Fewer decorative icons (Chapter lists and Home rows are text only). Server deployed.
+
 - 2026-11-17 · Solomon · Background is now a light cyan-tinted white #F2F6F9 (was beige). Chapter page: logo with no white box, This Shabbat card (Teen Minyan time big, countdown, candle lighting / Shabbat ends), Rabbi Zevy & Shani card (Call, Ask), next event at the Chabad house, iOS Settings-style lists with colored icon squares (Directions, Call, Instagram, Shul schedule; About CTeen; More). Events title matches Feed (big Events + subtitle).
 
 - 2026-11-17 · Solomon · New palette (src/theme.ts): CTeen cyan #0BAFE6 (primary, links, tab bar) + orange #FF7A2F (C.orange: things you act on: profile button, Snap button and Home pill, Up next tag, active carousel dot, Feed new-post button) on warm off-white #F7F4EF with navy ink #0F1D2B; dark mode deep navy #0B1520. HUES.blue/orange updated to match.

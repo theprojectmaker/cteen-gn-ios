@@ -10,6 +10,7 @@ import { Setup } from '../src/setup';
 import { Intro } from '../src/intro';
 import { StartupPopup } from '../src/popup';
 import { Tour } from '../src/tour';
+import { InviteReminderSync } from '../src/invites';
 import { Composer } from '../src/composer';
 import { WrapReminderSync } from '../src/wrapReminders';
 import { useOtaUpdates } from '../src/shell';
@@ -50,6 +51,7 @@ function Root() {
         <Stack.Screen name="event/[id]" options={{ presentation: 'modal', headerShown: false, contentStyle: { backgroundColor: C.bg } }} />
         <Stack.Screen name="post/[id]" options={{ presentation: 'modal', headerShown: false, contentStyle: { backgroundColor: C.bg } }} />
         <Stack.Screen name="challenge-rules/[id]" options={{ presentation: 'modal', headerShown: false, contentStyle: { backgroundColor: C.bg } }} />
+        <Stack.Screen name="invite/[id]" options={{ presentation: 'modal', headerShown: false, contentStyle: { backgroundColor: C.bg } }} />
         <Stack.Screen name="challenges" options={page} />
         <Stack.Screen name="account" options={page} />
         <Stack.Screen name="settings" options={page} />
@@ -58,6 +60,7 @@ function Root() {
       <AdminPanel />
       <Composer />
       <WrapReminderSync />
+      <InviteReminderSync />
       {introDone ? <Setup /> : null}
       <Intro onDone={() => setIntroDone(true)} />
       <StartupPopup ready={introDone} />

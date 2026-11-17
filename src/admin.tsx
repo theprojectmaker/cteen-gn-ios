@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { AiPlanner, EventForm, PosterForm } from './leaderEvents';
+import { AiPlanner, EventForm, InviteForm, PosterForm } from './leaderEvents';
 import { ChallengeEditor, FoodForm, MinyanEditor, PhotoPicker, PopupEditor, WhatsAppImport, publishPhotos } from './leaderTools';
 import type { Snap } from './photo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -393,6 +393,7 @@ export function AdminPanel() {
                     <Text style={st.backText}>Back</Text>
                   </Pressable>
                   {task === 'event' ? <EventForm onDone={(msg) => { setNote(msg); setTask(null); }} />
+                    : task === 'invite' ? <InviteForm onDone={(msg) => { setNote(msg); setTask(null); }} />
                     : task === 'poster' ? <PosterForm onDone={(msg) => { setNote(msg); setTask(null); }} />
                     : task === 'ai' ? <AiPlanner onDone={(msg) => { setNote(msg); setTask(null); }} />
                     : task === 'post' || task === 'alert' || task === 'notify' ? <SimpleForm kind={task} onDone={(msg) => { setNote(msg); setTask(null); }} />
@@ -418,7 +419,7 @@ export function AdminPanel() {
 }
 
 // ───────── Simple mode ─────────
-type Task = 'post' | 'notify' | 'challenge' | 'poster' | 'ai' | 'whatsapp' | 'food' | 'event' | 'alert' | 'popup' | 'minyan' | 'signups' | 'photos' | 'people' | 'inbox';
+type Task = 'post' | 'notify' | 'challenge' | 'poster' | 'ai' | 'invite' | 'whatsapp' | 'food' | 'event' | 'alert' | 'popup' | 'minyan' | 'signups' | 'photos' | 'people' | 'inbox';
 const TASK_SECTION: Partial<Record<Task, Section>> = { signups: 'Sign-ups', photos: 'Photos', people: 'People', inbox: 'Inbox' };
 const TASKS: { k: Task; icon: string; color: 'blue' | 'orange' | 'purple' | 'green' | 'pink' | 'yellow'; title: string; sub: string }[] = [
   { k: 'post', icon: 'chat', color: 'blue', title: 'Post an update', sub: 'Write something, add photos' },
@@ -443,6 +444,7 @@ function SimpleHome({ onPick }: { onPick: (k: Task) => void }) {
     { k: 'compose', icon: 'camera', color: 'blue', title: 'New post' },
     { k: 'poster', icon: 'ticket', color: 'pink', title: 'Poster' },
     { k: 'event', icon: 'calendar', color: 'orange', title: 'Event' },
+    { k: 'invite', icon: 'send', color: 'orange', title: 'Invitation' },
     { k: 'ai', icon: 'star', color: 'purple', title: 'AI planner' },
     { k: 'notify', icon: 'bell', color: 'blue', title: 'Notification' },
     { k: 'alert', icon: 'megaphone', color: 'pink', title: 'Live banner' },

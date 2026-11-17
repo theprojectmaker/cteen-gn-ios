@@ -30,6 +30,8 @@
 //   POST /api/push/prefs                   { device, photos } photo alerts on/off (on unless turned off)
 //   POST /api/admin/push-me                { device } this leader phone gets a notification for every comment
 //   POST /api/admin/ai-event               { prompt, info, keep } AI drafts an event (keep = use the details as given)
+//   POST /api/invites/:id/respond          { id, token, answer: 'yes' | 'no' } answer a personal invitation
+//   GET  /api/admin/invite-responses       who said yes / no to each invitation
 //   GET  /api/broadcasts                   everything sent to everyone, newest first (the Inbox in Settings)
 //   POST /api/ask                          { name, text, device } question for the rabbi
 // Leaders: Authorization: Bearer <passcode> (the rabbi, "owner"), or X-Account: <id>:<token> for an
@@ -312,6 +314,12 @@ function sanitize(doc, alert) {
       image: typeof doc.popup.image === 'string' && /^https:\/\/\S{4,400}$/.test(doc.popup.image) ? doc.popup.image : '', more: clean(doc.popup.more, 800),
       target: doc.popup.target && ['event', 'challenge', 'post'].includes(doc.popup.target.type) && idOk(doc.popup.target.id) ? { type: doc.popup.target.type, id: doc.popup.target.id } : null,
     } : { on: false, id: '', title: '', body: '', button: '', target: null },
+    invites: list(doc.invites, 20).filter((v) => idOk(v.id)).map((v) => ({
+      id: v.id, on: v.on !== false, title: clean(v.title, 80), message: clean(v.message, 600), details: clean(v.details, 2000),
+      eventId: idOk(v.eventId) ? v.eventId : '', image: typeof v.image === 'string' && /^https:\/\/\S{4,400}$/.test(v.image) ? v.image : '',
+      audience: ['boys', 'girls'].includes(v.audience) ? v.audience : 'all', until: dateOk(v.until) ? v.until : '', remind: v.remind !== false,
+      at: typeof v.at === 'string' ? clean(v.at, 30) : new Date().toISOString(),
+    })),
     minyan: doc.minyan && typeof doc.minyan === 'object' ? {
       weekday: list(doc.minyan.weekday, 12).map((r) => ({ label: clean(r.label, 50), time: clean(r.time, 40) })).filter((r) => r.label),
       shabbat: list(doc.minyan.shabbat, 12).map((r) => ({ label: clean(r.label, 50), time: clean(r.time, 40) })).filter((r) => r.label),
@@ -793,6 +801,20 @@ export async function onRequest({ request, env, params, waitUntil }) {
       }
     }
 
+    let ivm = /^invites\/([a-z0-9-]+)\/respond$/.exec(path);
+    if (ivm && method === 'POST') {
+      const content = await getContent(env);
+      const inv = (content.invites || []).find((v) => v.id === ivm[1]);
+      if (!inv) return bad('That invitation was taken down.', 404);
+      const who = await actor(env, body);
+      if (who.error) return bad(who.error, 401);
+      const answer = body.answer === 'no' ? 'no' : 'yes';
+      const key = 'inviteans:' + inv.id;
+      const rows = ((await env.CTEEN.get(key, 'json')) || []).filter((r) => r.who !== who.key);
+      rows.push({ who: who.key, name: who.name, answer, at: new Date().toISOString() });
+      await env.CTEEN.put(key, JSON.stringify(rows.slice(-2000)));
+      return json({ ok: true, answer });
+    }
     if (path === 'broadcasts' && method === 'GET') {
       return edgeCached(request, 10, async () => json({ items: (await env.CTEEN.get('broadcasts', 'json')) || [] }));
     }
@@ -863,6 +885,11 @@ export async function onRequest({ request, env, params, waitUntil }) {
         ].slice(0, 3);
         for (const n of fresh) { await pushAll(env, n.title, n.body, { target: n.target }); await logBroadcast(env, n.target && n.target.type === 'event' ? 'event' : 'post', n.title, n.body, n.target); }
         if (next.popup && next.popup.on && next.popup.title && (!current.popup || current.popup.id !== next.popup.id)) await logBroadcast(env, 'popup', next.popup.title, next.popup.body, next.popup.target);
+        const oldInv = new Set((current.invites || []).map((v) => v.id));
+        for (const v of (next.invites || []).filter((x) => x.on && !oldInv.has(x.id)).slice(0, 2)) {
+          await pushAll(env, "You're invited: " + v.title, 'Rabbi Zevy sent you a personal invitation. Open CTeen GN to answer.', { target: { type: 'invite', id: v.id } }, v.image);
+          await logBroadcast(env, 'event', "You're invited: " + v.title, v.message.replace(/\{name\}/g, '').slice(0, 200), null);
+        }
         return json(withManaged(next));
       }
       if (path === 'admin/alert' && method === 'POST') {
@@ -942,6 +969,14 @@ export async function onRequest({ request, env, params, waitUntil }) {
         const status = ['checked', 'hidden'].includes(body.status) ? body.status : '';
         const ok = await editPhotoEntry(env, String(body.key || ''), (p) => { p.status = status; });
         return ok ? json({ ok: true }) : bad('That photo is gone.', 404);
+      }
+      if (path === 'admin/invite-responses' && method === 'GET') {
+        const content = await getContent(env);
+        const ids = (content.invites || []).map((v) => v.id);
+        const rows = await Promise.all(ids.map((id) => env.CTEEN.get('inviteans:' + id, 'json')));
+        const out = {};
+        ids.forEach((id, i) => { out[id] = (rows[i] || []).map((r) => ({ name: r.name, answer: r.answer, at: r.at })); });
+        return json({ responses: out });
       }
       if (path === 'admin/ai-event' && method === 'POST') {
         const prompt = clean(body.prompt, 600), info = clean(body.info, 2000);
