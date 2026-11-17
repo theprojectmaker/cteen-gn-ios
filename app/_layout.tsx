@@ -4,7 +4,7 @@ import { Appearance, Platform, Pressable, Text, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { C, IS_DARK, PREFS, F } from '../src/theme';
-import { StoreProvider, useStore } from '../src/store';
+import { StoreProvider } from '../src/store';
 import { AdminPanel } from '../src/admin';
 import { Setup } from '../src/setup';
 import { Intro } from '../src/intro';
@@ -28,7 +28,9 @@ const page = { headerTransparent: true, headerTitle: '', headerBackTitle: 'Back'
 // Tabs at the bottom; other pages slide in on top with a native back button (swipe from the edge to go back).
 function Root() {
   useOtaUpdates();
-  const { onboarded, device } = useStore();
+  // Opening animation first (everyone, every launch unless turned off in Settings); the sign-up
+  // screen waits for it, so there is never more than one layer opening at the same moment.
+  const [introDone, setIntroDone] = useState(false);
   // Make Apple's own pieces (tab bar, sheets, keyboard) follow Settings > Appearance, after the first frame.
   useEffect(() => {
     if (Platform.OS === 'web' || PREFS.theme === 'system') return;
@@ -48,8 +50,8 @@ function Root() {
         <Stack.Screen name="settings" options={page} />
       </Stack>
       <AdminPanel />
-      <Setup />
-      {device && onboarded ? <Intro /> : null}
+      {introDone ? <Setup /> : null}
+      <Intro onDone={() => setIntroDone(true)} />
     </>
   );
 }

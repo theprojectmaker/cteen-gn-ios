@@ -8,8 +8,9 @@ import { C, PREFS, F } from './theme';
 const ND = Platform.OS !== 'web';
 const WORD = 'GREAT NECK';
 
-export function Intro() {
+export function Intro({ onDone }: { onDone?: () => void }) {
   const [done, setDone] = useState(!PREFS.intro || PREFS.reduceMotion);
+  useEffect(() => { if (done) onDone?.(); }, [done]);
   const tile = useRef(new Animated.Value(0)).current;
   const ring = useRef(new Animated.Value(0)).current;
   const letters = useRef([...WORD].map(() => new Animated.Value(0))).current;
