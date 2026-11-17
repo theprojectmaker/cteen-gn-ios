@@ -11,8 +11,8 @@
   body { margin: 0; padding: 16px; background: var(--bg); color: var(--ink); font: 14px system-ui, sans-serif; }
   .row { display: flex; gap: 24px; align-items: flex-end; flex-wrap: wrap; }
   #big { width: min(512px, 100%); height: auto; border-radius: 22.37%; box-shadow: 0 8px 30px rgba(0,0,0,.18); }
-  #small { width: 60px; height: 60px; border-radius: 13px; }
   #mid { width: 120px; height: 120px; border-radius: 27px; }
+  #small { width: 60px; height: 60px; border-radius: 13px; }
   button { margin-top: 16px; font: 600 15px system-ui; padding: 10px 18px; border-radius: 10px; border: 0; background: #159fdc; color: #fff; }
 </style>
 </head>
@@ -26,11 +26,66 @@
 <button id="save">Save to assets/icon.png</button>
 <p id="status"></p>
 <script>
-// Layout of the icon (1024 x 1024). The CTeen logo's blue and tan panels are
-// stretched edge to edge; "GREAT NECK" sits above the big C.
-const BLUE = 'rgb(43,199,247)';
-const TAN = 'rgb(234,181,122)';
+// CTeen GN icon (1024 x 1024): CTeen's blue and tan panels as gradients, the
+// logo's white C and "teen" lifted out as letters with a sticker shadow,
+// "GREAT NECK" curved over the top like a badge, and a wave where the blue
+// meets the sand (Great Neck is on the water).
 const TEXT = 'GREAT NECK';
+const S = 1024;
+
+// Cut the white lettering out of one panel of the logo: alpha = how white each pixel is.
+function letters(logo, sx, sy, sw, sh, bgChannel, bgValue) {
+  const c = document.createElement('canvas');
+  c.width = sw; c.height = sh;
+  const x = c.getContext('2d');
+  x.drawImage(logo, sx, sy, sw, sh, 0, 0, sw, sh);
+  const img = x.getImageData(0, 0, sw, sh), d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const a = Math.max(0, Math.min(1, (d[i + bgChannel] - bgValue) / (255 - bgValue)));
+    d[i] = d[i + 1] = d[i + 2] = 255;
+    d[i + 3] = Math.round(a * a * (3 - 2 * a) * 255);
+  }
+  x.putImageData(img, 0, 0);
+  // Tight bounds of the lettering
+  let x0 = sw, y0 = sh, x1 = 0, y1 = 0;
+  for (let y = 0; y < sh; y++) for (let xx = 0; xx < sw; xx++) if (d[(y * sw + xx) * 4 + 3] > 40) { x0 = Math.min(x0, xx); x1 = Math.max(x1, xx); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  return { canvas: c, x0, y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+}
+
+function drawLetters(ctx, L, cx, top, height, shadow) {
+  const w = (L.w / L.h) * height;
+  ctx.save();
+  ctx.shadowColor = shadow;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = height * 0.035;
+  ctx.shadowBlur = 0;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(L.canvas, L.x0, L.y0, L.w, L.h, cx - w / 2, top, w, height);
+  ctx.restore();
+}
+
+// Text along the top of a circle, letter by letter.
+function arcText(ctx, text, cx, cy, r, color, shadow) {
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  const widths = [...text].map((ch) => ctx.measureText(ch).width);
+  const gap = ctx.measureText('M').width * 0.035;
+  const total = widths.reduce((a, b) => a + b, 0) + gap * (text.length - 1);
+  let angle = -Math.PI / 2 - total / r / 2;
+  [...text].forEach((ch, i) => {
+    const half = widths[i] / 2 / r;
+    angle += half;
+    ctx.save();
+    ctx.translate(cx + r * Math.cos(angle), cy + r * Math.sin(angle));
+    ctx.rotate(angle + Math.PI / 2);
+    ctx.fillStyle = shadow; ctx.fillText(ch, 0, 9);
+    ctx.fillStyle = color; ctx.fillText(ch, 0, 0);
+    ctx.restore();
+    angle += half + gap / r;
+  });
+  ctx.restore();
+}
 
 async function draw() {
   await document.fonts.load('700 120px Fredoka');
@@ -38,58 +93,49 @@ async function draw() {
   logo.src = '/logo.png';
   await logo.decode();
 
-  // Find where the logo turns from blue to tan (first tan row near the left edge).
+  // Where the logo turns from blue to tan
   const probe = document.createElement('canvas');
   probe.width = logo.width; probe.height = logo.height;
   const pc = probe.getContext('2d');
   pc.drawImage(logo, 0, 0);
   const px = pc.getImageData(0, 0, logo.width, logo.height).data;
-  const at = (x, y) => px.slice((y * logo.width + x) * 4, (y * logo.width + x) * 4 + 3);
   let split = 0;
-  for (let y = 20; y < logo.height; y++) { const [r, g, b] = at(12, y); if (r > 180 && b < 160) { split = y; break; } }
+  for (let y = 20; y < logo.height; y++) { const i = (y * logo.width + 12) * 4; if (px[i] > 180 && px[i + 2] < 160) { split = y; break; } }
 
-  // Top of the white C (first row with white pixels in the blue panel).
-  let cTop = 0;
-  for (let y = 12; y < split && !cTop; y++) for (let x = 20; x < logo.width - 20; x++) { const [r, g, b] = at(x, y); if (r > 230 && g > 230 && b > 230) { cTop = y; break; } }
+  const C = letters(logo, 8, 8, logo.width - 16, split - 10, 0, 43);                 // white on blue: use red channel
+  const teen = letters(logo, 8, split + 4, logo.width - 16, logo.height - split - 14, 2, 122); // white on tan: use blue channel
 
-  const c = document.getElementById('c');
-  const ctx = c.getContext('2d');
-  const S = 1024;
-  const cropBottom = logo.height - 10, cropL = 3, cropR = logo.width - 3; // skip the logo's rounded corners
-  const W = cropR - cropL;
+  const ctx = document.getElementById('c').getContext('2d');
 
-  // Tan "teen" band, full width along the bottom
-  const tScale = 1.5;
-  const bandTop = S - (cropBottom - split) * tScale;
+  // Sky-blue panel with a soft light in the upper left
+  let g = ctx.createLinearGradient(0, 0, 0, S);
+  g.addColorStop(0, '#3fd2fb'); g.addColorStop(0.75, '#16a6e2'); g.addColorStop(1, '#0f8fd0');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, S, S);
+  g = ctx.createRadialGradient(260, 170, 20, 260, 170, 620);
+  g.addColorStop(0, 'rgba(255,255,255,0.28)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, S, S);
 
-  // Blue panel with the C: scaled on its own so it fits between the text and the band
-  const cSrcTop = Math.max(12, cTop - 6);
-  const cDestTop = 318;
-  const cScale = (bandTop - cDestTop) / (split - cSrcTop);
-  const oy = cDestTop;
+  // Sand band with a wavy top edge, plus a thin foam line
+  const bandTop = 800, amp = 16;
+  const wave = (x) => bandTop + amp * Math.sin((x / S) * Math.PI * 2 * 1.5 + 0.6);
+  const sandPath = () => { ctx.beginPath(); ctx.moveTo(0, S); for (let x = 0; x <= S; x += 8) ctx.lineTo(x, wave(x)); ctx.lineTo(S, S); ctx.closePath(); };
+  ctx.save(); ctx.translate(0, -14); sandPath(); ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.fill(); ctx.restore();
+  sandPath();
+  g = ctx.createLinearGradient(0, bandTop - amp, 0, S);
+  g.addColorStop(0, '#f3c48f'); g.addColorStop(1, '#e2a764');
+  ctx.fillStyle = g; ctx.fill();
 
-  ctx.fillStyle = BLUE; ctx.fillRect(0, 0, S, S);
-  ctx.fillStyle = TAN; ctx.fillRect(0, bandTop, S, S - bandTop);
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(logo, cropL, cSrcTop, W, split - cSrcTop, (S - W * cScale) / 2, cDestTop, W * cScale, bandTop - cDestTop);
-  ctx.fillStyle = TAN; ctx.fillRect(0, bandTop - 2, S, S - bandTop + 2); // clean straight seam
-  ctx.drawImage(logo, cropL, split, W, cropBottom - split, (S - W * tScale) / 2, bandTop, W * tScale, S - bandTop);
+  // Letters
+  drawLetters(ctx, C, S / 2, 292, 452, 'rgba(8, 70, 130, 0.35)');
+  drawLetters(ctx, teen, S / 2, 838, 140, 'rgba(150, 90, 30, 0.35)');
 
-  // "GREAT NECK" above the C
-  let size = 150;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'alphabetic';
-  ctx.letterSpacing = '6px';
-  do { ctx.font = `700 ${size}px Fredoka`; size -= 2; } while (ctx.measureText(TEXT).width > 800);
-  const baseline = 262;
-  ctx.fillStyle = 'rgba(12, 94, 158, 0.28)';
-  ctx.fillText(TEXT, S / 2, baseline + 7);
-  ctx.fillStyle = '#ffffff';
-  ctx.fillText(TEXT, S / 2, baseline);
+  // GREAT NECK over the top
+  ctx.font = '700 116px Fredoka';
+  arcText(ctx, TEXT, S / 2, 1030, 800, '#ffffff', 'rgba(8, 70, 130, 0.32)');
 
-  const url = c.toDataURL('image/png');
+  const url = document.getElementById('c').toDataURL('image/png');
   for (const id of ['big', 'mid', 'small']) document.getElementById(id).src = url;
-  window.__icon = { url, split, bandTop, oy, size };
+  window.__icon = { url, split };
   return window.__icon;
 }
 
