@@ -27,6 +27,7 @@
 //   POST /api/challenges/:id/react         { id, token, key, emoji } toggles your reaction on a photo
 //   GET  /api/photo?key=&exp=&sig=         one photo as a JPEG (signed link from the wall, valid 1 hour)
 //   POST /api/push/register                { token, device }
+//   POST /api/push/prefs                   { device, photos } photo alerts on/off (on unless turned off)
 //   POST /api/ask                          { name, text, device } question for the rabbi
 // Leaders: Authorization: Bearer <passcode> (the rabbi, "owner"), or X-Account: <id>:<token> for an
 // account the rabbi made a leader. New events and Feed posts notify every phone automatically.
@@ -75,9 +76,7 @@ function sunTimes(ymd) {
 }
 const nyClock = (ms) => new Date(ms).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' });
 // Returns an error message when tefillin can't be wrapped right now, or '' when it can.
-const TEST_OPEN_UNTIL = Date.parse('2026-11-17T05:28:00Z'); // TEST window, closes by itself. Remove later.
 function wrapClosed(now = Date.now()) {
-  if (now < TEST_OPEN_UNTIL) return '';
   const day = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short' }).format(new Date(now));
   if (day === 'Sat') return 'No tefillin on Shabbat. See you Sunday.';
   const { rise, set: sunset } = sunTimes(nyDate(new Date(now)));
@@ -312,6 +311,17 @@ function sanitize(doc, alert) {
       note: clean(doc.minyan.note, 300),
     } : MINYAN_DEFAULT,
   };
+}
+
+// "Jonathan took his tefillin photo today" to every phone except the poster and anyone who turned it off.
+async function pushPhotoAlert(env, title, body, data, exceptDevice) {
+  const all = (await env.CTEEN.get('push', 'json')) || {};
+  const off = (await env.CTEEN.get('pushoff:photos', 'json')) || {};
+  const tokens = Object.entries(all).filter(([d]) => d !== exceptDevice && !off[d]).map(([, tok]) => tok);
+  for (let i = 0; i < tokens.length; i += 100) {
+    const batch = tokens.slice(i, i + 100).map((to) => ({ to, title, body, sound: 'default', data: data || {} }));
+    await fetch('https://exp.host/--/api/v2/push/send', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(batch) }).catch(() => null);
+  }
 }
 
 async function pushAll(env, title, body, data) {
@@ -737,6 +747,10 @@ export async function onRequest({ request, env, params, waitUntil }) {
           const list = ((await env.CTEEN.get(listKey, 'json')) || []).filter((p) => p.key !== photoKey);
           list.unshift({ key: photoKey, name: who.name, who: who.key, at: new Date().toISOString(), status: '', comments: [], caption: clean(body.caption, 140), reactions: {} });
           await env.CTEEN.put(listKey, JSON.stringify(list.slice(0, 500)), { expirationTtl: PHOTO_TTL });
+          const first = (who.name || 'Someone').split(' ')[0];
+          const title = id === 'tefillin' ? `${first} took his tefillin photo today` : `${first} checked in to ${ch.title}`;
+          const note = clean(body.caption, 140) || 'Tap to see it and cheer him on.';
+          try { waitUntil(pushPhotoAlert(env, title, note, { target: { type: 'challenge', id } }, clean(body.device, 40))); } catch {}
         }
         if (!board[who.key] && Object.keys(board).length >= 1000) return bad('Leaderboard is full.', 409);
         board[who.key] = { name: who.name, count: Math.min(row.count + 1, 9999), last: period, days: [...new Set([...(row.days || (row.last ? [row.last] : [])), period])].slice(-120) };
@@ -747,6 +761,14 @@ export async function onRequest({ request, env, params, waitUntil }) {
       }
     }
 
+    if (path === 'push/prefs' && method === 'POST') {
+      const device = clean(body.device, 40);
+      if (!device) return bad('Bad request.');
+      const off = (await env.CTEEN.get('pushoff:photos', 'json')) || {};
+      if (body.photos === false) off[device] = 1; else delete off[device];
+      await env.CTEEN.put('pushoff:photos', JSON.stringify(off));
+      return json({ ok: true, photos: body.photos !== false });
+    }
     if (path === 'push/register' && method === 'POST') {
       const device = clean(body.device, 40), token = clean(body.token, 120);
       if (device.length < 8 || !/^Expo(nent)?PushToken\[[^\]]+\]$/.test(token)) return bad('Bad request.');

@@ -129,6 +129,7 @@ type Ctx = Local & {
   leaderLogin: (code: string) => Promise<string | null>; leaderLogout: () => void;
   saveContent: (next: Content) => Promise<string | null>;
   uploadPhoto: (base64: string) => Promise<string | { error: string }>;
+  setPhotoAlerts: (on: boolean) => Promise<void>;
   aiDraft: (text: string) => Promise<AiDraft | { error: string }>;
   minyanFromText: (text: string) => Promise<Minyan | { error: string }>;
   sendAlert: (a: { title: string; text: string; target: Target; hours: number; push: boolean } | null) => Promise<string>;
@@ -479,7 +480,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     checkin: async (id, photo, caption) => {
       const me = ref.current;
       try {
-        const r = await api<{ already: boolean; count: number; period: string; board: BoardRow[] }>(`/challenges/${id}/checkin`, { method: 'POST', body: { ...who(me), photo, caption } });
+        const r = await api<{ already: boolean; count: number; period: string; board: BoardRow[] }>(`/challenges/${id}/checkin`, { method: 'POST', body: { ...who(me), photo, caption, device: me.device } });
         patch((s) => ({ ...s, counts: { ...s.counts, [id]: r.count }, checks: { ...s.checks, [id]: [...new Set([...(s.checks[id] ?? []), r.period])] } }));
         if (!r.already) tap(true);
         return { already: r.already, count: r.count, board: r.board };
@@ -520,6 +521,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       }
     },
     leaderLogout: () => { setLeader(null); setAdminOpen(false); },
+    setPhotoAlerts: async (on) => {
+      try { await api('/push/prefs', { method: 'POST', body: { device: ref.current.device, photos: on } }); } catch {}
+    },
     uploadPhoto: async (base64) => {
       try { return (await api<{ url: string }>('/admin/media', { method: 'POST', body: { photo: base64 }, leader })).url; } catch (e) { return { error: msg(e) }; }
     },

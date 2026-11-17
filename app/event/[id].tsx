@@ -16,7 +16,7 @@ export default function EventRoute() {
   const e = content.events.find((x) => x.id === id);
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 30 }} showsVerticalScrollIndicator={false}>
+      <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" contentContainerStyle={{ paddingBottom: insets.bottom + 30 }} showsVerticalScrollIndicator={false}>
         <View style={st.col}>
           {e ? <EventDetails e={e} /> : <Text style={[T.body, { textAlign: 'center', marginTop: 60 }]}>This event isn't on the calendar anymore.</Text>}
         </View>

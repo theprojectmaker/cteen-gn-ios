@@ -11,7 +11,7 @@ export default function ChallengesRoute() {
   const { content } = useStore();
   const live = content.challenges.filter((c) => c.active);
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ paddingTop: insets.top + 60, paddingBottom: insets.bottom + 40 }}>
+    <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ paddingTop: insets.top + 60, paddingBottom: insets.bottom + 40 }}>
       <View style={st.col}>
         <Text style={st.title}>Challenges</Text>
         <Text style={[T.small, { fontSize: 15, marginTop: 6, marginBottom: 22 }]}>Sign up, keep your streak, win rewards.</Text>

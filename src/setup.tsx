@@ -225,7 +225,7 @@ export function Setup() {
 
   return (
     <Modal visible animationType="fade" onRequestClose={() => step > 1 && step < 4 && go(step - 1)}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: C.bg }}>
+      <KeyboardAvoidingView behavior={undefined} style={{ flex: 1, backgroundColor: C.bg }}>
         <View style={[st.top, { paddingTop: insets.top + 10 }]}>
           <Pressable onPress={() => go(step - 1)} hitSlop={10} style={st.back} accessibilityRole="button" accessibilityLabel="Back" disabled={step >= 4}>
             {step < 4 ? <Icon name="right" size={20} color={C.ink} stroke={2.4} /> : null}
@@ -233,7 +233,7 @@ export function Setup() {
           <Progress step={step} />
           <View style={{ width: 44 }} />
         </View>
-        <ScrollView contentContainerStyle={st.scroll} keyboardShouldPersistTaps="handled">
+        <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" contentContainerStyle={st.scroll} keyboardShouldPersistTaps="handled">
           <Animated.View style={{ opacity: fade, transform: [{ translateX: slide }] }}>{body}</Animated.View>
           {err ? <Text style={st.err}>{err}</Text> : null}
         </ScrollView>

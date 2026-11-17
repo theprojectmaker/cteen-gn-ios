@@ -184,7 +184,7 @@ export function Sheet({ onClose, children }: { onClose: () => void; children: Re
       <View style={s.sheetBack}>
         <Pressable style={s.fill} onPress={onClose} accessibilityLabel="Close" />
         <View style={s.sheet}>
-          <ScrollView bounces={false} keyboardShouldPersistTaps="handled">{children}</ScrollView>
+          <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" bounces={false} keyboardShouldPersistTaps="handled">{children}</ScrollView>
           <Pressable onPress={onClose} style={s.closePos} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close">
             <Glass style={s.close}>
               <Icon name="x" size={18} color={C.ink} stroke={2.4} />

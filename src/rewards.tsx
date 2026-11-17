@@ -1,10 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { AppState, Animated, Easing, Image, KeyboardAvoidingView, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useFocusEffect } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Fire, FireBadge } from './fire';
 import Svg, { Circle } from 'react-native-svg';
 import { C, HUES, R, T, F } from './theme';
 import { Icon, challengeIcon } from './icons';
 import { nyTime, untilText, wrapWindow } from './zmanim';
-import { Pulse, leftText, useWrapStatus } from './wrap';
+import { leftText, useWrapStatus } from './wrap';
 import { doneThisPeriod, hourLabel, periodKey, streak, tap, useStore, type Challenge, type ChallengeStats, type Wall as WallT, type WallPost } from './store';
 import { Button, Card, Chips, Field, IconTile, s as u } from './ui';
 import { snapPhoto } from './photo';
@@ -25,9 +28,8 @@ export function ChallengeBanner({ ch }: { ch: Challenge }) {
   const line = wrapNow && w ? (w.lastHour ? `Only ${leftText(w.left)} left to wrap today` : `${leftText(w.left)} left to wrap today`) : !mine ? 'Tap to join. Win the backpack.' : done ? `${fire} ${unit(ch, fire)} in a row. See you tomorrow.` : fire > 0 ? `${fire} ${unit(ch, fire)} in a row. Keep it alive.` : 'Start your streak today.';
   const action = !mine ? 'Join' : done ? 'Done' : ch.photo ? 'Snap' : 'Check in';
   return (
-    <Pulse on={wrapNow || (!mine && ch.active)} color={w?.lastHour ? '#E8742A' : hue.solid} radius={R.card}>
     <Card style={st.banner} onPress={() => openChallenge(ch.id)} label={`${ch.title}. ${line}`}>
-      <IconTile icon={challengeIcon(ch)} color={ch.color} size={52} solid />
+      {ch.id === 'tefillin' ? <FireBadge lit={done} streak={fire} size={50} /> : <IconTile icon={challengeIcon(ch)} color={ch.color} size={52} solid />}
       <View style={{ flex: 1 }}>
         <Text style={T.h3} numberOfLines={1}>{ch.title}</Text>
         <Text style={[T.small, { marginTop: 2 }]} numberOfLines={2}>{line}</Text>
@@ -37,7 +39,6 @@ export function ChallengeBanner({ ch }: { ch: Challenge }) {
         <Text style={[st.pillText, done && { color: hue.deep }]}>{action}</Text>
       </View>
     </Card>
-    </Pulse>
   );
 }
 
@@ -123,7 +124,7 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
   const [wall, setWall] = useState<WallT | null>(null);
   const [wallErr, setWallErr] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
-  const [open, setOpen] = useState<WallPost | null>(null);
+  const [open, setOpen] = useState<number | null>(null);
   const [pending, setPending] = useState<{ uri: string; base64: string } | null>(null);
   const [caption, setCaption] = useState('');
   const [party, setParty] = useState<{ count: number; streak: number } | null>(null);
@@ -146,14 +147,20 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
   useEffect(() => {
     if (!mine || !ch.photo) return;
     let alive = true;
-    setWallErr(null);
     fetchWall(ch.id, today).then((r) => {
       if (!alive) return;
-      if ('error' in r) { setWallErr(r.error); setWall(null); return; }
+      if ('error' in r) { if (!wall) setWallErr(r.error); return; }
+      setWallErr(null);
       setWall(r);
     });
     return () => { alive = false; };
   }, [ch.id, reload, mine]);
+
+  useFocusEffect(React.useCallback(() => {
+    if (!mine || !ch.photo) return;
+    const tick = setInterval(() => { if (AppState.currentState === 'active') setReload((k) => k + 1); }, 10000);
+    return () => clearInterval(tick);
+  }, [mine, ch.photo]));
 
   // numbers come from the server (the same on every phone); fall back to this phone's record
   const me: ChallengeStats = wall?.me ?? { count: counts[ch.id] ?? 0, streak: streak(ch, checks), strikes: 0, out: false, goal: ch.goal, done: doneThisPeriod(ch, checks) };
@@ -200,7 +207,7 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
     <View style={{ paddingBottom: 24 }}>
       {/* title */}
       <View style={st.top}>
-        <IconTile icon={challengeIcon(ch)} color={ch.color} size={54} solid />
+        {timed ? <Fire size={58} lit={done} /> : <IconTile icon={challengeIcon(ch)} color={ch.color} size={54} solid />}
         <View style={{ flex: 1 }}>
           <Text style={st.topTitle} numberOfLines={2}>{ch.title}</Text>
           {dayLine ? <Text style={st.topSub}>{dayLine}{lastDay ? ` · ends ${niceDay(lastDay)}` : ''}</Text> : null}
@@ -268,8 +275,7 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
               </View>
             </View>
           ) : (
-            <Pulse on={!busy} color={ws?.lastHour ? '#E8742A' : hue.solid} radius={24} style={{ marginTop: 16 }}>
-            <Pressable onPress={doCheck} disabled={busy || !ch.active} style={({ pressed }) => [st.snap, { marginTop: 0, backgroundColor: ws?.lastHour ? '#E8742A' : hue.solid }, pressed && { transform: [{ scale: 0.98 }], opacity: 0.95 }]} accessibilityRole="button" accessibilityLabel="Snap today's selfie">
+            <Pressable onPress={doCheck} disabled={busy || !ch.active} style={({ pressed }) => [st.snap, { backgroundColor: ws?.lastHour ? '#E8742A' : hue.solid }, pressed && { transform: [{ scale: 0.98 }], opacity: 0.95 }]} accessibilityRole="button" accessibilityLabel="Snap today's selfie">
               <View style={st.snapIconWrap}><Icon name={ch.photo ? 'camera' : 'tick'} size={24} color={hue.solid} stroke={2.2} /></View>
               <View style={{ flex: 1 }}>
                 <Text style={st.snapText}>{busy ? 'Posting…' : ch.photo ? "Snap today's selfie" : 'Check in for today'}</Text>
@@ -279,7 +285,6 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
                 <View style={st.snapTimer}><Text style={st.snapTimerText}>{leftText(ws.left)}</Text><Text style={st.snapTimerLabel}>left</Text></View>
               ) : <Icon name="right" size={20} color="rgba(255,255,255,0.85)" stroke={2.4} />}
             </Pressable>
-            </Pulse>
           )}
           {me.strikes > 0 && !me.out ? <Text style={st.strikeNote}>{me.strikes === 1 ? 'You missed 1 day.' : `You missed ${me.strikes} days.`} A 3rd miss and you're out.</Text> : null}
           {note ? <Text style={st.note} accessibilityLiveRegion="polite">{note}</Text> : null}
@@ -289,10 +294,10 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
             <View style={{ marginTop: 28 }}>
               <View style={st.wallHead}>
                 <Text style={st.section0}>Today</Text>
-                <Text style={T.small}>{wall ? `${wall.posts.length} of ${total} wrapped` : ''}</Text>
+                <View style={st.liveRow}><View style={st.liveDot} /><Text style={T.small}>{wall ? `${wall.posts.length} of ${total} wrapped` : 'Live'}</Text></View>
               </View>
               {wallErr ? <Text style={[T.small, { marginTop: 12 }]}>{wallErr}</Text> : !wall ? <BoardSkeleton /> : <Board wall={wall} onOpen={setOpen} />}
-              <Text style={st.boardHint}>Tap a photo to see who it is, react and comment.</Text>
+              <Text style={st.boardHint}>Updates live. Tap a photo to see it big, react and comment.</Text>
             </View>
           ) : null}
 
@@ -302,11 +307,11 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
           <Pressable onPress={() => leave(ch.id)} hitSlop={8} style={{ alignSelf: 'center', marginTop: 24 }} accessibilityRole="button">
             <Text style={[T.small, { textDecorationLine: 'underline' }]}>Leave this challenge</Text>
           </Pressable>
-          <PhotoSheet ch={ch} post={open} onClose={() => setOpen(null)} />
+          <PhotoViewer ch={ch} posts={wall?.posts ?? []} start={open} onClose={() => setOpen(null)} onChanged={() => setReload((k) => k + 1)} />
           <Modal visible={!!pending || !!party} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => { setPending(null); setParty(null); }}>
             <View style={{ flex: 1, backgroundColor: C.bg }}>
               {party ? <Celebrate ch={ch} count={party.count} streak={party.streak} onClose={() => setParty(null)} /> : (
-              <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40, maxWidth: 600, width: '100%', alignSelf: 'center' }} keyboardShouldPersistTaps="handled">
+              <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" contentContainerStyle={{ padding: 20, paddingBottom: 40, maxWidth: 600, width: '100%', alignSelf: 'center' }} keyboardShouldPersistTaps="handled">
                 <View style={st.sheetHead}>
                   <Text style={[T.h2, { flex: 1 }]}>Today's selfie</Text>
                   <Pressable onPress={() => setPending(null)} style={st.sheetClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Cancel"><Icon name="x" size={18} color={C.ink} stroke={2.4} /></Pressable>
@@ -339,37 +344,34 @@ function Step({ icon, title, sub, last }: { icon: string; title: string; sub: st
   );
 }
 
-// The board: 8 small squares across. Photos for those who wrapped, grey squares for those who
-// haven't, faint open squares after that. Starts as 8 x 16 and grows when more people sign up.
-const COLS = 8;
-function Board({ wall, onOpen }: { wall: WallT; onOpen: (p: WallPost) => void }) {
-  const filled = wall.posts.length + wall.waiting.length;
-  const slots = Math.max(COLS * 16, Math.ceil(filled / COLS) * COLS);
-  const cells: React.ReactNode[] = [];
-  wall.posts.forEach((p) => cells.push(
-    <Pressable key={p.key} onPress={() => onOpen(p)} style={({ pressed }) => [st.cell, pressed && { transform: [{ scale: 0.9 }] }]} accessibilityRole="button" accessibilityLabel={`${p.name}, ${timeOf(p.at)}`}>
-      <Image source={{ uri: p.url }} style={u.fill} resizeMode="cover" />
-      {p.status === 'checked' ? <View style={st.cellCheck} /> : null}
-    </Pressable>,
-  ));
-  wall.waiting.forEach((w, i) => cells.push(
-    <View key={'w' + i} style={[st.cell, st.cellWaiting]} accessibilityLabel={`${w.name}, not yet`}>
-      <Text style={st.cellInitial}>{w.name[0]?.toUpperCase()}</Text>
-    </View>,
-  ));
-  for (let i = filled; i < slots; i++) cells.push(<View key={'e' + i} style={[st.cell, st.cellOpen]} />);
+// Today's photos: big squares, 3 across, the name and the time under each. People who haven't
+// posted yet are a soft grey square with their initial. As long as the list needs to be.
+const COLS = 3;
+function Board({ wall, onOpen }: { wall: WallT; onOpen: (i: number) => void }) {
   return (
-    <View>
-      <View style={st.board}>{cells}</View>
-      <View style={st.legend}>
-        <View style={[st.legendDot, { backgroundColor: C.blue }]} /><Text style={st.legendText}>Wrapped</Text>
-        <View style={[st.legendDot, st.cellWaiting]} /><Text style={st.legendText}>Not yet</Text>
-        <View style={[st.legendDot, st.cellOpen]} /><Text style={st.legendText}>Open spot</Text>
-      </View>
+    <View style={st.board}>
+      {wall.posts.map((p, i) => (
+        <Pressable key={p.key} onPress={() => onOpen(i)} style={({ pressed }) => [st.cell, pressed && { opacity: 0.85 }]} accessibilityRole="button" accessibilityLabel={`${p.name}, ${timeOf(p.at)}`}>
+          <View style={st.square}>
+            <Image source={{ uri: p.url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            {p.status === 'checked' ? <View style={st.checkBadge}><Icon name="tick" size={10} color="#FFFFFF" stroke={3.2} /></View> : null}
+          </View>
+          <Text style={st.cellName} numberOfLines={1}>{p.mine ? 'You' : p.name}</Text>
+          <Text style={st.cellTime}>{timeOf(p.at)}</Text>
+        </Pressable>
+      ))}
+      {wall.waiting.map((w, i) => (
+        <View key={'w' + i} style={st.cell} accessibilityLabel={`${w.name}, ${w.out ? 'out' : 'not yet'}`}>
+          <View style={[st.square, st.squareWaiting]}>
+            <Text style={st.waitingInitial}>{w.name[0]?.toUpperCase()}</Text>
+          </View>
+          <Text style={[st.cellName, { color: C.sub }]} numberOfLines={1}>{w.mine ? 'You' : w.name}</Text>
+          <Text style={st.cellTime}>{w.out ? 'Out' : 'Not yet'}</Text>
+        </View>
+      ))}
     </View>
   );
 }
-
 
 // Grey squares that breathe while the day's photos load.
 function BoardSkeleton() {
@@ -384,156 +386,180 @@ function BoardSkeleton() {
   }, []);
   return (
     <Animated.View style={[st.board, { opacity: a }]} accessibilityLabel="Loading photos">
-      {[...Array(COLS * 4)].map((_, i) => <View key={i} style={[st.cell, st.cellWaiting]} />)}
+      {[...Array(6)].map((_, i) => <View key={i} style={st.cell}><View style={[st.square, st.squareWaiting]} /><View style={st.skelLine} /></View>)}
     </Animated.View>
   );
 }
 
-// After posting: confetti, a check that springs in, the new streak and the next reward.
-const CONFETTI = ['#159FDC', '#F5B81F', '#F0569A', '#1FA971', '#7C5CFC', '#F2913D'];
+// After posting: the fire lights up with sparks, and the streak number.
 function Celebrate({ ch, count, streak: days, onClose }: { ch: Challenge; count: number; streak: number; onClose: () => void }) {
-  const hue = HUES[ch.color] ?? HUES.blue;
   const nd = Platform.OS !== 'web';
-  const burst = useRef(new Animated.Value(0)).current;
-  const check = useRef(new Animated.Value(0)).current;
   const text = useRef(new Animated.Value(0)).current;
-  const bits = useRef([...Array(28)].map((_, i) => ({
-    angle: (i / 28) * Math.PI * 2 + Math.random() * 0.4,
-    dist: 110 + Math.random() * 90,
-    spin: (Math.random() > 0.5 ? 1 : -1) * (180 + Math.random() * 360),
-    color: CONFETTI[i % CONFETTI.length],
-    w: 6 + Math.random() * 5,
-    round: i % 3 === 0,
-  }))).current;
+  const num = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(burst, { toValue: 1, duration: 1300, easing: Easing.out(Easing.cubic), useNativeDriver: nd }),
-      Animated.spring(check, { toValue: 1, friction: 5, tension: 120, useNativeDriver: nd }),
-      Animated.timing(text, { toValue: 1, duration: 500, delay: 250, useNativeDriver: nd }),
+    Animated.sequence([
+      Animated.delay(450),
+      Animated.parallel([
+        Animated.spring(num, { toValue: 1, friction: 5, tension: 90, useNativeDriver: nd }),
+        Animated.timing(text, { toValue: 1, duration: 450, useNativeDriver: nd }),
+      ]),
     ]).start();
   }, []);
   const next = ch.rewards.find((r) => r.at > count);
-  const goalLeft = Math.max(0, ch.goal - count);
   return (
     <View style={st.party}>
-      <View style={st.partyStage}>
-        {bits.map((b, i) => (
-          <Animated.View key={i} pointerEvents="none" style={{
-            position: 'absolute', width: b.w, height: b.round ? b.w : b.w * 1.8, borderRadius: b.round ? b.w : 2, backgroundColor: b.color,
-            opacity: burst.interpolate({ inputRange: [0, 0.1, 0.75, 1], outputRange: [0, 1, 1, 0] }),
-            transform: [
-              { translateX: burst.interpolate({ inputRange: [0, 1], outputRange: [0, Math.cos(b.angle) * b.dist] }) },
-              { translateY: burst.interpolate({ inputRange: [0, 0.6, 1], outputRange: [0, Math.sin(b.angle) * b.dist * 0.8, Math.sin(b.angle) * b.dist + 70] }) },
-              { rotate: burst.interpolate({ inputRange: [0, 1], outputRange: ['0deg', b.spin + 'deg'] }) },
-            ],
-          }} />
-        ))}
-        <Animated.View style={[st.partyCheck, { backgroundColor: hue.solid, transform: [{ scale: check }] }]}>
-          <Icon name="tick" size={54} color={C.white} stroke={3} />
-        </Animated.View>
-      </View>
-      <Animated.View style={{ alignItems: 'center', opacity: text, transform: [{ translateY: text.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }] }}>
-        <Text style={st.partyTitle}>{days > 1 ? `${days} days in a row` : 'You wrapped today'}</Text>
-        <Text style={st.partySub}>Your photo is on today's board.</Text>
-        <View style={st.partyStats}>
-          <View style={st.partyStat}><Text style={st.partyNum}>{count}</Text><Text style={st.partyLabel}>check-ins</Text></View>
-          <View style={st.partyDivider} />
-          <View style={st.partyStat}><Text style={st.partyNum}>{goalLeft}</Text><Text style={st.partyLabel}>to the goal</Text></View>
-        </View>
-        {next ? (
-          <View style={st.partyNext}>
-            <Icon name="gift" size={18} color={hue.deep} stroke={2.2} />
-            <Text style={[st.partyNextText, { color: hue.deep }]}>{next.at - count} more for: {next.prize}</Text>
-          </View>
-        ) : null}
+      <Fire size={170} lit ignite />
+      <Animated.Text style={[st.partyNum, { opacity: num, transform: [{ scale: num.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }) }] }]}>{days}</Animated.Text>
+      <Animated.View style={{ alignItems: 'center', opacity: text, transform: [{ translateY: text.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }] }}>
+        <Text style={st.partyLabel}>day streak</Text>
+        <Text style={st.partySub}>{count} of {ch.goal} done. Your photo is on today's board.</Text>
+        {next ? <Text style={st.partyNext}>{next.at - count} more to go for the {next.prize.replace(/\s*\(.*\)$/, '')}</Text> : null}
       </Animated.View>
-      <View style={{ width: '100%', marginTop: 28 }}>
-        <Button label="See today's board" color={hue.solid} onPress={onClose} />
+      <View style={{ width: '100%', marginTop: 30 }}>
+        <Button label="See today's photos" color="#FF5A1F" onPress={onClose} />
       </View>
     </View>
   );
 }
 
-
-
-
-
-// Tapping a photo opens it in Apple's card-style sheet (drag down to close), with comments.
-function PhotoSheet({ ch, post, onClose }: { ch: Challenge; post: WallPost | null; onClose: () => void }) {
-  const { comment, react } = useStore();
-  const [comments, setComments] = useState<WallPost['comments']>([]);
-  const [reactions, setReactions] = useState<NonNullable<WallPost['reactions']>>([]);
+// Tapping a photo opens it full screen on black: swipe left and right through today's photos,
+// swipe down to close. Reactions, caption and comments sit under the photo.
+function PhotoViewer({ ch, posts, start, onClose, onChanged }: { ch: Challenge; posts: WallPost[]; start: number | null; onClose: () => void; onChanged: () => void }) {
+  const { comment, react, name } = useStore();
+  const insets = useSafeAreaInsets();
+  const [w, setW] = useState(0);
+  const [idx, setIdx] = useState(start ?? 0);
+  const [extra, setExtra] = useState<Record<string, { comments?: WallPost['comments']; reactions?: NonNullable<WallPost['reactions']> }>>({});
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  useEffect(() => { setComments(post?.comments ?? []); setReactions(post?.reactions ?? []); setText(''); setErr(null); }, [post?.key]);
-  if (!post) return null;
+  const [showComments, setShowComments] = useState(false);
+  const drag = useRef(new Animated.Value(0)).current;
+  const scroller = useRef<ScrollView>(null);
+  useEffect(() => { if (start !== null) { setIdx(start); setShowComments(false); setText(''); drag.setValue(0); } }, [start]);
+  useEffect(() => { if (w && start !== null) setTimeout(() => scroller.current?.scrollTo({ x: start * w, animated: false }), 0); }, [w, start]);
+  const pan = useRef(PanResponder.create({
+    onMoveShouldSetPanResponder: (_, g) => g.dy > 12 && Math.abs(g.dy) > Math.abs(g.dx) * 1.5,
+    onPanResponderMove: (_, g) => drag.setValue(Math.max(0, g.dy)),
+    onPanResponderRelease: (_, g) => {
+      if (g.dy > 110 || g.vy > 1.2) Animated.timing(drag, { toValue: 900, duration: 200, useNativeDriver: Platform.OS !== 'web' }).start(onClose);
+      else Animated.spring(drag, { toValue: 0, friction: 7, useNativeDriver: Platform.OS !== 'web' }).start();
+    },
+  })).current;
+  if (start === null || !posts.length) return null;
+  const post = posts[Math.min(idx, posts.length - 1)];
+  const comments = extra[post.key]?.comments ?? post.comments ?? [];
+  const reactions = extra[post.key]?.reactions ?? post.reactions ?? [];
   const send = async () => {
     if (!text.trim()) return;
-    setBusy(true); setErr(null);
+    setBusy(true);
     const r = await comment(ch.id, post.key, text.trim());
     setBusy(false);
-    if ('error' in r) return setErr(r.error);
-    setComments((c) => [...c, r]);
+    if ('error' in r) return;
+    tap();
+    setExtra((e) => ({ ...e, [post.key]: { ...e[post.key], comments: [...comments, r] } }));
     setText('');
+    onChanged();
+  };
+  const doReact = async (emoji: string) => {
+    tap();
+    const next = await react(ch.id, post.key, emoji);
+    if (next) { setExtra((e) => ({ ...e, [post.key]: { ...e[post.key], reactions: next } })); onChanged(); }
   };
   return (
-    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: C.bg }}>
-        <ScrollView contentContainerStyle={{ paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
-          <View style={st.sheetGrab} />
-          <View style={{ paddingHorizontal: 20, maxWidth: 600, width: '100%', alignSelf: 'center' }}>
-            <View style={st.sheetHead}>
-              <View style={st.avatar}><Text style={st.avatarText}>{post.name[0]?.toUpperCase()}</Text></View>
+    <Modal visible transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+      <Animated.View style={[st.viewer, { opacity: drag.interpolate({ inputRange: [0, 400], outputRange: [1, 0.3], extrapolate: 'clamp' }) }]}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+          <Animated.View style={{ flex: 1, transform: [{ translateY: drag }] }} {...pan.panHandlers}>
+            <View style={[st.viewerTop, { paddingTop: insets.top + 8 }]}>
+              <View style={st.viewerAvatar}><Text style={st.viewerInitial}>{post.name[0]?.toUpperCase()}</Text></View>
               <View style={{ flex: 1 }}>
-                <Text style={T.h2}>{post.mine ? 'You' : post.name}</Text>
-                <Text style={T.small}>Wrapped at {timeOf(post.at)}</Text>
+                <Text style={st.viewerName}>{post.mine ? 'You' : post.name}</Text>
+                <Text style={st.viewerTime}>Wrapped at {timeOf(post.at)}{post.status === 'checked' ? ' · Checked by Rabbi Zevy' : ''}</Text>
               </View>
-              <Pressable onPress={onClose} style={st.sheetClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close">
-                <Icon name="x" size={18} color={C.ink} stroke={2.4} />
+              <Text style={st.viewerCount}>{idx + 1} / {posts.length}</Text>
+              <Pressable onPress={onClose} hitSlop={10} style={st.viewerClose} accessibilityRole="button" accessibilityLabel="Close">
+                <Icon name="x" size={18} color="#FFFFFF" stroke={2.4} />
               </Pressable>
             </View>
-            <Image source={{ uri: post.url }} style={st.bigPhoto} resizeMode="cover" accessibilityLabel={`${post.name}'s photo`} />
-            {post.caption ? <Text style={st.caption}>{post.caption}</Text> : null}
-            {post.status === 'checked' ? (
-              <View style={st.checkedRow}><Icon name="check" size={16} color={C.green} stroke={2.4} /><Text style={st.checkedText}>Checked by Rabbi Zevy</Text></View>
-            ) : null}
-            <View style={st.reactRow}>
-              {['❤️', '🔥', '💪', '👏', '🙌'].map((e) => {
-                const r = reactions.find((x) => x.emoji === e);
-                return (
-                  <Pressable key={e} onPress={async () => { const next = await react(ch.id, post.key, e); if (next) setReactions(next); }} style={({ pressed }) => [st.reactBtn, r?.mine && st.reactOn, pressed && { transform: [{ scale: 0.92 }] }]} accessibilityRole="button" accessibilityLabel={`React ${e}${r ? `, ${r.count}` : ''}`}>
-                    <Text style={st.reactEmoji}>{e}</Text>
-                    {r ? <Text style={[st.reactCount, r.mine && { color: C.blueDeep }]}>{r.count}</Text> : null}
-                  </Pressable>
-                );
-              })}
+            <View style={{ flex: 1 }} onLayout={(e) => setW(e.nativeEvent.layout.width)}>
+              <ScrollView ref={scroller} horizontal pagingEnabled showsHorizontalScrollIndicator={false} onMomentumScrollEnd={(e) => { if (w) { setIdx(Math.round(e.nativeEvent.contentOffset.x / w)); setShowComments(false); } }}>
+                {posts.map((p) => (
+                  <View key={p.key} style={{ width: w || 1, height: '100%', justifyContent: 'center' }}>
+                    <Image source={{ uri: p.url }} style={{ width: '100%', height: '100%' }} resizeMode="contain" accessibilityLabel={`${p.name}'s photo`} />
+                  </View>
+                ))}
+              </ScrollView>
             </View>
-            <Text style={[st.section, { marginTop: 22 }]}>Comments</Text>
-            {comments.length === 0 ? <Text style={T.small}>Be the first to cheer them on.</Text> : null}
-            <View style={{ gap: 10 }}>
-              {comments.map((c, i) => (
-                <Text key={c.at + i} style={st.comment}>
-                  <Text style={[st.commentName, c.leader && { color: C.blueDeep }]}>{c.leader ? 'Rabbi Zevy' : c.name} </Text>
-                  {c.text}
-                </Text>
-              ))}
-            </View>
-            <View style={st.commentRow}>
-              <TextInput value={text} onChangeText={setText} placeholder="Add a comment" placeholderTextColor={C.faint} style={st.commentInput} maxLength={200} accessibilityLabel="Add a comment" onSubmitEditing={send} returnKeyType="send" />
-              <Pressable onPress={send} disabled={busy || !text.trim()} style={[st.send, (!text.trim() || busy) && { opacity: 0.4 }]} accessibilityRole="button" accessibilityLabel="Send comment">
-                <Icon name="send" size={18} color={C.white} stroke={2.2} />
+            <View style={[st.viewerBottom, { paddingBottom: insets.bottom + 12 }]}>
+              {post.caption ? <Text style={st.viewerCaption}><Text style={{ fontWeight: '800' }}>{post.mine ? 'You' : post.name}  </Text>{post.caption}</Text> : null}
+              <View style={st.viewerReacts}>
+                {['❤️', '🔥', '💪', '👏', '🙌'].map((e) => {
+                  const r = reactions.find((x) => x.emoji === e);
+                  return (
+                    <Pressable key={e} onPress={() => doReact(e)} style={({ pressed }) => [st.vReact, r?.mine && st.vReactOn, pressed && { transform: [{ scale: 0.9 }] }]} accessibilityRole="button" accessibilityLabel={`React ${e}${r ? `, ${r.count}` : ''}`}>
+                      <Text style={{ fontSize: 18 }}>{e}</Text>
+                      {r ? <Text style={st.vReactCount}>{r.count}</Text> : null}
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Pressable onPress={() => setShowComments((s) => !s)} hitSlop={6} accessibilityRole="button">
+                <Text style={st.viewerComments}>{comments.length ? (showComments ? 'Hide comments' : `View ${comments.length === 1 ? '1 comment' : `all ${comments.length} comments`}`) : 'No comments yet'}</Text>
               </Pressable>
+              {showComments ? (
+                <ScrollView style={{ maxHeight: 180 }} keyboardShouldPersistTaps="handled">
+                  {comments.map((c, i) => (
+                    <Text key={c.at + i} style={st.viewerComment}><Text style={{ fontWeight: '800', color: c.leader ? '#7FD0F5' : '#FFFFFF' }}>{c.leader ? 'Rabbi Zevy' : c.name}  </Text>{c.text}</Text>
+                  ))}
+                </ScrollView>
+              ) : null}
+              <View style={st.viewerInputRow}>
+                <View style={st.viewerMe}><Text style={st.viewerInitial}>{name[0]?.toUpperCase() || '?'}</Text></View>
+                <TextInput value={text} onChangeText={setText} placeholder={`Cheer on ${post.mine ? 'yourself' : post.name.split(' ')[0]}…`} placeholderTextColor="rgba(255,255,255,0.5)" style={st.viewerInput} maxLength={200} onSubmitEditing={send} returnKeyType="send" accessibilityLabel="Add a comment" />
+                <Pressable onPress={send} disabled={busy || !text.trim()} style={[st.viewerSend, (!text.trim() || busy) && { opacity: 0.35 }]} accessibilityRole="button" accessibilityLabel="Send comment">
+                  <Icon name="send" size={15} color="#FFFFFF" stroke={2.4} />
+                </Pressable>
+              </View>
             </View>
-            {err ? <Text style={[T.small, { color: '#C0303F', marginTop: 6 }]}>{err}</Text> : null}
-          </View>
-        </ScrollView>
-      </View>
+          </Animated.View>
+        </KeyboardAvoidingView>
+      </Animated.View>
     </Modal>
   );
 }
 
 const st = StyleSheet.create({
+  liveRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#E8364F' },
+  square: { width: '100%', aspectRatio: 1, borderRadius: 16, overflow: 'hidden', backgroundColor: C.line },
+  squareWaiting: { alignItems: 'center', justifyContent: 'center', backgroundColor: C.line },
+  waitingInitial: { fontSize: 26, fontFamily: F.display, color: C.faint },
+  checkBadge: { position: 'absolute', top: 6, right: 6, width: 18, height: 18, borderRadius: 9, backgroundColor: '#1FA971', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#FFFFFF' },
+  cellName: { fontSize: 13, fontWeight: '800', color: C.ink, marginTop: 6 },
+  cellTime: { fontSize: 11, fontWeight: '600', color: C.faint, marginTop: 1, fontVariant: ['tabular-nums'] },
+  skelLine: { height: 10, width: '60%', borderRadius: 5, backgroundColor: C.line, marginTop: 8 },
+  partyNum: { fontSize: 76, lineHeight: 82, fontFamily: F.display, color: C.ink, marginTop: 22, fontVariant: ['tabular-nums'] },
+  partyLabel: { fontSize: 15, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase', color: '#FF5A1F', marginTop: -4 },
+  viewer: { flex: 1, backgroundColor: '#000000' },
+  viewerTop: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingBottom: 10 },
+  viewerAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#2A3440', alignItems: 'center', justifyContent: 'center' },
+  viewerMe: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#2A3440', alignItems: 'center', justifyContent: 'center' },
+  viewerInitial: { color: '#FFFFFF', fontWeight: '900', fontSize: 14 },
+  viewerName: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
+  viewerTime: { color: 'rgba(255,255,255,0.65)', fontSize: 12, marginTop: 1 },
+  viewerCount: { color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  viewerClose: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' },
+  viewerBottom: { paddingHorizontal: 14, paddingTop: 10, gap: 10 },
+  viewerCaption: { color: '#FFFFFF', fontSize: 15, lineHeight: 21 },
+  viewerReacts: { flexDirection: 'row', gap: 8 },
+  vReact: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 36, paddingHorizontal: 11, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.12)' },
+  vReactOn: { backgroundColor: 'rgba(43,178,238,0.35)' },
+  vReactCount: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+  viewerComments: { color: 'rgba(255,255,255,0.65)', fontSize: 14, fontWeight: '600' },
+  viewerComment: { color: 'rgba(255,255,255,0.92)', fontSize: 14, lineHeight: 20, marginBottom: 6 },
+  viewerInputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 2 },
+  viewerInput: { flex: 1, height: 42, borderRadius: 21, paddingHorizontal: 16, backgroundColor: 'rgba(255,255,255,0.12)', color: '#FFFFFF', fontSize: 15 },
+  viewerSend: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#159FDC', alignItems: 'center', justifyContent: 'center' },
   snapTimer: { alignItems: 'flex-end' },
   snapTimerText: { fontSize: 20, fontFamily: F.display, color: '#FFFFFF', fontVariant: ['tabular-nums'] },
   snapTimerLabel: { fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.85)', marginTop: -2 },
@@ -569,8 +595,6 @@ const st = StyleSheet.create({
   partySub: { fontSize: 15, color: C.sub, marginTop: 6, textAlign: 'center' },
   partyStats: { flexDirection: 'row', alignItems: 'center', marginTop: 22, paddingVertical: 14, paddingHorizontal: 26, borderRadius: 20, backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
   partyStat: { alignItems: 'center', minWidth: 90 },
-  partyNum: { fontSize: 28, fontFamily: F.display, color: C.ink, fontVariant: ['tabular-nums'] },
-  partyLabel: { fontSize: 12, fontWeight: '700', color: C.sub, marginTop: 2 },
   partyDivider: { width: 1, height: 34, backgroundColor: C.line, marginHorizontal: 10 },
   partyNext: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 14, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 14, backgroundColor: C.bluePale },
   partyNextText: { fontSize: 14, fontWeight: '800', flexShrink: 1 },
@@ -584,8 +608,8 @@ const st = StyleSheet.create({
   windowFill: { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 3, backgroundColor: '#F5B81F' },
   windowNow: { position: 'absolute', width: 14, height: 14, borderRadius: 7, marginLeft: -7, backgroundColor: C.card, borderWidth: 3, borderColor: '#F5B81F' },
   windowNote: { fontSize: 12, color: C.faint, marginTop: 10 },
-  board: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 14 },
-  cell: { width: '11.5%', aspectRatio: 1, borderRadius: 7, overflow: 'hidden', backgroundColor: C.line },
+  board: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -5, marginTop: 14 },
+  cell: { width: '33.333%', paddingHorizontal: 5, marginBottom: 14 },
   cellWaiting: { backgroundColor: C.line, alignItems: 'center', justifyContent: 'center' },
   cellOpen: { backgroundColor: 'transparent', borderWidth: 1, borderColor: C.line, opacity: 0.6 },
   cellInitial: { fontSize: 11, fontWeight: '900', color: C.faint },

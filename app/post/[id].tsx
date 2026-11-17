@@ -1,5 +1,5 @@
 import React from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, T } from '../../src/theme';
@@ -14,9 +14,9 @@ export default function PostRoute() {
   const insets = useSafeAreaInsets();
   const post = content.posts.find((p) => p.id === id);
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: C.bg }}>
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
       <View style={st.grab} />
-      <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 22, paddingBottom: insets.bottom + 30 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" contentContainerStyle={{ padding: 16, paddingTop: 22, paddingBottom: insets.bottom + 30 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <View style={st.col}>
           {post ? (
             <>
@@ -29,7 +29,7 @@ export default function PostRoute() {
       <Pressable onPress={() => router.back()} style={st.close} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close">
         <Icon name="x" size={18} color={C.ink} stroke={2.4} />
       </Pressable>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

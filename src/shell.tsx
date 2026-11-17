@@ -61,7 +61,7 @@ export function Screen({ children }: { children: React.ReactNode }) {
   };
   return (
     <View style={st.root}>
-      <ScrollView
+      <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive"
         style={{ flex: 1 }}
         contentInsetAdjustmentBehavior="never"
         contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: insets.bottom + (Platform.OS === 'web' ? 110 : 32) }}

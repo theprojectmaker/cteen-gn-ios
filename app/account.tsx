@@ -7,7 +7,7 @@ import { AccountPage } from '../src/account';
 export default function AccountRoute() {
   const insets = useSafeAreaInsets();
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ paddingTop: insets.top + 56, paddingBottom: insets.bottom + 40 }} keyboardShouldPersistTaps="handled">
+    <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ paddingTop: insets.top + 56, paddingBottom: insets.bottom + 40 }} keyboardShouldPersistTaps="handled">
       <View style={st.col}>
         <AccountPage />
       </View>

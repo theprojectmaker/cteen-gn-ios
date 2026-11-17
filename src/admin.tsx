@@ -381,7 +381,7 @@ export function AdminPanel() {
           ) : null}
           {leader && mode === 'expert' ? <Chips options={SECTIONS} value={section} onChange={setSection} /> : null}
         </View>
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingVertical: 16, paddingBottom: insets.bottom + 40 }} keyboardShouldPersistTaps="handled">
+        <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" style={{ flex: 1 }} contentContainerStyle={{ paddingVertical: 16, paddingBottom: insets.bottom + 40 }} keyboardShouldPersistTaps="handled">
           <View style={st.col}>
             {note ? <Text style={st.note} accessibilityLiveRegion="polite">{note}</Text> : null}
             {leader && mode === 'simple' ? (

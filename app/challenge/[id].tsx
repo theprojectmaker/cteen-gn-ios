@@ -12,7 +12,7 @@ export default function ChallengeRoute() {
   const insets = useSafeAreaInsets();
   const ch = content.challenges.find((c) => c.id === id);
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ paddingTop: insets.top + 56, paddingBottom: insets.bottom + 40 }}>
+    <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ paddingTop: insets.top + 56, paddingBottom: insets.bottom + 40 }}>
       <View style={st.col}>
         {ch ? <ChallengePage ch={ch} /> : <Text style={[T.body, { textAlign: 'center', marginTop: 40 }]}>This challenge isn't available anymore.</Text>}
       </View>

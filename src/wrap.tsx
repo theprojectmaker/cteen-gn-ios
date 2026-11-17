@@ -5,6 +5,7 @@ import { C, F, PREFS } from './theme';
 import { Icon } from './icons';
 import { doneThisPeriod, useStore } from './store';
 import { nyTime, wrapWindow, type WrapWindow } from './zmanim';
+import { Fire } from './fire';
 
 // Everything about "have you wrapped today, and how long is left": the live last-hour banner,
 // the countdown text, and a gentle pulse for things that want a tap.
@@ -74,17 +75,17 @@ export function WrapBanner() {
   if (!w || !w.lastHour) return null;
   const friday = !!w.win.friday;
   return (
-    <Pulse on color="#F2913D" radius={22} style={{ marginBottom: 18 }}>
+    <View style={{ marginBottom: 18 }}>
       <Pressable onPress={() => router.push(`/challenge/${w.id}`)} style={({ pressed }) => [st.banner, friday && st.bannerFri, pressed && { opacity: 0.92 }]} accessibilityRole="button" accessibilityLiveRegion="polite"
         accessibilityLabel={`${friday ? 'Wrap tefillin before Shabbat' : 'Last hour to wrap tefillin'}, ${leftText(w.left)} left`}>
-        <View style={st.icon}><Icon name="tefillin" size={22} color="#FFFFFF" stroke={2} /></View>
+        <View style={st.icon}><Fire size={30} lit={false} /></View>
         <View style={{ flex: 1 }}>
           <Text style={st.title}>{friday ? 'Wrap before Shabbat' : 'Last hour to wrap'}</Text>
           <Text style={st.sub}>{friday ? `Candle lighting at ${nyTime(w.win.set)}. Wrap, snap, then get ready for Shabbat.` : `Closes at sunset, ${nyTime(w.win.set)}. ${w.mine ? 'Snap your selfie now.' : 'Join and wrap today.'}`}</Text>
         </View>
         <Text style={st.timer}>{leftText(w.left)}</Text>
       </Pressable>
-    </Pulse>
+    </View>
   );
 }
 
