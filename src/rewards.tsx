@@ -135,6 +135,8 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
   const [wallErr, setWallErr] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
   const [open, setOpen] = useState<WallPost | null>(null);
+  const [pending, setPending] = useState<{ uri: string; base64: string } | null>(null);
+  const [caption, setCaption] = useState('');
   const hue = HUES[ch.color] ?? HUES.blue;
   const mine = joined.includes(ch.id);
 
@@ -163,16 +165,21 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
   };
   const doCheck = async () => {
     setNote(null);
-    let base64: string | undefined;
     if (ch.photo) {
       const snap = await snapPhoto();
       if (!snap) return;
       if ('error' in snap) return setNote(snap.error);
-      base64 = snap.base64;
+      setCaption('');
+      setPending(snap); // show the photo with a caption box before posting
+      return;
     }
+    await post();
+  };
+  const post = async (base64?: string, cap?: string) => {
     setBusy(true);
-    const r = await checkin(ch.id, base64);
+    const r = await checkin(ch.id, base64, cap);
     setBusy(false);
+    setPending(null);
     if (r.error) return setNote(r.error);
     setNote(r.already ? 'You already checked in today.' : 'Posted. Nice.');
     setDay(0);
@@ -275,25 +282,30 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
                 ))}
               </ScrollView>
               {wallErr ? <Text style={[T.small, { marginTop: 12 }]}>{wallErr}</Text> : !wall ? <Text style={[T.small, { marginTop: 12 }]}>Loading…</Text> : (
+                <>
+                <Board wall={wall} onOpen={setOpen} />
+                <Text style={[st.section, { marginTop: 26 }]}>Who wrapped</Text>
                 <View style={st.grid}>
-                  {wall.posts.map((p) => (
-                    <Pressable key={p.key} onPress={() => setOpen(p)} style={({ pressed }) => [st.tile, pressed && { transform: [{ scale: 0.97 }] }]} accessibilityRole="button" accessibilityLabel={`${p.name}, ${timeOf(p.at)}`}>
-                      <Image source={{ uri: p.url }} style={u.fill} resizeMode="cover" />
-                      <View style={st.tileShade} />
-                      {p.status === 'checked' ? <View style={st.tileCheck}><Icon name="tick" size={11} color={C.white} stroke={3} /></View> : null}
-                      <Text style={st.tileName} numberOfLines={1}>{p.mine ? 'You' : p.name}</Text>
-                      <Text style={st.tileTime}>{timeOf(p.at)}</Text>
-                    </Pressable>
-                  ))}
-                  {wall.waiting.map((w, i) => (
-                    <View key={w.name + i} style={[st.tile, st.tileEmpty]} accessibilityLabel={`${w.name}, ${w.out ? 'out' : day === 0 ? 'not yet' : 'missed'}`}>
-                      <View style={st.emptyAvatar}><Text style={st.emptyInitial}>{w.name[0]?.toUpperCase()}</Text></View>
-                      <Text style={st.emptyName} numberOfLines={1}>{w.mine ? 'You' : w.name}</Text>
-                      <Text style={st.emptyState}>{w.out ? 'Out' : day === 0 ? 'Not yet' : 'Missed'}</Text>
-                    </View>
-                  ))}
+                  <Card style={{ padding: 0, width: '100%' }}>
+                    {wall.posts.map((p, i) => (
+                      <Pressable key={p.key} onPress={() => setOpen(p)} style={({ pressed }) => [st.whoRow, i > 0 && st.ruleTop, pressed && { backgroundColor: C.bg }]} accessibilityRole="button" accessibilityLabel={`${p.name}, ${timeOf(p.at)}`}>
+                        <Image source={{ uri: p.url }} style={st.whoThumb} />
+                        <Text style={[T.h3, { flex: 1 }]} numberOfLines={1}>{p.mine ? 'You' : p.name}</Text>
+                        {p.status === 'checked' ? <Icon name="check" size={16} color={C.green} stroke={2.4} /> : null}
+                        <Text style={st.whoTime}>{timeOf(p.at)}</Text>
+                      </Pressable>
+                    ))}
+                    {wall.waiting.map((w, i) => (
+                      <View key={w.name + i} style={[st.whoRow, (wall.posts.length > 0 || i > 0) && st.ruleTop, { opacity: 0.6 }]} accessibilityLabel={`${w.name}, ${w.out ? 'out' : day === 0 ? 'not yet' : 'missed'}`}>
+                        <View style={[st.whoThumb, st.whoEmpty]}><Text style={st.emptyInitial}>{w.name[0]?.toUpperCase()}</Text></View>
+                        <Text style={[T.h3, { flex: 1, color: C.sub }]} numberOfLines={1}>{w.mine ? 'You' : w.name}</Text>
+                        <Text style={st.whoTime}>{w.out ? 'Out' : day === 0 ? 'Not yet' : 'Missed'}</Text>
+                      </View>
+                    ))}
+                  </Card>
                   {total === 0 ? <Text style={[T.small, { marginTop: 4 }]}>No one has signed up yet.</Text> : null}
                 </View>
+                </>
               )}
             </View>
           ) : null}
@@ -308,8 +320,55 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
             <Text style={[T.small, { textDecorationLine: 'underline' }]}>Leave this challenge</Text>
           </Pressable>
           <PhotoSheet ch={ch} post={open} onClose={() => setOpen(null)} />
+          <Modal visible={!!pending} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setPending(null)}>
+            <View style={{ flex: 1, backgroundColor: C.bg }}>
+              <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40, maxWidth: 600, width: '100%', alignSelf: 'center' }} keyboardShouldPersistTaps="handled">
+                <View style={st.sheetHead}>
+                  <Text style={[T.h2, { flex: 1 }]}>Today's photo</Text>
+                  <Pressable onPress={() => setPending(null)} style={st.sheetClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Cancel"><Icon name="x" size={18} color={C.ink} stroke={2.4} /></Pressable>
+                </View>
+                {pending ? <Image source={{ uri: pending.uri }} style={st.bigPhoto} resizeMode="cover" accessibilityLabel="Your photo" /> : null}
+                <TextInput value={caption} onChangeText={setCaption} placeholder="Add a caption (optional)" placeholderTextColor={C.faint} maxLength={140} style={st.captionInput} accessibilityLabel="Caption" />
+                <View style={{ marginTop: 14 }}>
+                  <Button label={busy ? 'Posting…' : 'Post'} color={hue.solid} disabled={busy} onPress={() => pending && post(pending.base64, caption.trim())} />
+                </View>
+                <Pressable onPress={doCheck} hitSlop={8} style={{ alignSelf: 'center', marginTop: 14 }} accessibilityRole="button"><Text style={u.link}>Retake</Text></Pressable>
+              </ScrollView>
+            </View>
+          </Modal>
         </>
       )}
+    </View>
+  );
+}
+
+// The board: 8 small squares across. Photos for those who wrapped, grey squares for those who
+// haven't, faint open squares after that. Starts as 8 x 16 and grows when more people sign up.
+const COLS = 8;
+function Board({ wall, onOpen }: { wall: WallT; onOpen: (p: WallPost) => void }) {
+  const filled = wall.posts.length + wall.waiting.length;
+  const slots = Math.max(COLS * 16, Math.ceil(filled / COLS) * COLS);
+  const cells: React.ReactNode[] = [];
+  wall.posts.forEach((p) => cells.push(
+    <Pressable key={p.key} onPress={() => onOpen(p)} style={({ pressed }) => [st.cell, pressed && { transform: [{ scale: 0.9 }] }]} accessibilityRole="button" accessibilityLabel={`${p.name}, ${timeOf(p.at)}`}>
+      <Image source={{ uri: p.url }} style={u.fill} resizeMode="cover" />
+      {p.status === 'checked' ? <View style={st.cellCheck} /> : null}
+    </Pressable>,
+  ));
+  wall.waiting.forEach((w, i) => cells.push(
+    <View key={'w' + i} style={[st.cell, st.cellWaiting]} accessibilityLabel={`${w.name}, not yet`}>
+      <Text style={st.cellInitial}>{w.name[0]?.toUpperCase()}</Text>
+    </View>,
+  ));
+  for (let i = filled; i < slots; i++) cells.push(<View key={'e' + i} style={[st.cell, st.cellOpen]} />);
+  return (
+    <View>
+      <View style={st.board}>{cells}</View>
+      <View style={st.legend}>
+        <View style={[st.legendDot, { backgroundColor: C.blue }]} /><Text style={st.legendText}>Wrapped</Text>
+        <View style={[st.legendDot, st.cellWaiting]} /><Text style={st.legendText}>Not yet</Text>
+        <View style={[st.legendDot, st.cellOpen]} /><Text style={st.legendText}>Open spot</Text>
+      </View>
     </View>
   );
 }
@@ -377,12 +436,13 @@ function Rewards({ ch, count, mine }: { ch: Challenge; count: number; mine: bool
 
 // Tapping a photo opens it in Apple's card-style sheet (drag down to close), with comments.
 function PhotoSheet({ ch, post, onClose }: { ch: Challenge; post: WallPost | null; onClose: () => void }) {
-  const { comment } = useStore();
+  const { comment, react } = useStore();
   const [comments, setComments] = useState<WallPost['comments']>([]);
+  const [reactions, setReactions] = useState<NonNullable<WallPost['reactions']>>([]);
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  useEffect(() => { setComments(post?.comments ?? []); setText(''); setErr(null); }, [post?.key]);
+  useEffect(() => { setComments(post?.comments ?? []); setReactions(post?.reactions ?? []); setText(''); setErr(null); }, [post?.key]);
   if (!post) return null;
   const send = async () => {
     if (!text.trim()) return;
@@ -410,9 +470,21 @@ function PhotoSheet({ ch, post, onClose }: { ch: Challenge; post: WallPost | nul
               </Pressable>
             </View>
             <Image source={{ uri: post.url }} style={st.bigPhoto} resizeMode="cover" accessibilityLabel={`${post.name}'s photo`} />
+            {post.caption ? <Text style={st.caption}>{post.caption}</Text> : null}
             {post.status === 'checked' ? (
               <View style={st.checkedRow}><Icon name="check" size={16} color={C.green} stroke={2.4} /><Text style={st.checkedText}>Checked by Rabbi Zevy</Text></View>
             ) : null}
+            <View style={st.reactRow}>
+              {['❤️', '🔥', '💪', '👏', '🙌'].map((e) => {
+                const r = reactions.find((x) => x.emoji === e);
+                return (
+                  <Pressable key={e} onPress={async () => { const next = await react(ch.id, post.key, e); if (next) setReactions(next); }} style={({ pressed }) => [st.reactBtn, r?.mine && st.reactOn, pressed && { transform: [{ scale: 0.92 }] }]} accessibilityRole="button" accessibilityLabel={`React ${e}${r ? `, ${r.count}` : ''}`}>
+                    <Text style={st.reactEmoji}>{e}</Text>
+                    {r ? <Text style={[st.reactCount, r.mine && { color: C.blueDeep }]}>{r.count}</Text> : null}
+                  </Pressable>
+                );
+              })}
+            </View>
             <Text style={[st.section, { marginTop: 22 }]}>Comments</Text>
             {comments.length === 0 ? <Text style={T.small}>Be the first to cheer them on.</Text> : null}
             <View style={{ gap: 10 }}>
@@ -438,6 +510,26 @@ function PhotoSheet({ ch, post, onClose }: { ch: Challenge; post: WallPost | nul
 }
 
 const st = StyleSheet.create({
+  board: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 14 },
+  cell: { width: '11.5%', aspectRatio: 1, borderRadius: 7, overflow: 'hidden', backgroundColor: C.line },
+  cellWaiting: { backgroundColor: C.line, alignItems: 'center', justifyContent: 'center' },
+  cellOpen: { backgroundColor: 'transparent', borderWidth: 1, borderColor: C.line, opacity: 0.6 },
+  cellInitial: { fontSize: 11, fontWeight: '900', color: C.faint },
+  cellCheck: { position: 'absolute', right: 3, top: 3, width: 7, height: 7, borderRadius: 4, backgroundColor: '#29C27A', borderWidth: 1, borderColor: '#fff' },
+  legend: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, flexWrap: 'wrap' },
+  legendDot: { width: 12, height: 12, borderRadius: 3, marginLeft: 6 },
+  legendText: { fontSize: 12, color: C.sub, fontWeight: '700' },
+  whoRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 10 },
+  whoThumb: { width: 36, height: 36, borderRadius: 10, backgroundColor: C.line },
+  whoEmpty: { alignItems: 'center', justifyContent: 'center' },
+  whoTime: { fontSize: 13, fontWeight: '800', color: C.sub, fontVariant: ['tabular-nums'] },
+  captionInput: { marginTop: 14, minHeight: 50, borderRadius: 16, backgroundColor: C.card, borderWidth: 1, borderColor: C.line, paddingHorizontal: 16, fontSize: 16, color: C.ink },
+  caption: { fontSize: 16, lineHeight: 23, color: C.ink, marginTop: 14 },
+  reactRow: { flexDirection: 'row', gap: 8, marginTop: 14, flexWrap: 'wrap' },
+  reactBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 40, paddingHorizontal: 12, borderRadius: R.pill, backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
+  reactOn: { backgroundColor: C.bluePale, borderColor: C.blue },
+  reactEmoji: { fontSize: 18 },
+  reactCount: { fontSize: 14, fontWeight: '800', color: C.sub },
   strikes: { flexDirection: 'row', gap: 6, marginTop: 4 },
   strike: { width: 22, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.3)' },
   strikeOn: { backgroundColor: '#FFD27A' },

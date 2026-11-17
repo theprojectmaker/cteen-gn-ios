@@ -33,7 +33,8 @@ export type Account = { id: string; token: string; google: { email: string } | n
 export type WallComment = { name: string; text: string; at: string; leader?: boolean };
 export type Person = { id: string; name: string; grade: string; age: number | null; gender: string; created: string; via: string; leader: boolean };
 export type PhotoRow = { key: string; name: string; at: string; day: string; status?: string; comments?: WallComment[] };
-export type WallPost = { key: string; name: string; at: string; status: string; mine: boolean; comments: WallComment[]; url: string };
+export type Reaction = { emoji: string; count: number; mine: boolean };
+export type WallPost = { key: string; name: string; at: string; status: string; mine: boolean; comments: WallComment[]; url: string; caption?: string; reactions?: Reaction[] };
 export type WallWaiting = { name: string; out: boolean; mine: boolean };
 export type ChallengeStats = { count: number; streak: number; strikes: number; out: boolean; goal: number; done: boolean };
 export type Wall = { posts: WallPost[]; waiting: WallWaiting[]; members: number; me: ChallengeStats | null };
@@ -97,7 +98,8 @@ type Ctx = Local & {
   comment: (id: string, key: string, text: string) => Promise<WallComment | { error: string }>;
   setPhotoStatus: (key: string, status: 'checked' | 'hidden' | '') => Promise<boolean>;
   deleteComment: (key: string, at: string) => Promise<boolean>;
-  checkin: (id: string, photo?: string) => Promise<{ error?: string; already?: boolean; board?: BoardRow[] }>;
+  react: (id: string, key: string, emoji: string) => Promise<Reaction[] | null>;
+  checkin: (id: string, photo?: string, caption?: string) => Promise<{ error?: string; already?: boolean; board?: BoardRow[] }>;
   ask: (text: string) => Promise<string | null>;
   push: PushState; turnOnPush: () => Promise<void>;
   leader: string | null; isOwner: boolean; adminOpen: boolean; setAdminOpen: (v: boolean) => void;
@@ -412,10 +414,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       patch((s) => ({ ...s, joined: s.joined.filter((x) => x !== id) }));
       setReminder(id, '', 'day', null);
     },
-    checkin: async (id, photo) => {
+    react: (id, key, emoji) => api<{ reactions: Reaction[] }>(`/challenges/${id}/react`, { method: 'POST', body: { ...who(ref.current), key, emoji } }).then((r) => { tap(); return r.reactions; }).catch(() => null),
+    checkin: async (id, photo, caption) => {
       const me = ref.current;
       try {
-        const r = await api<{ already: boolean; count: number; period: string; board: BoardRow[] }>(`/challenges/${id}/checkin`, { method: 'POST', body: { ...who(me), photo } });
+        const r = await api<{ already: boolean; count: number; period: string; board: BoardRow[] }>(`/challenges/${id}/checkin`, { method: 'POST', body: { ...who(me), photo, caption } });
         patch((s) => ({ ...s, counts: { ...s.counts, [id]: r.count }, checks: { ...s.checks, [id]: [...new Set([...(s.checks[id] ?? []), r.period])] } }));
         if (!r.already) tap(true);
         return { already: r.already, board: r.board };

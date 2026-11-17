@@ -14,6 +14,7 @@
 //   POST /api/challenges/:id/join          { id, token } join (needed to see the photo wall)
 //   GET  /api/challenges/:id/wall?day=     { id, token } members see that day's photos, names, times, comments
 //   POST /api/challenges/:id/comment       { id, token, key, text }
+//   POST /api/challenges/:id/react         { id, token, key, emoji } toggles your reaction on a photo
 //   GET  /api/photo?key=&exp=&sig=         one photo as a JPEG (signed link from the wall, valid 1 hour)
 //   POST /api/push/register                { token, device }
 //   POST /api/ask                          { name, text, device } question for the rabbi
@@ -395,7 +396,7 @@ export async function onRequest({ request, env, params }) {
     }
 
     // ── challenges ──
-    m = /^challenges\/([a-z0-9-]+)\/(join|wall|comment)$/.exec(path);
+    m = /^challenges\/([a-z0-9-]+)\/(join|wall|comment|react)$/.exec(path);
     if (m) {
       const [, id, action] = m;
       const content = await getContent(env);
@@ -420,7 +421,8 @@ export async function onRequest({ request, env, params }) {
         const posts = [];
         for (const p of list) {
           if (p.status === 'hidden' && !leader) continue;
-          posts.push({ key: p.key, name: p.name, at: p.at, status: p.status || '', mine: p.who === who.key, comments: (p.comments || []).map((c) => ({ name: c.name, text: c.text, at: c.at, leader: !!c.leader })), url: await photoUrl(env, url.origin, p.key) });
+          const reactions = Object.entries(p.reactions || {}).map(([emoji, keys]) => ({ emoji, count: keys.length, mine: keys.includes(who.key) })).filter((r) => r.count > 0);
+          posts.push({ key: p.key, name: p.name, at: p.at, status: p.status || '', mine: p.who === who.key, caption: p.caption || '', reactions, comments: (p.comments || []).map((c) => ({ name: c.name, text: c.text, at: c.at, leader: !!c.leader })), url: await photoUrl(env, url.origin, p.key) });
         }
         const board = (await env.CTEEN.get('board:' + id, 'json')) || {};
         const ch = content.challenges.find((c) => c.id === id);
@@ -435,6 +437,21 @@ export async function onRequest({ request, env, params }) {
         others.sort((a, b) => Number(a.out) - Number(b.out) || a.name.localeCompare(b.name));
         const me = who.key !== 'leader' ? memberStats(ch, board[who.key], members[who.key]?.at) : null;
         return json({ day, posts, waiting: others, members: Object.keys(members).length, me });
+      }
+      if (action === 'react' && method === 'POST') {
+        const REACTIONS = ['❤️', '🔥', '💪', '👏', '🙌'];
+        const emoji = REACTIONS.includes(body.emoji) ? body.emoji : null;
+        const k = String(body.key || '');
+        if (!emoji || !k.startsWith(`photo:${id}:`)) return bad('Bad request.');
+        let result = null;
+        const ok = await editPhotoEntry(env, k, (p) => {
+          if (p.status === 'hidden') return false;
+          p.reactions = p.reactions || {};
+          const keys = p.reactions[emoji] || [];
+          p.reactions[emoji] = keys.includes(who.key) ? keys.filter((x) => x !== who.key) : [...keys, who.key].slice(-1000);
+          result = Object.entries(p.reactions).map(([e, ks]) => ({ emoji: e, count: ks.length, mine: ks.includes(who.key) })).filter((r) => r.count > 0);
+        });
+        return ok ? json({ ok: true, reactions: result }) : bad('That photo is gone.', 404);
       }
       if (action === 'comment' && method === 'POST') {
         const text = clean(body.text, 200);
@@ -494,7 +511,7 @@ export async function onRequest({ request, env, params }) {
           await env.CTEEN.put(photoKey, photo, { expirationTtl: PHOTO_TTL });
           const listKey = `photos:${id}:${period}`;
           const list = ((await env.CTEEN.get(listKey, 'json')) || []).filter((p) => p.key !== photoKey);
-          list.unshift({ key: photoKey, name: who.name, who: who.key, at: new Date().toISOString(), status: '', comments: [] });
+          list.unshift({ key: photoKey, name: who.name, who: who.key, at: new Date().toISOString(), status: '', comments: [], caption: clean(body.caption, 140), reactions: {} });
           await env.CTEEN.put(listKey, JSON.stringify(list.slice(0, 500)), { expirationTtl: PHOTO_TTL });
         }
         if (!board[who.key] && Object.keys(board).length >= 1000) return bad('Leaderboard is full.', 409);

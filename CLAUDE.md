@@ -92,7 +92,8 @@ preview misses. `dist/` is ignored by git.
 - **Never commit keys, tokens, passcodes or `.env` files.** The leader passcode and all signing
   keys live outside this repo on purpose. If you need a secret, ask Solomon.
 - **No emojis anywhere in the app.** Use an icon from `src/icons.tsx` (add a new one there if
-  needed).
+  needed). The one exception Solomon asked for: the five photo reactions on the Tefillin
+  Challenge (`src/rewards.tsx`, and the same list on the server).
 - **Do not make up chapter facts** (dates, prices, prizes, names). Content comes from the rabbi
   through the leader panel.
 - Do not change `app.json` identifiers (`bundleIdentifier`, `owner`, `extra.eas.projectId`),
