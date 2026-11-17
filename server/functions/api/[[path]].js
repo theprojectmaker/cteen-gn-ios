@@ -145,6 +145,48 @@ async function editPhotoEntry(env, key, fn) {
   return true;
 }
 
+// ───────── challenge rules ─────────
+// Each missed day (Shabbat never counts) is a strike and resets the streak.
+// Strike 2 also adds one extra day to your goal. Strike 3 and you're out of the challenge.
+const STRIKES_OUT = 3;
+function periodsBetween(every, fromIso, toIso) {
+  // periods strictly after fromIso up to and including toIso (YYYY-MM-DD, NY dates)
+  const out = [];
+  const step = every === 'week' ? 7 : 1;
+  const d = new Date(fromIso + 'T12:00:00Z');
+  const end = new Date(toIso + 'T12:00:00Z');
+  if (every === 'week') d.setUTCDate(d.getUTCDate() - d.getUTCDay());
+  d.setUTCDate(d.getUTCDate() + step);
+  while (d <= end && out.length < 400) {
+    if (!(every === 'day' && d.getUTCDay() === 6)) out.push(d.toISOString().slice(0, 10));
+    d.setUTCDate(d.getUTCDate() + step);
+  }
+  return out;
+}
+function memberStats(ch, row, joinedAt) {
+  const days = new Set((row && row.days) || (row && row.last ? [row.last] : []));
+  const today = periodKey(ch.every);
+  const joined = joinedAt ? nyDate(new Date(joinedAt)) : today;
+  const start = joined;
+  // the period before today is the last one that can be missed
+  const yesterday = new Date(today + 'T12:00:00Z');
+  yesterday.setUTCDate(yesterday.getUTCDate() - (ch.every === 'week' ? 7 : 1));
+  const missed = periodsBetween(ch.every, start, yesterday.toISOString().slice(0, 10)).filter((p) => !days.has(p));
+  const strikes = Math.min(missed.length, STRIKES_OUT);
+  // streak: periods in a row, back from today (or yesterday if today isn't done yet)
+  let streak = 0;
+  const cur = new Date(today + 'T12:00:00Z');
+  if (!days.has(today)) cur.setUTCDate(cur.getUTCDate() - (ch.every === 'week' ? 7 : 1));
+  for (let i = 0; i < 400; i++) {
+    const k = cur.toISOString().slice(0, 10);
+    if (ch.every === 'day' && cur.getUTCDay() === 6) { cur.setUTCDate(cur.getUTCDate() - 1); continue; }
+    if (!days.has(k)) break;
+    streak++;
+    cur.setUTCDate(cur.getUTCDate() - (ch.every === 'week' ? 7 : 1));
+  }
+  return { count: (row && row.count) || 0, streak, strikes, out: strikes >= STRIKES_OUT, goal: ch.goal + (strikes >= 2 ? 1 : 0), done: days.has(today) };
+}
+
 async function getContent(env) {
   const c = (await env.CTEEN.get('content', 'json')) || SEED;
   if (c.alert && c.alert.on && c.alert.until && c.alert.until < new Date().toISOString()) c.alert = { ...c.alert, on: false };
@@ -380,7 +422,19 @@ export async function onRequest({ request, env, params }) {
           if (p.status === 'hidden' && !leader) continue;
           posts.push({ key: p.key, name: p.name, at: p.at, status: p.status || '', mine: p.who === who.key, comments: (p.comments || []).map((c) => ({ name: c.name, text: c.text, at: c.at, leader: !!c.leader })), url: await photoUrl(env, url.origin, p.key) });
         }
-        return json({ day, posts, members: Object.keys(members).length });
+        const board = (await env.CTEEN.get('board:' + id, 'json')) || {};
+        const ch = content.challenges.find((c) => c.id === id);
+        const posted = new Set(list.map((p) => p.who));
+        const others = [];
+        for (const [k, m] of Object.entries(members)) {
+          if (posted.has(k)) continue;
+          const s = memberStats(ch, board[k], m.at);
+          if (m.at && nyDate(new Date(m.at)) > day) continue; // joined after that day
+          others.push({ name: m.name, out: s.out, mine: k === who.key });
+        }
+        others.sort((a, b) => Number(a.out) - Number(b.out) || a.name.localeCompare(b.name));
+        const me = who.key !== 'leader' ? memberStats(ch, board[who.key], members[who.key]?.at) : null;
+        return json({ day, posts, waiting: others, members: Object.keys(members).length, me });
       }
       if (action === 'comment' && method === 'POST') {
         const text = clean(body.text, 200);
@@ -427,8 +481,10 @@ export async function onRequest({ request, env, params }) {
         if (who.error) return bad(who.error, 401);
         if (who.name.length < 2) return bad('Add your name first.');
         const period = periodKey(ch.every);
-        const row = board[who.key] || { name: who.name, count: 0, last: '' };
+        const row = board[who.key] || { name: who.name, count: 0, last: '', days: [] };
         if (row.last === period) return json({ ok: true, already: true, count: row.count, period, board: top() });
+        const membersNow = (await env.CTEEN.get('members:' + id, 'json')) || {};
+        if (memberStats(ch, row, membersNow[who.key]?.at).out) return bad("You've missed 3 days, so you're out of this challenge. Talk to Rabbi Zevy.", 409);
         let photoKey = '';
         if (ch.photo) {
           const photo = typeof body.photo === 'string' ? body.photo : '';
@@ -442,7 +498,7 @@ export async function onRequest({ request, env, params }) {
           await env.CTEEN.put(listKey, JSON.stringify(list.slice(0, 500)), { expirationTtl: PHOTO_TTL });
         }
         if (!board[who.key] && Object.keys(board).length >= 1000) return bad('Leaderboard is full.', 409);
-        board[who.key] = { name: who.name, count: Math.min(row.count + 1, 9999), last: period };
+        board[who.key] = { name: who.name, count: Math.min(row.count + 1, 9999), last: period, days: [...new Set([...(row.days || (row.last ? [row.last] : [])), period])].slice(-120) };
         await env.CTEEN.put(key, JSON.stringify(board));
         const members = (await env.CTEEN.get('members:' + id, 'json')) || {};
         if (!members[who.key]) { members[who.key] = { name: who.name, at: new Date().toISOString() }; await env.CTEEN.put('members:' + id, JSON.stringify(members)); }

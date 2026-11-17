@@ -92,22 +92,25 @@ export function Setup() {
   let onCta: () => void = () => go(step + 1);
 
   if (step === 0) {
+    // Welcome: real photos from the chapter, the logo, one plain line, and the sign-up buttons.
     return (
       <Modal visible animationType="fade" onRequestClose={() => {}} statusBarTranslucent>
-        <View style={[st.hero, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}>
-          <View style={[st.blob, { backgroundColor: '#5fd6ff', top: -120, right: -100 }]} />
-          <View style={[st.blob, { backgroundColor: '#0a4f86', bottom: -140, left: -120 }]} />
-          <Animated.View style={[st.heroInner, { opacity: fade, transform: [{ translateY: slide }] }]}>
-            <Image source={require('../assets/icon.png')} style={st.heroIcon} />
-            <Text style={st.heroEyebrow}>CTEEN GREAT NECK</Text>
-            <Text style={st.heroTitle}>Your crew.{'\n'}Your events.{'\n'}Your Great Neck.</Text>
-            <View style={{ gap: 14, marginTop: 28 }}>
-              <Feature icon="ticket" text="Sign up for chapter events in one tap" />
-              <Feature icon="flame" text="Keep streaks going and win rewards" />
-              <Feature icon="megaphone" text="Hear it first from Rabbi Zevy" />
+        <View style={[st.welcome, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 20 }]}>
+          <Animated.View style={[st.photos, { opacity: fade }]}>
+            <Image source={require('../assets/welcome/UDxu12904575.jpg')} style={[st.ph, st.phTall]} resizeMode="cover" accessibilityLabel="CTeen Great Neck teens" />
+            <View style={st.phCol}>
+              <Image source={require('../assets/welcome/Kkbw12904573.jpg')} style={[st.ph, st.phHalf]} resizeMode="cover" accessibilityLabel="Girls' night at CTeen Great Neck" />
+              <Image source={require('../assets/welcome/mwvp12904577.jpg')} style={[st.ph, st.phHalf]} resizeMode="cover" accessibilityLabel="Rabbi Zevy teaching a class" />
             </View>
           </Animated.View>
-          <View style={st.heroBottom}>
+          <Animated.View style={[st.welcomeText, { opacity: fade, transform: [{ translateY: slide }] }]}>
+            <View style={st.brandRow}>
+              <Image source={require('../assets/logo.png')} style={st.brandLogo} resizeMode="contain" />
+              <Text style={st.brandName}>CTeen Great Neck</Text>
+            </View>
+            <Text style={st.welcomeLine}>The teen chapter at Chabad of Great Neck, with Rabbi Zevy and Shani Geisinsky.</Text>
+          </Animated.View>
+          <View style={st.welcomeButtons}>
             {appleReady ? (
               <Pressable
                 onPress={async () => {
@@ -121,20 +124,19 @@ export function Setup() {
                 style={({ pressed }) => [st.appleBtn, pressed && { opacity: 0.9 }]}
                 accessibilityRole="button"
                 accessibilityLabel="Continue with Apple">
-                <Text style={st.appleLogo}>{'\uF8FF'}</Text>
+                <Text style={st.appleLogo}>{''}</Text>
                 <Text style={st.appleText}>Continue with Apple</Text>
               </Pressable>
             ) : null}
-            <Pressable onPress={() => go(1)} style={({ pressed }) => [st.heroBtn, appleReady && { marginTop: 12, backgroundColor: 'rgba(255,255,255,0.18)' }, pressed && { opacity: 0.9 }]} accessibilityRole="button">
-              <Text style={[st.heroBtnText, appleReady && { color: C.white }]}>{appleReady ? 'Sign up with your name' : 'Get started'}</Text>
-              <Icon name="arrow" size={18} color={appleReady ? C.white : C.blueDeep} stroke={2.4} />
+            <Pressable onPress={() => go(1)} style={({ pressed }) => [st.nameBtn, pressed && { opacity: 0.85 }]} accessibilityRole="button">
+              <Text style={st.nameBtnText}>{appleReady ? 'Sign up with your name' : 'Sign up'}</Text>
             </Pressable>
             {googleReady && Platform.OS !== 'web' ? (
-              <Pressable onPress={async () => { const e = await linkGoogle(); if (e) setErr(e); }} hitSlop={8} style={{ marginTop: 16 }} accessibilityRole="button">
-                <Text style={st.heroLink}>I already have an account</Text>
+              <Pressable onPress={async () => { const e = await linkGoogle(); if (e) setErr(e); }} hitSlop={8} style={{ marginTop: 14, alignSelf: 'center' }} accessibilityRole="button">
+                <Text style={st.signInLink}>I already have an account</Text>
               </Pressable>
             ) : null}
-            {err ? <Text style={[st.err, { color: C.white }]}>{err}</Text> : null}
+            {err ? <Text style={st.err}>{err}</Text> : null}
           </View>
         </View>
       </Modal>
@@ -250,16 +252,23 @@ export function Setup() {
   );
 }
 
-function Feature({ icon, text }: { icon: string; text: string }) {
-  return (
-    <View style={st.feature}>
-      <View style={st.featureIcon}><Icon name={icon} size={20} color={C.white} stroke={2} /></View>
-      <Text style={st.featureText}>{text}</Text>
-    </View>
-  );
-}
 
 const st = StyleSheet.create({
+  welcome: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 20 },
+  photos: { flexDirection: 'row', justifyContent: 'space-between', height: 400, width: '100%', maxWidth: 560, alignSelf: 'center' },
+  phCol: { width: '48.5%', height: '100%', justifyContent: 'space-between' },
+  ph: { borderRadius: 22, backgroundColor: C.line },
+  phTall: { width: '48.5%', height: '100%' },
+  phHalf: { width: '100%', height: '48.8%' },
+  welcomeText: { marginTop: 26, width: '100%', maxWidth: 560, alignSelf: 'center' },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  brandLogo: { width: 26, height: 46 },
+  brandName: { fontSize: 32, fontWeight: '900', color: C.ink, letterSpacing: -0.8 },
+  welcomeLine: { fontSize: 17, lineHeight: 24, color: C.sub, marginTop: 10 },
+  welcomeButtons: { marginTop: 'auto', paddingTop: 24, width: '100%', maxWidth: 560, alignSelf: 'center', gap: 10 },
+  nameBtn: { minHeight: 56, borderRadius: R.pill, backgroundColor: C.blue, alignItems: 'center', justifyContent: 'center' },
+  nameBtnText: { color: C.white, fontSize: 18, fontWeight: '800' },
+  signInLink: { color: C.blueDeep, fontSize: 15, fontWeight: '700' },
   hero: { flex: 1, backgroundColor: '#1186c8', paddingHorizontal: 28, justifyContent: 'space-between', overflow: 'hidden' },
   blob: { position: 'absolute', width: 380, height: 380, borderRadius: 190, opacity: 0.45 },
   heroInner: { marginTop: 24, maxWidth: 480, width: '100%', alignSelf: 'center' },

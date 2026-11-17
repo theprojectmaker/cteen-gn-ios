@@ -266,7 +266,7 @@ export function Feed() {
   );
 }
 
-function PostCard({ post }: { post: Post }) {
+export function PostCard({ post, full }: { post: Post; full?: boolean }) {
   const { liked, toggleLiked, openEvent, openChallenge, content } = useStore();
   const on = liked.includes(post.id);
   const ev = post.eventId ? content.events.find((e) => e.id === post.eventId) : undefined;
@@ -286,10 +286,11 @@ function PostCard({ post }: { post: Post }) {
           </View>
         ) : null}
       </View>
-      <View style={{ paddingHorizontal: 16 }}>
-        <Text style={[T.h2, { fontSize: 18, lineHeight: 23 }]}>{post.title}</Text>
-        {post.body ? <Text style={[T.body, { marginTop: 6, color: C.ink }]}>{post.body}</Text> : null}
-      </View>
+      <Pressable onPress={full ? undefined : () => router.push(`/post/${post.id}`)} disabled={full} style={({ pressed }) => [{ paddingHorizontal: 16 }, pressed && { opacity: 0.7 }]} accessibilityRole={full ? undefined : 'button'} accessibilityLabel={full ? undefined : `Open: ${post.title}`}>
+        <Text style={[T.h2, full ? { fontSize: 24, lineHeight: 29 } : { fontSize: 18, lineHeight: 23 }]}>{post.title}</Text>
+        {post.body ? <Text style={[T.body, { marginTop: 6, color: C.ink }, full && { fontSize: 17, lineHeight: 25 }]} numberOfLines={full ? undefined : 4}>{post.body}</Text> : null}
+        {!full && (post.body?.length ?? 0) > 180 ? <Text style={[u.link, { marginTop: 4 }]}>Read more</Text> : null}
+      </Pressable>
       {ev ? (
         <Pressable onPress={() => openEvent(ev.id)} style={({ pressed }) => [st.attach, pressed && u.pressed]} accessibilityRole="button" accessibilityLabel={`Open ${ev.title}`}>
           <Cover e={ev} style={st.attachImg} iconSize={26} />
@@ -312,7 +313,7 @@ function PostCard({ post }: { post: Post }) {
       ) : null}
       {post.photos?.length ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 14 }} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
-          {post.photos.map((uri) => <Image key={uri} source={{ uri }} style={st.photo} resizeMode="cover" />)}
+          {post.photos.map((uri) => <Image key={uri} source={{ uri }} style={full ? st.photoBig : st.photo} resizeMode="cover" />)}
         </ScrollView>
       ) : null}
       <View style={st.postFoot}>
@@ -496,6 +497,7 @@ const st = StyleSheet.create({
   attach: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, marginTop: 14, padding: 10, borderRadius: R.tile, backgroundColor: C.bg },
   attachImg: { width: 56, height: 56, borderRadius: 14 },
   photo: { width: 150, height: 150, borderRadius: R.tile, backgroundColor: C.line },
+  photoBig: { width: 300, height: 380, borderRadius: 20, backgroundColor: C.line },
   postFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, marginTop: 14, borderTopWidth: 1, borderTopColor: C.line },
   like: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   likeText: { fontSize: 14, fontWeight: '700', color: C.sub },

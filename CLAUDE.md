@@ -114,7 +114,7 @@ preview misses. `dist/` is ignored by git.
 | `app/(tabs)/_layout.tsx` | Tab bar: Apple's own on iPhone (real Liquid Glass on iOS 26, Feed badge, live banner in its bottom accessory); `src/webTabs.tsx` imitates it on web |
 | `app/(tabs)/index.tsx`, `events.tsx`, `feed.tsx`, `chapter.tsx` | One file per tab (expo-router); each wraps a screen from `src/screens.tsx` |
 | `src/setup.tsx` | Required first-launch setup: Continue with Apple or your name, then grade, age, boy/girl, notifications |
-| `app/event/[id].tsx` | Event details as Apple's slide-up sheet (grab pill, drag down to close) |
+| `app/event/[id].tsx`, `app/post/[id].tsx` | Event details and full Feed posts as Apple card pop-ups (drag down to close) |
 | `app/challenges.tsx` | List of live challenges (trophy button when more than one) |
 | `app/challenge/[id].tsx`, `app/account.tsx` | Challenge page (`src/rewards.tsx`, photo check-ins via `src/photo.ts`) and account page (`src/account.tsx`) |
 | `src/shell.tsx` | Page wrapper: one-piece glass header (greeting, trophy, profile), pull to refresh, Shabbat banners, footer, over-the-air update check |

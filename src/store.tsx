@@ -34,6 +34,9 @@ export type WallComment = { name: string; text: string; at: string; leader?: boo
 export type Person = { id: string; name: string; grade: string; age: number | null; gender: string; created: string; via: string; leader: boolean };
 export type PhotoRow = { key: string; name: string; at: string; day: string; status?: string; comments?: WallComment[] };
 export type WallPost = { key: string; name: string; at: string; status: string; mine: boolean; comments: WallComment[]; url: string };
+export type WallWaiting = { name: string; out: boolean; mine: boolean };
+export type ChallengeStats = { count: number; streak: number; strikes: number; out: boolean; goal: number; done: boolean };
+export type Wall = { posts: WallPost[]; waiting: WallWaiting[]; members: number; me: ChallengeStats | null };
 
 export const CHAPTER = {
   name: 'CTeen Great Neck',
@@ -90,7 +93,7 @@ type Ctx = Local & {
   signup: (id: string, on: boolean) => Promise<string | null>;
   join: (id: string, reminderHour: number | null) => void; leave: (id: string) => void;
   joinChallenge: (id: string, name: string, reminderHour: number | null) => Promise<string | null>;
-  fetchWall: (id: string, day?: string) => Promise<{ posts: WallPost[]; members: number } | { error: string }>;
+  fetchWall: (id: string, day?: string) => Promise<Wall | { error: string }>;
   comment: (id: string, key: string, text: string) => Promise<WallComment | { error: string }>;
   setPhotoStatus: (key: string, status: 'checked' | 'hidden' | '') => Promise<boolean>;
   deleteComment: (key: string, at: string) => Promise<boolean>;
@@ -388,7 +391,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (!me.account) return { error: 'Join the challenge to see the photos.' };
       try {
         const q = `id=${encodeURIComponent(me.account.id)}&token=${encodeURIComponent(me.account.token)}${day ? '&day=' + day : ''}`;
-        return await api<{ posts: WallPost[]; members: number }>(`/challenges/${id}/wall?${q}`);
+        const w = await api<Wall>(`/challenges/${id}/wall?${q}`);
+        return { ...w, waiting: w.waiting ?? [], me: w.me ?? null };
       } catch (e) {
         return { error: msg(e) };
       }

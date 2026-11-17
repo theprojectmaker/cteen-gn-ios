@@ -25,8 +25,9 @@ function Root() {
       <Stack screenOptions={{ contentStyle: { backgroundColor: C.bg }, animation: PREFS.reduceMotion ? 'fade' : 'default', gestureEnabled: true }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="challenge/[id]" options={page} />
-        {/* Apple's slide-up sheet: grab pill on top, drag down to close, half or full height. */}
-        <Stack.Screen name="event/[id]" options={{ presentation: 'formSheet', sheetGrabberVisible: true, sheetAllowedDetents: [0.75, 1], sheetCornerRadius: 28, headerShown: false, contentStyle: { backgroundColor: C.bg } }} />
+        {/* Apple's card pop-up (like Carbix): slides up, the page behind shrinks back, drag down to close. */}
+        <Stack.Screen name="event/[id]" options={{ presentation: 'modal', headerShown: false, contentStyle: { backgroundColor: C.bg } }} />
+        <Stack.Screen name="post/[id]" options={{ presentation: 'modal', headerShown: false, contentStyle: { backgroundColor: C.bg } }} />
         <Stack.Screen name="challenges" options={page} />
         <Stack.Screen name="account" options={page} />
         <Stack.Screen name="settings" options={page} />
