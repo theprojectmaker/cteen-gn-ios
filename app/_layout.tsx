@@ -3,7 +3,6 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { C } from '../src/theme';
 import { StoreProvider } from '../src/store';
-import { EventSheet } from '../src/screens';
 import { AdminPanel } from '../src/admin';
 import { Setup } from '../src/setup';
 import { useOtaUpdates } from '../src/shell';
@@ -17,9 +16,11 @@ function Root() {
       <Stack screenOptions={{ contentStyle: { backgroundColor: C.bg } }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="challenge/[id]" options={{ headerTransparent: true, headerTitle: '', headerBackTitle: 'Back', headerTintColor: C.ink }} />
+        {/* Apple's slide-up sheet: grab pill on top, drag down to close, half or full height. */}
+        <Stack.Screen name="event/[id]" options={{ presentation: 'formSheet', sheetGrabberVisible: true, sheetAllowedDetents: [0.75, 1], sheetCornerRadius: 28, headerShown: false, contentStyle: { backgroundColor: C.bg } }} />
+        <Stack.Screen name="challenges" options={{ headerTransparent: true, headerTitle: '', headerBackTitle: 'Back', headerTintColor: C.ink }} />
         <Stack.Screen name="account" options={{ headerTransparent: true, headerTitle: '', headerBackTitle: 'Back', headerTintColor: C.ink }} />
       </Stack>
-      <EventSheet />
       <AdminPanel />
       <Setup />
     </>

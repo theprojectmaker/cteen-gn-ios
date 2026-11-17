@@ -7,7 +7,7 @@ import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { C } from './theme';
 import { Icon } from './icons';
 import { Glass, LIQUID } from './glass';
-import { CHAPTER, upcoming, useStore, type Alert } from './store';
+import { CHAPTER, doneThisPeriod, open, upcoming, useStore, type Alert } from './store';
 
 // Over-the-air updates: every push to main publishes one. The app checks when it opens or comes
 // back to the front, downloads quietly, and switches to it the next time it is opened.
@@ -46,18 +46,23 @@ export function Screen({ children }: { children: React.ReactNode }) {
         contentInsetAdjustmentBehavior="never"
         contentContainerStyle={{ paddingTop: topH + 14, paddingBottom: insets.bottom + (Platform.OS === 'web' ? 110 : 32) }}
         showsVerticalScrollIndicator={false}>
-        <View style={st.col}>{children}</View>
+        <View style={st.col}>
+          {children}
+          <Footer />
+        </View>
       </ScrollView>
       <View style={[st.top, { paddingTop: insets.top + 8 }]} onLayout={(e) => setTopH(e.nativeEvent.layout.height)} pointerEvents="box-none">
         <View style={st.col} pointerEvents="box-none">
-          <Glass style={st.header}>
-            <Image source={require('../assets/logo.png')} style={st.logo} resizeMode="contain" />
-            <View style={{ flex: 1 }}>
-              <Text style={st.topEyebrow}>YOUR CHAPTER</Text>
-              <Text style={st.topName}>{CHAPTER.name}, NY</Text>
-            </View>
+          <View style={st.headerRow}>
+            <Glass style={st.brand}>
+              <Image source={require('../assets/logo.png')} style={st.logo} resizeMode="contain" />
+              <View>
+                <Text style={st.topEyebrow}>CTEEN</Text>
+                <Text style={st.topName}>Great Neck</Text>
+              </View>
+            </Glass>
             <HeaderButtons />
-          </Glass>
+          </View>
           {/* On iOS 26 the live banner lives in the tab bar's accessory instead. */}
           {liveAlert && !LIQUID ? <TopAlert alert={liveAlert} /> : null}
         </View>
@@ -66,19 +71,54 @@ export function Screen({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Top-right of the header: Events (with how many are coming up) and your account.
+// Top-right: one glass capsule with Challenges, Events and your account, like iOS 26 toolbars.
 function HeaderButtons() {
-  const { content, fits, go, name } = useStore();
+  const { content, fits, go, name, checks, joined } = useStore();
   const n = upcoming(content.events).filter(fits).length;
+  const live = content.challenges.filter((c) => c.active);
+  const todo = live.filter((c) => joined.includes(c.id) && !doneThisPeriod(c, checks)).length; // red dot: a check-in still to do
+  const openChallenges = () => (live.length === 1 ? router.push(`/challenge/${live[0].id}`) : router.push('/challenges'));
   return (
-    <View style={st.hBtns}>
-      <Pressable onPress={() => go('Events')} style={({ pressed }) => [st.hBtn, pressed && { opacity: 0.6 }]} hitSlop={6} accessibilityRole="button" accessibilityLabel={`Events, ${n} coming up`}>
-        <Icon name="ticket" size={20} color={C.ink} stroke={2} />
+    <Glass style={st.hGroup} interactive>
+      {live.length ? (
+        <Pressable onPress={openChallenges} style={({ pressed }) => [st.hBtn, pressed && { opacity: 0.55 }]} hitSlop={4} accessibilityRole="button" accessibilityLabel="Challenges">
+          <Icon name="trophy" size={21} color={C.ink} stroke={2} />
+          {todo > 0 ? <View style={st.hDot} /> : null}
+        </Pressable>
+      ) : null}
+      <Pressable onPress={() => go('Events')} style={({ pressed }) => [st.hBtn, pressed && { opacity: 0.55 }]} hitSlop={4} accessibilityRole="button" accessibilityLabel={`Events, ${n} coming up`}>
+        <Icon name="ticket" size={21} color={C.ink} stroke={2} />
         {n > 0 ? <View style={st.hCount}><Text style={st.hCountText}>{n}</Text></View> : null}
       </Pressable>
-      <Pressable onPress={() => router.push('/account')} style={({ pressed }) => [st.hAvatar, pressed && { opacity: 0.6 }]} hitSlop={6} accessibilityRole="button" accessibilityLabel="Your account">
-        {name ? <Text style={st.hAvatarText}>{name[0].toUpperCase()}</Text> : <Icon name="user" size={18} color={C.white} stroke={2.2} />}
+      <Pressable onPress={() => router.push('/account')} style={({ pressed }) => [st.hAvatar, pressed && { opacity: 0.6 }]} hitSlop={4} accessibilityRole="button" accessibilityLabel="Your account">
+        {name ? <Text style={st.hAvatarText}>{name[0].toUpperCase()}</Text> : <Icon name="user" size={17} color={C.white} stroke={2.2} />}
       </Pressable>
+    </Glass>
+  );
+}
+
+// Bottom of every page: the shortcuts, then the chapter's name and address.
+function Footer() {
+  const { go } = useStore();
+  const links = [
+    { icon: 'ticket', label: 'Events', onPress: () => go('Events') },
+    { icon: 'chat', label: 'Feed', onPress: () => go('Feed') },
+    { icon: 'camera', label: 'Instagram', onPress: () => open(CHAPTER.instagram) },
+    { icon: 'heart', label: 'Hours', onPress: () => open('https://myportal.cteen.com/service') },
+  ];
+  return (
+    <View style={st.footer}>
+      <View style={st.footRule} />
+      <View style={st.footRow}>
+        {links.map((l) => (
+          <Pressable key={l.label} onPress={l.onPress} style={({ pressed }) => [st.footLink, pressed && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel={l.label}>
+            <View style={st.footIcon}><Icon name={l.icon} size={20} color={C.blueDeep} stroke={2} /></View>
+            <Text style={st.footLabel}>{l.label}</Text>
+          </Pressable>
+        ))}
+      </View>
+      <Text style={st.footName}>{CHAPTER.name}</Text>
+      <Text style={st.footSmall}>{CHAPTER.org} · 400 East Shore Road</Text>
     </View>
   );
 }
@@ -130,8 +170,19 @@ const st = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
   col: { width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 20 },
   top: { position: 'absolute', left: 0, right: 0, top: 0 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 22, paddingHorizontal: 14, paddingVertical: 9, overflow: 'hidden' },
-  logo: { width: 20, height: 35 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  brand: { flexDirection: 'row', alignItems: 'center', gap: 9, borderRadius: 26, paddingLeft: 10, paddingRight: 16, height: 52, overflow: 'hidden' },
+  hGroup: { flexDirection: 'row', alignItems: 'center', gap: 2, borderRadius: 26, paddingHorizontal: 6, height: 52, overflow: 'hidden' },
+  hDot: { position: 'absolute', top: 7, right: 7, width: 9, height: 9, borderRadius: 5, backgroundColor: '#E0445C', borderWidth: 1.5, borderColor: C.white },
+  footer: { marginTop: 48, alignItems: 'center' },
+  footRule: { width: 40, height: 4, borderRadius: 2, backgroundColor: C.line, marginBottom: 22 },
+  footRow: { flexDirection: 'row', justifyContent: 'center', gap: 22, marginBottom: 20 },
+  footLink: { alignItems: 'center', gap: 6, minWidth: 56 },
+  footIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: C.white, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.line },
+  footLabel: { fontSize: 12, fontWeight: '700', color: C.sub },
+  footName: { fontSize: 13, fontWeight: '800', color: C.sub },
+  footSmall: { fontSize: 12, color: C.faint, marginTop: 2 },
+  logo: { width: 19, height: 33 },
   topEyebrow: { fontSize: 10, fontWeight: '800', letterSpacing: 0.8, color: C.sub },
   topName: { fontSize: 16, fontWeight: '900', color: C.ink, letterSpacing: -0.2 },
   alert: { marginTop: 8, flexDirection: 'row', alignItems: 'center', borderRadius: 20, paddingLeft: 14, paddingRight: 6, paddingVertical: 10, overflow: 'hidden' },
@@ -140,11 +191,10 @@ const st = StyleSheet.create({
   alertTitle: { fontSize: 14, lineHeight: 18, fontWeight: '800', color: C.ink },
   alertText: { fontSize: 13, lineHeight: 17, color: C.sub, marginTop: 1 },
   alertClose: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
-  hBtns: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  hBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(19,32,44,0.06)', alignItems: 'center', justifyContent: 'center' },
+  hBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   hCount: { position: 'absolute', top: -3, right: -3, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: C.blue, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, borderWidth: 2, borderColor: C.white },
   hCountText: { color: C.white, fontSize: 10, fontWeight: '900' },
-  hAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: C.blue, alignItems: 'center', justifyContent: 'center' },
+  hAvatar: { width: 36, height: 36, borderRadius: 18, marginLeft: 2, backgroundColor: C.blue, alignItems: 'center', justifyContent: 'center' },
   hAvatarText: { color: C.white, fontSize: 16, fontWeight: '900' },
   acc: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingLeft: 16, paddingRight: 4 },
   accTitle: { fontSize: 14, fontWeight: '800', color: C.ink },

@@ -114,11 +114,13 @@ preview misses. `dist/` is ignored by git.
 | `app/(tabs)/_layout.tsx` | Tab bar: Apple's own on iPhone (real Liquid Glass on iOS 26, Feed badge, live banner in its bottom accessory); `src/webTabs.tsx` imitates it on web |
 | `app/(tabs)/index.tsx`, `events.tsx`, `feed.tsx`, `chapter.tsx` | One file per tab (expo-router); each wraps a screen from `src/screens.tsx` |
 | `src/setup.tsx` | First-launch setup: welcome, name, school and grade, age and gender, notifications |
+| `app/event/[id].tsx` | Event details as Apple's slide-up sheet (grab pill, drag down to close) |
+| `app/challenges.tsx` | List of live challenges (trophy button when more than one) |
 | `app/challenge/[id].tsx`, `app/account.tsx` | Challenge page (`src/rewards.tsx`, photo check-ins via `src/photo.ts`) and account page (`src/account.tsx`) |
 | `src/shell.tsx` | Glass header with the Events and account buttons, top live banner (older iOS and web), over-the-air update check |
 | `src/screens.tsx` | Home, Events, Feed and Chapter tabs, event sheet |
-| `src/rewards.tsx` | Challenge cards, challenge page with photo streaks, leaderboard |
-| `src/admin.tsx` | Leader panel (posts, events with audiences, challenges, check-in photos, live banner, sign-ups, inbox) |
+| `src/rewards.tsx` | Challenge cards; challenge page: sign up, streak, daily photo wall with comments |
+| `src/admin.tsx` | Leader panel: Simple mode (six plain tasks for the rabbi) and Expert mode (everything) |
 | `src/store.tsx` | All data: server calls, saved state on the phone, date helpers |
 | `src/ui.tsx`, `src/glass.tsx`, `src/icons.tsx`, `src/theme.ts` | Shared pieces, glass surface, icons, colors |
 | `src/push.ts` | Notifications and challenge reminders |

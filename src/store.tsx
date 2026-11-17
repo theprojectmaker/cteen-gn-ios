@@ -29,7 +29,9 @@ export type SignupRow = { name: string; grade: string; age?: number | null; gend
 export type Gender = '' | 'boy' | 'girl';
 export type Profile = { name: string; grade: string; age: number | null; gender: Gender; school: string };
 export type Account = { id: string; token: string; google: { email: string } | null };
-export type PhotoRow = { key: string; name: string; at: string; day: string };
+export type WallComment = { name: string; text: string; at: string; leader?: boolean };
+export type PhotoRow = { key: string; name: string; at: string; day: string; status?: string; comments?: WallComment[] };
+export type WallPost = { key: string; name: string; at: string; status: string; mine: boolean; comments: WallComment[]; url: string };
 
 export const CHAPTER = {
   name: 'CTeen Great Neck',
@@ -77,12 +79,17 @@ type Ctx = Local & {
   googleReady: boolean; linkGoogle: () => Promise<string | null>; signOut: () => void;
   unreadFeed: number; markFeedSeen: () => void;
   fits: (e: EventItem) => boolean;
-  activeEvent: EventItem | null; openEvent: (id: string | null) => void;
+  openEvent: (id: string | null) => void;
   openChallenge: (id: string | null) => void;
   openTarget: (t: Target) => void;
   liveAlert: Alert | null; dismissAlert: () => void;
   signup: (id: string, on: boolean) => Promise<string | null>;
   join: (id: string, reminderHour: number | null) => void; leave: (id: string) => void;
+  joinChallenge: (id: string, name: string, reminderHour: number | null) => Promise<string | null>;
+  fetchWall: (id: string, day?: string) => Promise<{ posts: WallPost[]; members: number } | { error: string }>;
+  comment: (id: string, key: string, text: string) => Promise<WallComment | { error: string }>;
+  setPhotoStatus: (key: string, status: 'checked' | 'hidden' | '') => Promise<boolean>;
+  deleteComment: (key: string, at: string) => Promise<boolean>;
   checkin: (id: string, photo?: string) => Promise<{ error?: string; already?: boolean; board?: BoardRow[] }>;
   ask: (text: string) => Promise<string | null>;
   push: PushState; turnOnPush: () => Promise<void>;
@@ -132,7 +139,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [local, setLocal] = useState<Local>(blank);
   const [content, setContent] = useState<Content>(SEED as Content);
   const [online, setOnline] = useState<boolean | null>(null);
-  const [eventId, setEventId] = useState<string | null>(null);
   const [googleReady, setGoogleReady] = useState(false);
   const [leader, setLeader] = useState<string | null>(null);
   const [adminOpen, setAdminOpen] = useState(false);
@@ -198,7 +204,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const openTarget = useCallback((t: Target) => {
     if (!t) return;
     tap();
-    if (t.type === 'event') setEventId(t.id);
+    if (t.type === 'event') router.push(`/event/${t.id}`);
     else router.push(`/challenge/${t.id}`);
   }, []);
   useEffect(() => onNotificationTap((t) => openTarget(t as Target)), [openTarget]);
@@ -229,7 +235,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const value = useMemo<Ctx>(() => ({
+  const value: Ctx = useMemo<Ctx>(() => ({
     ...local, content, online, refresh, openTarget, liveAlert, push, googleReady, unreadFeed, saveProfile,
     finishOnboarding: () => patch((s) => ({ ...s, onboarded: true })),
     markFeedSeen: () => {
@@ -277,8 +283,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const me = ref.current;
       saveProfile({ name, grade }); // ref is updated first, so an action fired right after sees it
     },
-    activeEvent: content.events.find((e) => e.id === eventId) ?? null,
-    openEvent: (id) => { tap(); setEventId(id); },
+    openEvent: (id) => { if (id) { tap(); router.push(`/event/${id}`); } },
     openChallenge: (id) => { if (id) { tap(); router.push(`/challenge/${id}`); } },
     dismissAlert: () => patch((s) => ({ ...s, dismissed: [...s.dismissed.slice(-20), a.id] })),
     signup: async (id, on) => {
@@ -306,6 +311,41 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         setReminder(id, ch.title, ch.every, hour);
       }
     },
+    joinChallenge: async (id, name, hour) => {
+      // Make sure there is an account first: the photo wall is for signed-up members only.
+      if (!ref.current.account || ref.current.name !== name.trim()) {
+        const e = await saveProfile({ name });
+        if (e) return e;
+      }
+      try {
+        await api(`/challenges/${id}/join`, { method: 'POST', body: who(ref.current) });
+      } catch (e) {
+        return msg(e);
+      }
+      value.join(id, hour);
+      return null;
+    },
+    fetchWall: async (id, day) => {
+      const me = ref.current;
+      if (!me.account) return { error: 'Join the challenge to see the photos.' };
+      try {
+        const q = `id=${encodeURIComponent(me.account.id)}&token=${encodeURIComponent(me.account.token)}${day ? '&day=' + day : ''}`;
+        return await api<{ posts: WallPost[]; members: number }>(`/challenges/${id}/wall?${q}`);
+      } catch (e) {
+        return { error: msg(e) };
+      }
+    },
+    comment: async (id, key, text) => {
+      try {
+        const r = await api<{ comment: WallComment }>(`/challenges/${id}/comment`, { method: 'POST', body: { ...who(ref.current), key, text } });
+        tap();
+        return r.comment;
+      } catch (e) {
+        return { error: msg(e) };
+      }
+    },
+    setPhotoStatus: (key, status) => api('/admin/photo-status', { method: 'POST', body: { key, status }, leader }).then(() => true).catch(() => false),
+    deleteComment: (key, at) => api('/admin/comment-delete', { method: 'POST', body: { key, at }, leader }).then(() => true).catch(() => false),
     leave: (id) => {
       patch((s) => ({ ...s, joined: s.joined.filter((x) => x !== id) }));
       setReminder(id, '', 'day', null);
@@ -375,7 +415,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     removeQuestion: (id) => api('/admin/inbox/remove', { method: 'POST', body: { id }, leader }).then(() => {}).catch(() => {}),
     loadPhotos: (cid) => api<{ photos: PhotoRow[] }>(`/admin/photos?challenge=${cid}`, { leader }).then((r) => r.photos).catch(() => null),
     loadPhoto: (key) => api<{ photo: string }>(`/admin/photo?key=${encodeURIComponent(key)}`, { leader }).then((r) => r.photo).catch(() => null),
-  }), [local, content, online, eventId, leader, adminOpen, push, liveAlert, googleReady, unreadFeed, flip, patch, refresh, keep, openTarget, registerToken]);
+  }), [local, content, online, leader, adminOpen, push, liveAlert, googleReady, unreadFeed, flip, patch, refresh, keep, openTarget, registerToken]);
 
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>;
 }

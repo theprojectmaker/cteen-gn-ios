@@ -3,7 +3,7 @@ import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'rea
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, T } from './theme';
 import { EVENT_ICONS, Icon } from './icons';
-import { dateLabel, todayIso, useStore, type Content, type Question, type SignupRow, type Target } from './store';
+import { dateLabel, todayIso, useStore, type Content, type PhotoRow, type Question, type SignupRow, type Target } from './store';
 import { Button, Card, Chips, Field, IconTile, Toggle, s as u } from './ui';
 
 // ───────── form description ─────────
@@ -169,8 +169,10 @@ export function AdminPanel() {
   const [confirmDel, setConfirmDel] = useState(false);
   const [signups, setSignups] = useState<{ signups: Record<string, SignupRow[]>; phones: number } | null>(null);
   const [inbox, setInbox] = useState<Question[] | null>(null);
+  const [mode, setMode] = useState<'simple' | 'expert'>('simple');
+  const [task, setTask] = useState<Task | null>(null);
 
-  useEffect(() => { setEditing(null); setNote(null); setConfirmDel(false); }, [section, adminOpen]);
+  useEffect(() => { setEditing(null); setNote(null); setConfirmDel(false); }, [section, adminOpen, mode]);
   useEffect(() => {
     if (!leader || !adminOpen) return;
     if (section === 'Sign-ups') { setSignups(null); store.loadSignups().then((r) => setSignups(r ?? { signups: {}, phones: 0 })); }
@@ -364,12 +366,31 @@ export function AdminPanel() {
               <Icon name="x" size={18} color={C.ink} stroke={2.4} />
             </Pressable>
           </View>
-          {leader ? <Chips options={SECTIONS} value={section} onChange={setSection} /> : null}
+          {leader ? (
+            <View style={st.modeRow}>
+              {(['simple', 'expert'] as const).map((m) => (
+                <Pressable key={m} onPress={() => { setMode(m); setTask(null); }} style={[st.modeBtn, mode === m && st.modeOn]} accessibilityRole="button" accessibilityState={{ selected: mode === m }}>
+                  <Text style={[st.modeText, mode === m && { color: C.white }]}>{m === 'simple' ? 'Simple' : 'Expert'}</Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
+          {leader && mode === 'expert' ? <Chips options={SECTIONS} value={section} onChange={setSection} /> : null}
         </View>
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingVertical: 16, paddingBottom: insets.bottom + 40 }} keyboardShouldPersistTaps="handled">
           <View style={st.col}>
             {note ? <Text style={st.note} accessibilityLiveRegion="polite">{note}</Text> : null}
-            {body}
+            {leader && mode === 'simple' ? (
+              task === null ? <SimpleHome onPick={(k) => { setNote(null); setTask(k); const s = TASK_SECTION[k]; if (s) setSection(s); }} /> : (
+                <View>
+                  <Pressable onPress={() => setTask(null)} style={st.backRow} hitSlop={8} accessibilityRole="button">
+                    <View style={{ transform: [{ scaleX: -1 }] }}><Icon name="right" size={18} color={C.blueDeep} stroke={2.4} /></View>
+                    <Text style={st.backText}>All tasks</Text>
+                  </Pressable>
+                  {task === 'post' || task === 'event' || task === 'alert' ? <SimpleForm kind={task} onDone={(msg) => { setNote(msg); setTask(null); }} /> : body}
+                </View>
+              )
+            ) : body}
             {leader && !editing ? (
               <Pressable onPress={store.leaderLogout} style={{ alignSelf: 'center', marginTop: 24 }} hitSlop={8} accessibilityRole="button">
                 <Text style={[T.small, { textDecorationLine: 'underline' }]}>Sign out of the leader panel</Text>
@@ -382,12 +403,129 @@ export function AdminPanel() {
   );
 }
 
+// ───────── Simple mode ─────────
+type Task = 'post' | 'event' | 'alert' | 'signups' | 'photos' | 'inbox';
+const TASK_SECTION: Partial<Record<Task, Section>> = { signups: 'Sign-ups', photos: 'Photos', inbox: 'Inbox' };
+const TASKS: { k: Task; icon: string; color: 'blue' | 'orange' | 'purple' | 'green' | 'pink' | 'yellow'; title: string; sub: string }[] = [
+  { k: 'post', icon: 'chat', color: 'blue', title: 'Post an update', sub: 'Write something for the Feed' },
+  { k: 'event', icon: 'calendar', color: 'orange', title: 'Add an event', sub: 'Name, day, time and place' },
+  { k: 'alert', icon: 'megaphone', color: 'pink', title: 'Send a quick alert', sub: 'A banner on every phone, plus a notification' },
+  { k: 'signups', icon: 'users', color: 'green', title: "See who's coming", sub: 'Sign-ups for each event' },
+  { k: 'photos', icon: 'camera', color: 'purple', title: 'Check Tefillin photos', sub: "Look over today's photos" },
+  { k: 'inbox', icon: 'question', color: 'yellow', title: 'Questions from teens', sub: 'What teens asked you' },
+];
+
+function SimpleHome({ onPick }: { onPick: (k: Task) => void }) {
+  return (
+    <View>
+      <Text style={st.simpleHello}>What would you like to do?</Text>
+      <View style={{ gap: 12, marginTop: 16 }}>
+        {TASKS.map((x) => (
+          <Card key={x.k} style={st.task} onPress={() => onPick(x.k)} label={x.title}>
+            <IconTile icon={x.icon} color={x.color} size={52} solid />
+            <View style={{ flex: 1 }}>
+              <Text style={st.taskTitle}>{x.title}</Text>
+              <Text style={st.taskSub}>{x.sub}</Text>
+            </View>
+            <Icon name="right" size={20} color={C.faint} stroke={2.4} />
+          </Card>
+        ))}
+      </View>
+      <Text style={[T.small, { marginTop: 22, textAlign: 'center' }]}>Need more options, like colors, age limits or challenges? Switch to Expert.</Text>
+    </View>
+  );
+}
+
+const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+function nextDays() {
+  const out: { l: string; v: string }[] = [];
+  for (let i = 0; i < 14; i++) {
+    const d = new Date(); d.setDate(d.getDate() + i);
+    out.push({ l: i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }), v: iso(d) });
+  }
+  return out;
+}
+
+// Three plain forms: only the fields the rabbi needs, big text, one button.
+function SimpleForm({ kind, onDone }: { kind: 'post' | 'event' | 'alert'; onDone: (msg: string) => void }) {
+  const { content, saveContent, sendPush, sendAlert } = useStore();
+  const [title, setTitle] = useState('');
+  const [text, setText] = useState('');
+  const [day, setDay] = useState(iso(new Date()));
+  const [time, setTime] = useState('');
+  const [place, setPlace] = useState('Chabad of Great Neck');
+  const [notify, setNotify] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const days = nextDays();
+  const go = async () => {
+    if (title.trim().length < 2) return setErr(kind === 'event' ? 'Give the event a name.' : 'Write a headline first.');
+    setBusy(true); setErr(null);
+    let msg = '';
+    if (kind === 'post') {
+      const post = { id: 'p-' + Date.now().toString(36), kind: 'News' as const, pinned: false, title: title.trim(), body: text.trim(), eventId: '', challengeId: '', photos: [], linkLabel: '', linkUrl: '', at: iso(new Date()) };
+      const e = await saveContent({ ...content, posts: [post, ...content.posts] });
+      if (e) { setBusy(false); return setErr(e); }
+      msg = 'Posted to the Feed.';
+      if (notify) msg += ' ' + (await sendPush(post.title, post.body.slice(0, 150), null));
+    } else if (kind === 'event') {
+      const ev = { id: 'e-' + Date.now().toString(36), title: title.trim(), icon: 'star', color: 'blue' as const, scope: 'gn' as const, start: day, end: day, time: time.trim(), place: place.trim(), price: '', who: '', about: text.trim(), signup: 'app' as const, url: '', payUrl: '', gender: 'all' as const, minAge: null, maxAge: null };
+      const e = await saveContent({ ...content, events: [...content.events, ev] });
+      if (e) { setBusy(false); return setErr(e); }
+      msg = 'Event added. Teens can sign up in the app.';
+      if (notify) msg += ' ' + (await sendPush('New event: ' + ev.title, [days.find((d) => d.v === day)?.l, ev.time, ev.place].filter(Boolean).join(' · '), { type: 'event', id: ev.id }));
+    } else {
+      msg = await sendAlert({ title: title.trim(), text: text.trim(), target: null, hours: 24, push: notify });
+    }
+    setBusy(false);
+    onDone(msg.trim());
+  };
+  const heading = kind === 'post' ? 'Post an update' : kind === 'event' ? 'Add an event' : 'Send a quick alert';
+  return (
+    <Card style={{ padding: 20 }}>
+      <Text style={st.simpleHello}>{heading}</Text>
+      <Field label={kind === 'event' ? 'Event name' : 'Headline'} value={title} onChange={setTitle} placeholder={kind === 'event' ? 'Pizza and Torah night' : kind === 'alert' ? 'Tonight is moved to 8 PM' : 'Great turnout at the Shabbaton'} />
+      {kind === 'event' ? (
+        <>
+          <View style={{ marginTop: 16 }}>
+            <Text style={u.fieldLabel}>Day</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+              {days.map((d) => (
+                <Pressable key={d.v} onPress={() => setDay(d.v)} style={[u.chip, day === d.v && u.chipOn]} accessibilityRole="button" accessibilityState={{ selected: day === d.v }}>
+                  <Text style={[u.chipText, day === d.v && u.chipTextOn]}>{d.l}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+          <Field label="Time" value={time} onChange={setTime} placeholder="7:00 PM" />
+          <Field label="Where" value={place} onChange={setPlace} />
+        </>
+      ) : null}
+      <Field label={kind === 'event' ? 'Details (optional)' : kind === 'alert' ? 'More detail (optional)' : 'Message'} value={text} onChange={setText} multiline />
+      <View style={st.toggle}>
+        <Text style={[T.h3, { flex: 1, fontSize: 16 }]}>Send a notification to every phone</Text>
+        <Toggle value={notify} onChange={setNotify} label="Send a notification" />
+      </View>
+      {err ? <Text style={{ color: '#C0303F', fontWeight: '700', marginTop: 12 }}>{err}</Text> : null}
+      <View style={{ marginTop: 20 }}>
+        <Button label={busy ? 'Sending…' : kind === 'post' ? 'Post it' : kind === 'event' ? 'Add the event' : 'Send the alert'} disabled={busy} onPress={go} />
+      </View>
+    </Card>
+  );
+}
+
 // Check-in photos from the last 7 days, per photo challenge. Photos load one at a time when tapped.
 function PhotoReview() {
-  const { content, loadPhotos, loadPhoto } = useStore();
+  const { content, loadPhotos, loadPhoto, setPhotoStatus, deleteComment } = useStore();
   const photoChallenges = content.challenges.filter((c) => c.photo);
   const [cid, setCid] = useState(photoChallenges[0]?.id ?? '');
-  const [rows, setRows] = useState<{ key: string; name: string; at: string; day: string }[] | null>(null);
+  const [rows, setRows] = useState<PhotoRow[] | null>(null);
+  const mark = async (key: string, status: 'checked' | 'hidden' | '') => {
+    if (await setPhotoStatus(key, status)) setRows((r) => (r ?? []).map((p) => (p.key === key ? { ...p, status } : p)));
+  };
+  const dropComment = async (key: string, at: string) => {
+    if (await deleteComment(key, at)) setRows((r) => (r ?? []).map((p) => (p.key === key ? { ...p, comments: (p.comments ?? []).filter((c) => c.at !== at) } : p)));
+  };
   const [shown, setShown] = useState<Record<string, string>>({});
   useEffect(() => {
     if (!cid) return;
@@ -399,7 +537,7 @@ function PhotoReview() {
   return (
     <View style={{ gap: 12 }}>
       {photoChallenges.length > 1 ? <Chips wrap options={photoChallenges.map((c) => c.title)} value={ch?.title ?? ''} onChange={(l) => setCid(photoChallenges.find((c) => c.title === l)!.id)} /> : null}
-      <Text style={T.small}>Photos are deleted automatically after 30 days. Only leaders can see them.</Text>
+      <Text style={T.small}>Teens in the challenge see each other's photos for the day. "Looks good" adds a Checked badge; "Hide" removes the photo for everyone. Photos are deleted after 30 days.</Text>
       {rows === null ? <Text style={T.small}>Loading photos…</Text> : rows.length === 0 ? <Text style={T.small}>No photos in the last 7 days.</Text> : null}
       {(rows ?? []).map((p) => (
         <Card key={p.key} style={{ padding: 12 }}>
@@ -411,6 +549,16 @@ function PhotoReview() {
             {!shown[p.key] ? <Button small kind="ghost" icon="camera" label="Show" onPress={async () => { const img = await loadPhoto(p.key); if (img) setShown((s) => ({ ...s, [p.key]: img })); }} /> : null}
           </View>
           {shown[p.key] ? <Image source={{ uri: 'data:image/jpeg;base64,' + shown[p.key] }} style={st.photo} resizeMode="cover" accessibilityLabel={`Check-in photo from ${p.name}`} /> : null}
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+            <View style={{ flex: 1 }}><Button small icon="check" label={p.status === 'checked' ? 'Checked' : 'Looks good'} color={C.green} disabled={p.status === 'checked'} onPress={() => mark(p.key, 'checked')} /></View>
+            <View style={{ flex: 1 }}><Button small kind="danger" label={p.status === 'hidden' ? 'Hidden (undo)' : 'Hide'} onPress={() => mark(p.key, p.status === 'hidden' ? '' : 'hidden')} /></View>
+          </View>
+          {(p.comments ?? []).map((c) => (
+            <View key={c.at} style={st.cRow}>
+              <Text style={[T.small, { flex: 1, color: C.ink }]}><Text style={{ fontWeight: '800' }}>{c.leader ? 'You' : c.name}: </Text>{c.text}</Text>
+              <Pressable onPress={() => dropComment(p.key, c.at)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Delete comment"><Icon name="x" size={14} color={C.faint} stroke={2.4} /></Pressable>
+            </View>
+          ))}
         </Card>
       ))}
     </View>
@@ -418,6 +566,17 @@ function PhotoReview() {
 }
 
 const st = StyleSheet.create({
+  modeRow: { flexDirection: 'row', backgroundColor: C.white, borderRadius: 14, padding: 4, marginBottom: 12, borderWidth: 1, borderColor: C.line },
+  modeBtn: { flex: 1, height: 40, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  modeOn: { backgroundColor: C.ink },
+  modeText: { fontSize: 15, fontWeight: '800', color: C.ink },
+  simpleHello: { fontSize: 22, fontWeight: '900', color: C.ink },
+  task: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16 },
+  taskTitle: { fontSize: 18, fontWeight: '800', color: C.ink },
+  taskSub: { fontSize: 14, color: C.sub, marginTop: 2 },
+  backRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 },
+  backText: { fontSize: 16, fontWeight: '800', color: C.blueDeep },
+  cRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
   photo: { width: '100%', aspectRatio: 3 / 4, borderRadius: 14, marginTop: 12, backgroundColor: C.line },
   root: { flex: 1, backgroundColor: C.bg },
   col: { width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 20 },

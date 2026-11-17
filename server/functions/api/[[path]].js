@@ -10,6 +10,10 @@
 //   POST /api/events/:id/signup|cancel     { id, token } (or legacy { device, name, grade })
 //   POST /api/challenges/:id/checkin       { id, token, photo? } one per day or week; photo is a small JPEG (base64)
 //   GET  /api/challenges/:id/board         top names + counts
+//   POST /api/challenges/:id/join          { id, token } join (needed to see the photo wall)
+//   GET  /api/challenges/:id/wall?day=     { id, token } members see that day's photos, names, times, comments
+//   POST /api/challenges/:id/comment       { id, token, key, text }
+//   GET  /api/photo?key=&exp=&sig=         one photo as a JPEG (signed link from the wall, valid 1 hour)
 //   POST /api/push/register                { token, device }
 //   POST /api/ask                          { name, text, device } question for the rabbi
 // Leaders (Authorization: Bearer <passcode>)
@@ -17,6 +21,8 @@
 //   GET  /api/admin/signups, GET /api/admin/inbox, POST /api/admin/inbox/remove
 //   GET  /api/admin/photos?challenge=ID    check-in photos from the last 7 days (newest first)
 //   GET  /api/admin/photo?key=KEY          one photo
+//   POST /api/admin/photo-status           { key, status: 'checked' | 'hidden' | '' }
+//   POST /api/admin/comment-delete         { key, at }
 import SEED from '../../../shared/seed.json';
 
 const CORS = {
@@ -100,6 +106,31 @@ async function actor(env, b) {
   const device = clean(b.device, 40);
   if (device.length < 8) return { error: 'Bad request.' };
   return { key: device, name: clean(b.name, 40), grade: clean(b.grade, 12), age: null, gender: '', school: '' };
+}
+
+// Signed, short-lived photo links so <Image> can load a photo without a login header.
+async function hmac(secret, msg) {
+  const k = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  return [...new Uint8Array(await crypto.subtle.sign('HMAC', k, new TextEncoder().encode(msg)))].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+async function photoUrl(env, origin, key) {
+  const exp = String(Date.now() + 3600 * 1000);
+  return `${origin}/api/photo?key=${encodeURIComponent(key)}&exp=${exp}&sig=${await hmac(env.ADMIN_PASSCODE || 'cteen', key + '|' + exp)}`;
+}
+const PHOTO_KEY = /^photo:([a-z0-9-]+):(\d{4}-\d{2}-\d{2}):([A-Za-z0-9-]+)$/;
+const recentDay = (d) => { for (let i = 0; i < 8; i++) if (nyDate(new Date(Date.now() - i * 86400000)) === d) return true; return false; };
+// The list entry for one photo lives in photos:<challenge>:<day>.
+async function editPhotoEntry(env, key, fn) {
+  const m = PHOTO_KEY.exec(key);
+  if (!m) return false;
+  const listKey = `photos:${m[1]}:${m[2]}`;
+  const list = (await env.CTEEN.get(listKey, 'json')) || [];
+  const i = list.findIndex((p) => p.key === key);
+  if (i < 0) return false;
+  const res = fn(list[i]);
+  if (res === false) return false;
+  await env.CTEEN.put(listKey, JSON.stringify(list), { expirationTtl: PHOTO_TTL });
+  return true;
 }
 
 async function getContent(env) {
@@ -267,6 +298,64 @@ export async function onRequest({ request, env, params }) {
     }
 
     // ── challenges ──
+    m = /^challenges\/([a-z0-9-]+)\/(join|wall|comment)$/.exec(path);
+    if (m) {
+      const [, id, action] = m;
+      const content = await getContent(env);
+      if (!content.challenges.find((c) => c.id === id)) return bad('Challenge not found.', 404);
+      const leader = request.headers.get('Authorization') ? (await isLeader(request, env)).ok : false;
+      const creds = method === 'GET' ? { id: url.searchParams.get('id'), token: url.searchParams.get('token') } : body;
+      const who = leader ? { key: 'leader', name: 'Rabbi Zevy' } : await actor(env, creds || {});
+      if (who.error) return bad(who.error, 401);
+      const members = (await env.CTEEN.get('members:' + id, 'json')) || {};
+      if (action === 'join' && method === 'POST') {
+        if (who.name.length < 2) return bad('Add your name first.');
+        if (!members[who.key] && Object.keys(members).length >= 1000) return bad('This challenge is full.', 409);
+        members[who.key] = { name: who.name, at: members[who.key]?.at || new Date().toISOString() };
+        await env.CTEEN.put('members:' + id, JSON.stringify(members));
+        return json({ ok: true, members: Object.keys(members).length });
+      }
+      if (!leader && !members[who.key]) return bad('Join the challenge to see the photos.', 403);
+      if (action === 'wall' && method === 'GET') {
+        const day = url.searchParams.get('day') || nyDate();
+        if (!recentDay(day)) return bad('Only the last week is kept.');
+        const list = (await env.CTEEN.get(`photos:${id}:${day}`, 'json')) || [];
+        const posts = [];
+        for (const p of list) {
+          if (p.status === 'hidden' && !leader) continue;
+          posts.push({ key: p.key, name: p.name, at: p.at, status: p.status || '', mine: p.who === who.key, comments: (p.comments || []).map((c) => ({ name: c.name, text: c.text, at: c.at, leader: !!c.leader })), url: await photoUrl(env, url.origin, p.key) });
+        }
+        return json({ day, posts, members: Object.keys(members).length });
+      }
+      if (action === 'comment' && method === 'POST') {
+        const text = clean(body.text, 200);
+        if (text.length < 1) return bad('Write a comment first.');
+        const k = String(body.key || '');
+        if (!k.startsWith(`photo:${id}:`)) return bad('Bad request.');
+        const cap = 'ccount:' + who.key + ':' + nyDate();
+        const n = Number((await env.CTEEN.get(cap)) || 0);
+        if (n >= 40) return bad("That's a lot of comments today. Try again tomorrow.", 429);
+        const comment = { name: who.name, who: who.key, text, at: new Date().toISOString(), leader: who.key === 'leader' };
+        const ok = await editPhotoEntry(env, k, (p) => {
+          if (p.status === 'hidden') return false;
+          p.comments = (p.comments || []).slice(-59);
+          p.comments.push(comment);
+        });
+        if (!ok) return bad('That photo is gone.', 404);
+        await env.CTEEN.put(cap, String(n + 1), { expirationTtl: 90000 });
+        return json({ ok: true, comment: { name: comment.name, text, at: comment.at, leader: comment.leader } });
+      }
+    }
+
+    if (path === 'photo' && method === 'GET') {
+      const key = url.searchParams.get('key') || '', exp = url.searchParams.get('exp') || '', sig = url.searchParams.get('sig') || '';
+      if (!PHOTO_KEY.test(key) || !(Number(exp) > Date.now()) || !(await sameSecret(sig, await hmac(env.ADMIN_PASSCODE || 'cteen', key + '|' + exp)))) return new Response('Link expired', { status: 403, headers: CORS });
+      const data = await env.CTEEN.get(key);
+      if (!data) return new Response('Gone', { status: 404, headers: CORS });
+      const bin = Uint8Array.from(atob(data), (ch) => ch.charCodeAt(0));
+      return new Response(bin, { headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'private, max-age=3600', ...CORS } });
+    }
+
     m = /^challenges\/([a-z0-9-]+)\/(checkin|board)$/.exec(path);
     if (m) {
       const [, id, action] = m;
@@ -294,12 +383,14 @@ export async function onRequest({ request, env, params }) {
           await env.CTEEN.put(photoKey, photo, { expirationTtl: PHOTO_TTL });
           const listKey = `photos:${id}:${period}`;
           const list = ((await env.CTEEN.get(listKey, 'json')) || []).filter((p) => p.key !== photoKey);
-          list.unshift({ key: photoKey, name: who.name, at: new Date().toISOString() });
+          list.unshift({ key: photoKey, name: who.name, who: who.key, at: new Date().toISOString(), status: '', comments: [] });
           await env.CTEEN.put(listKey, JSON.stringify(list.slice(0, 500)), { expirationTtl: PHOTO_TTL });
         }
         if (!board[who.key] && Object.keys(board).length >= 1000) return bad('Leaderboard is full.', 409);
         board[who.key] = { name: who.name, count: Math.min(row.count + 1, 9999), last: period };
         await env.CTEEN.put(key, JSON.stringify(board));
+        const members = (await env.CTEEN.get('members:' + id, 'json')) || {};
+        if (!members[who.key]) { members[who.key] = { name: who.name, at: new Date().toISOString() }; await env.CTEEN.put('members:' + id, JSON.stringify(members)); }
         return json({ ok: true, already: false, count: board[who.key].count, period, board: top() });
       }
     }
@@ -384,8 +475,17 @@ export async function onRequest({ request, env, params }) {
         const days = [];
         for (let i = 0; i < 7; i++) days.push(nyDate(new Date(Date.now() - i * 86400000)));
         const out = [];
-        for (const d of days) for (const p of (await env.CTEEN.get(`photos:${id}:${d}`, 'json')) || []) out.push({ ...p, day: d });
+        for (const d of days) for (const p of (await env.CTEEN.get(`photos:${id}:${d}`, 'json')) || []) out.push({ key: p.key, name: p.name, at: p.at, day: d, status: p.status || '', comments: p.comments || [] });
         return json({ photos: out });
+      }
+      if (path === 'admin/photo-status' && method === 'POST') {
+        const status = ['checked', 'hidden'].includes(body.status) ? body.status : '';
+        const ok = await editPhotoEntry(env, String(body.key || ''), (p) => { p.status = status; });
+        return ok ? json({ ok: true }) : bad('That photo is gone.', 404);
+      }
+      if (path === 'admin/comment-delete' && method === 'POST') {
+        const ok = await editPhotoEntry(env, String(body.key || ''), (p) => { p.comments = (p.comments || []).filter((c) => c.at !== body.at); });
+        return ok ? json({ ok: true }) : bad('That photo is gone.', 404);
       }
       if (path === 'admin/photo' && method === 'GET') {
         const key = url.searchParams.get('key') || '';

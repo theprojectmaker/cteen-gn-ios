@@ -69,13 +69,6 @@ export function Home() {
         </Card>
       ) : null}
 
-      <Text style={st.section}>Quick links</Text>
-      <View style={st.quickGrid}>
-        <Quick icon="ticket" color="blue" label="Events" onPress={() => go('Events')} />
-        <Quick icon="chat" color="purple" label="Feed" onPress={() => go('Feed')} />
-        <Quick icon="camera" color="pink" label="Instagram" onPress={() => open(CHAPTER.instagram)} />
-        <Quick icon="heart" color="green" label="Hours" onPress={() => open('https://myportal.cteen.com/service')} />
-      </View>
     </>
   );
 }
@@ -138,11 +131,10 @@ export function Events() {
   );
 }
 
-export function EventSheet() {
-  const { activeEvent: e, openEvent } = useStore();
-  if (!e) return null;
+// Event details, shown in a slide-up sheet (app/event/[id].tsx).
+export function EventDetails({ e }: { e: EventItem }) {
   return (
-    <Sheet onClose={() => openEvent(null)}>
+    <>
       <View style={st.sheetImgWrap}>
         <Cover e={e} style={u.fill} iconSize={96} />
         {e.image ? <View style={[u.fill, { backgroundColor: 'rgba(19,32,44,0.32)' }]} /> : null}
@@ -166,7 +158,7 @@ export function EventSheet() {
           <Button kind="ghost" icon="calendar" label="Add to calendar" onPress={() => open(calendarUrl(e))} />
         </View>
       </View>
-    </Sheet>
+    </>
   );
 }
 
