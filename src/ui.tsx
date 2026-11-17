@@ -127,7 +127,8 @@ export function EventMeta({ e }: { e: EventItem }) {
 }
 
 export function EventCard({ e, width }: { e: EventItem; width?: number }) {
-  const { openEvent } = useStore();
+  const { openEvent, goingCount, going } = useStore();
+  const n = e.signup === 'app' ? goingCount[e.id] ?? 0 : 0;
   return (
     <View style={{ width }}>
       <Pressable onPress={() => openEvent(e.id)} style={({ pressed }) => pressed && s.pressed} accessibilityRole="button" accessibilityLabel={e.title}>
@@ -140,6 +141,12 @@ export function EventCard({ e, width }: { e: EventItem; width?: number }) {
         </View>
         <Text style={[T.h3, { marginTop: 10 }]} numberOfLines={2}>{e.title}</Text>
         <EventMeta e={e} />
+        {n > 0 || going.includes(e.id) ? (
+          <View style={s.goingRow}>
+            <Icon name={going.includes(e.id) ? 'check' : 'users'} size={14} color={going.includes(e.id) ? C.green : C.sub} stroke={2.2} />
+            <Text style={[s.goingText, going.includes(e.id) && { color: C.green }]}>{going.includes(e.id) ? `You're going${n > 1 ? ` · ${n} going` : ''}` : `${n} going`}</Text>
+          </View>
+        ) : null}
       </Pressable>
       <SaveHeart id={e.id} />
     </View>
@@ -190,6 +197,8 @@ export function Sheet({ onClose, children }: { onClose: () => void; children: Re
 }
 
 export const s = StyleSheet.create({
+  goingRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 5 },
+  goingText: { fontSize: 13, fontWeight: '700', color: C.sub },
   fill: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, width: '100%', height: '100%' },
   card: { backgroundColor: C.card, borderRadius: R.card, padding: 16, ...shadow },
   pressed: { opacity: 0.82, transform: [{ scale: 0.985 }] },

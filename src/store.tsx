@@ -17,7 +17,7 @@ export type EventItem = {
   signup: 'app' | 'link'; url?: string; payUrl?: string;
   gender?: 'all' | 'boys' | 'girls'; minAge?: number | null; maxAge?: number | null;
 };
-export type Challenge = { id: string; title: string; icon: string; color: ColorKey; every: 'day' | 'week'; goal: number; about: string; active: boolean; photo?: boolean; rewards: { at: number; prize: string }[] };
+export type Challenge = { id: string; title: string; icon: string; color: ColorKey; every: 'day' | 'week'; goal: number; about: string; active: boolean; photo?: boolean; starts?: string; rewards: { at: number; prize: string }[] };
 export type Post = { id: string; kind: 'News' | 'Events' | 'Photos' | 'Rewards'; pinned?: boolean; title: string; body: string; eventId?: string; challengeId?: string; photos?: string[]; linkLabel?: string; linkUrl?: string; at: string };
 export type Info = { id: string; icon: string; title: string; body: string };
 export type Alert = { id: string; on: boolean; title: string; text: string; target: Target; until: string };
@@ -92,6 +92,7 @@ type Ctx = Local & {
   openTarget: (t: Target) => void;
   liveAlert: Alert | null; dismissAlert: () => void;
   signup: (id: string, on: boolean) => Promise<string | null>;
+  goingCount: Record<string, number>;
   join: (id: string, reminderHour: number | null) => void; leave: (id: string) => void;
   joinChallenge: (id: string, name: string, reminderHour: number | null) => Promise<string | null>;
   fetchWall: (id: string, day?: string) => Promise<Wall | { error: string }>;
@@ -159,6 +160,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [isOwner, setIsOwner] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
   const [push, setPush] = useState<PushState>('unsupported');
+  const [goingCount, setGoingCount] = useState<Record<string, number>>({});
   const ref = useRef(local);
   ref.current = local;
 
@@ -178,6 +180,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     try {
       keep(await api<Content>('/content'));
       setOnline(true);
+      api<{ counts: Record<string, number> }>('/events/counts').then((r) => setGoingCount(r.counts || {})).catch(() => {});
     } catch {
       setOnline(false);
     }
@@ -349,10 +352,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     openEvent: (id) => { if (id) { tap(); router.push(`/event/${id}`); } },
     openChallenge: (id) => { if (id) { tap(); router.push(`/challenge/${id}`); } },
     dismissAlert: () => patch((s) => ({ ...s, dismissed: [...s.dismissed.slice(-20), a.id] })),
+    goingCount,
     signup: async (id, on) => {
       const me = ref.current;
       try {
-        await api(`/events/${id}/${on ? 'signup' : 'cancel'}`, { method: 'POST', body: who(me) });
+        const r = await api<{ count: number }>(`/events/${id}/${on ? 'signup' : 'cancel'}`, { method: 'POST', body: who(me) });
+        if (typeof r.count === 'number') setGoingCount((c) => ({ ...c, [id]: r.count }));
         patch((s) => ({ ...s, going: on ? [...new Set([...s.going, id])] : s.going.filter((x) => x !== id) }));
         if (on) tap(true);
         return null;
@@ -491,7 +496,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     removeQuestion: (id) => api('/admin/inbox/remove', { method: 'POST', body: { id }, leader }).then(() => {}).catch(() => {}),
     loadPhotos: (cid) => api<{ photos: PhotoRow[] }>(`/admin/photos?challenge=${cid}`, { leader }).then((r) => r.photos).catch(() => null),
     loadPhoto: (key) => api<{ photo: string }>(`/admin/photo?key=${encodeURIComponent(key)}`, { leader }).then((r) => r.photo).catch(() => null),
-  }), [local, content, online, leader, isOwner, adminOpen, push, liveAlert, googleReady, appleReady, unreadFeed, newEvents, flip, patch, refresh, keep, openTarget, registerToken]);
+  }), [local, content, online, leader, isOwner, adminOpen, push, liveAlert, googleReady, appleReady, unreadFeed, newEvents, goingCount, flip, patch, refresh, keep, openTarget, registerToken]);
 
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>;
 }

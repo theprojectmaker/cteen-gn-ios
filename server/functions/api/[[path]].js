@@ -9,6 +9,7 @@
 //   POST /api/auth/redeem                  { ticket, id?, token? } -> links Google to the account, or signs in
 //   POST /api/auth/apple                   { identityToken, name?, id?, token? } -> Sign in with Apple
 //   POST /api/events/:id/signup|cancel     { id, token } (or legacy { device, name, grade })
+//   GET  /api/events/counts                how many are going to each in-app event (no names)
 //   POST /api/challenges/:id/checkin       { id, token, photo? } one per day or week; photo is a small JPEG (base64)
 //   GET  /api/challenges/:id/board         top names + counts
 //   POST /api/challenges/:id/join          { id, token } join (needed to see the photo wall)
@@ -194,7 +195,8 @@ function memberStats(ch, row, joinedAt) {
   const days = new Set((row && row.days) || (row && row.last ? [row.last] : []));
   const today = periodKey(ch.every);
   const joined = joinedAt ? nyDate(new Date(joinedAt)) : today;
-  const start = joined;
+  // nothing before the challenge's start day can count as a miss
+  const start = ch.starts && ch.starts > joined ? ch.starts : joined;
   // the period before today is the last one that can be missed
   const yesterday = new Date(today + 'T12:00:00Z');
   yesterday.setUTCDate(yesterday.getUTCDate() - (ch.every === 'week' ? 7 : 1));
@@ -243,6 +245,7 @@ function sanitize(doc, alert) {
     challenges: list(doc.challenges, 20).filter((c) => idOk(c.id)).map((c) => ({
       id: c.id, title: clean(c.title, 60), icon: clean(c.icon, 20), color: color(c.color), every: c.every === 'week' ? 'week' : 'day',
       goal: Math.min(366, Math.max(1, Number(c.goal) || 1)), about: clean(c.about, 400), active: c.active !== false, photo: !!c.photo,
+      starts: /^\d{4}-\d{2}-\d{2}$/.test(c.starts || '') ? c.starts : '',
       rewards: list(c.rewards, 8).map((r) => ({ at: Math.min(366, Math.max(1, Number(r.at) || 1)), prize: clean(r.prize, 80) })).sort((x, y) => x.at - y.at),
     })),
     posts: list(doc.posts, 200).filter((p) => idOk(p.id)).map((p) => ({
@@ -402,6 +405,13 @@ export async function onRequest({ request, env, params }) {
     }
 
     // ── events ──
+    // How many are going to each in-app event (numbers only; names stay leader-only).
+    if (path === 'events/counts' && method === 'GET') {
+      const content = await getContent(env);
+      const counts = {};
+      for (const e of content.events.filter((x) => x.signup === 'app')) counts[e.id] = ((await env.CTEEN.get('signups:' + e.id, 'json')) || []).length;
+      return json({ counts });
+    }
     let m = /^events\/([a-z0-9-]+)\/(signup|cancel)$/.exec(path);
     if (m && method === 'POST') {
       const [, id, action] = m;

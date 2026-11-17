@@ -47,12 +47,12 @@ export function Screen({ children }: { children: React.ReactNode }) {
   const { refresh, liveAlert } = useStore();
   const [refreshing, setRefreshing] = useState(false);
   const enter = useRef(new Animated.Value(PREFS.reduceMotion ? 1 : 0)).current;
-  useFocusEffect(useCallback(() => {
-    refresh();
+  // Ease in once when the page first opens; coming back to a tab is instant (no flicker).
+  useEffect(() => {
     if (PREFS.reduceMotion) return;
-    enter.setValue(0);
-    Animated.timing(enter, { toValue: 1, duration: 360, easing: Easing.out(Easing.cubic), useNativeDriver: NATIVE_DRIVER }).start();
-  }, [refresh]));
+    Animated.timing(enter, { toValue: 1, duration: 300, easing: Easing.bezier(0.22, 1, 0.36, 1), useNativeDriver: NATIVE_DRIVER }).start();
+  }, []);
+  useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
   const onRefresh = async () => {
     setRefreshing(true);
     await refresh();

@@ -13,6 +13,8 @@ Remove your line when it ships.
 
 ## Log
 
+- 2026-11-16 · Solomon · 30 Day Tefillin Challenge from the flyer: live content updated (title, 30 days, starts 2026-11-15, prize = luxury EZRI backpack valued at $300 for everyone who finishes, grades 8-12); challenges now carry `starts` (server keeps it, misses never count before it). Challenge page rebuilt simple: title + Day N of 30 + end date, dark prize card with progress, one big Snap button (or done/closed/out state), today's 8-across board, reminder. Old ring/week/rules/rewards/window pieces removed. RSVP on Great Neck events: Going / Can't go + live going count (GET /api/events/counts, numbers only), cards show N going. Pages ease in once instead of on every tab switch. Server deployed.
+
 - 2026-11-16 · Solomon · Top bar back to the build 4 look (compact glass pill, YOUR CHAPTER / CTeen Great Neck, NY, tinted round 38px buttons) with the tefillin button + profile; the greeting left the bar and is one line at the top of Home only. New opening animation (logo settles with a glow, drifting light, GREAT NECK rises over a drawn line, zoom-through exit).
 
 - 2026-11-16 · Solomon · THE ACTUAL LAUNCH CRASH (builds 7-10), found from the iPhone crash report (thrown on expo.controller.errorRecoveryQueue = a JS error at startup): src/prefs.native.ts imported DEFAULT_PREFS from './prefs', which on the phone resolves to prefs.native.ts itself, so DEFAULT_PREFS was undefined, readPrefs() returned undefined and theme.ts crashed reading PREFS.theme. Defaults now live in src/prefsDefaults.ts and theme.ts falls back to them. The expo-sqlite removal was not the cause (harmless). Lesson: a .native.ts file must never import its own base name.

@@ -160,43 +160,63 @@ export function EventDetails({ e }: { e: EventItem }) {
   );
 }
 
-// Great Neck events: sign up right here, the rabbi sees the list.
+// Great Neck events: RSVP right here in one tap (your name comes from your profile); the rabbi
+// sees the list, everyone sees how many are going.
 function InAppSignup({ e }: { e: EventItem }) {
-  const { going, name, grade, signup } = useStore();
+  const { going, name, signup, goingCount } = useStore();
   const [ask, setAsk] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [declined, setDeclined] = useState(false);
   const mine = going.includes(e.id);
+  const count = goingCount[e.id] ?? 0;
   const run = async (on: boolean) => {
     setBusy(true); setErr(null);
     setErr(await signup(e.id, on));
     setBusy(false);
   };
-  useEffect(() => { setAsk(false); setErr(null); }, [e.id]);
-  if (ask) return <Card><NameGate title="Who's signing up?" cta="Sign me up" onDone={() => { setAsk(false); run(true); }} /></Card>;
+  useEffect(() => { setAsk(false); setErr(null); setDeclined(false); }, [e.id]);
+  if (ask) return <Card><NameGate title="Who's going?" cta="I'm going" onDone={() => { setAsk(false); run(true); }} /></Card>;
+  const others = Math.max(0, count - (mine ? 1 : 0));
   return (
     <View>
-      {mine ? (
-        <View style={st.inBox}>
-          <Icon name="check" size={30} color={C.green} stroke={2} />
-          <View style={{ flex: 1 }}>
-            <Text style={T.h2}>You're in{name ? `, ${name.split(' ')[0]}` : ''}</Text>
-            <Text style={T.small}>Rabbi Zevy has you on the list{grade ? ` (grade ${grade})` : ''}.</Text>
-          </View>
+      <View style={st.rsvp}>
+        <View style={st.rsvpHead}>
+          <Text style={[T.h2, { flex: 1 }]}>{mine ? "You're going" : declined ? 'Maybe next time' : 'Are you going?'}</Text>
+          {count > 0 ? (
+            <View style={st.goingPill}>
+              <Icon name="users" size={14} color={C.blueDeep} stroke={2.2} />
+              <Text style={st.goingPillText}>{count} going</Text>
+            </View>
+          ) : null}
         </View>
-      ) : (
-        <Button label={busy ? 'Signing you up…' : 'Sign me up'} disabled={busy} onPress={() => (name ? run(true) : setAsk(true))} />
-      )}
+        <View style={st.rsvpRow}>
+          <Pressable
+            onPress={() => { if (mine) return; setDeclined(false); name ? run(true) : setAsk(true); }}
+            disabled={busy}
+            style={({ pressed }) => [st.rsvpBtn, mine && st.rsvpYes, pressed && { transform: [{ scale: 0.97 }] }]}
+            accessibilityRole="button" accessibilityState={{ selected: mine }}>
+            <Icon name={mine ? 'tick' : 'check'} size={18} color={mine ? C.white : C.ink} stroke={2.4} />
+            <Text style={[st.rsvpText, mine && { color: C.white }]}>{busy && !mine ? 'Saving…' : 'Going'}</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => { setDeclined(true); if (mine) run(false); }}
+            disabled={busy}
+            style={({ pressed }) => [st.rsvpBtn, declined && !mine && st.rsvpNo, pressed && { transform: [{ scale: 0.97 }] }]}
+            accessibilityRole="button" accessibilityState={{ selected: declined && !mine }}>
+            <Icon name="x" size={17} color={declined && !mine ? C.onInverse : C.ink} stroke={2.4} />
+            <Text style={[st.rsvpText, declined && !mine && { color: C.onInverse }]}>Can't go</Text>
+          </Pressable>
+        </View>
+        <Text style={st.rsvpNote}>
+          {mine ? `Rabbi Zevy has you on the list.${others > 0 ? ` You and ${others} other${others === 1 ? '' : 's'} are going.` : ''}` : count > 0 ? `${count} from Great Neck ${count === 1 ? 'is' : 'are'} going so far.` : 'Be the first to RSVP.'}
+        </Text>
+      </View>
       {err ? <Text style={st.err} accessibilityLiveRegion="polite">{err}</Text> : null}
       {e.payUrl ? (
         <View style={{ marginTop: 10 }}>
           <Button kind="ghost" icon="ticket" label={mine ? 'Next: get your ticket' : 'Ticket info'} onPress={() => open(e.payUrl!)} />
         </View>
-      ) : null}
-      {mine ? (
-        <Pressable onPress={() => run(false)} disabled={busy} hitSlop={8} style={{ alignSelf: 'center', marginTop: 12 }} accessibilityRole="button">
-          <Text style={[T.small, { textDecorationLine: 'underline' }]}>Can't make it? Remove me</Text>
-        </Pressable>
       ) : null}
     </View>
   );
@@ -473,6 +493,16 @@ function LinkRow({ icon, title, sub, url, first }: { icon: string; title: string
 }
 
 const st = StyleSheet.create({
+  rsvp: { padding: 16, borderRadius: 22, backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
+  rsvpHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  goingPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, height: 28, borderRadius: 14, backgroundColor: C.bluePale },
+  goingPillText: { fontSize: 13, fontWeight: '800', color: C.blueDeep },
+  rsvpRow: { flexDirection: 'row', gap: 10, marginTop: 14 },
+  rsvpBtn: { flex: 1, height: 50, borderRadius: 25, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: C.bg, borderWidth: 1, borderColor: C.line },
+  rsvpYes: { backgroundColor: C.green, borderColor: C.green },
+  rsvpNo: { backgroundColor: C.inverse, borderColor: C.inverse },
+  rsvpText: { fontSize: 16, fontWeight: '800', color: C.ink },
+  rsvpNote: { fontSize: 13, color: C.sub, marginTop: 12, lineHeight: 18 },
   helloLine: { fontSize: 27, lineHeight: 32, fontFamily: F.display, color: C.ink, letterSpacing: -0.6, marginBottom: 14, marginTop: -2 },
   hello: { fontSize: 32, lineHeight: 37, fontFamily: F.display, color: C.ink, letterSpacing: -0.6 },
   helloSub: { fontSize: 16, lineHeight: 22, color: C.sub, marginTop: 6 },

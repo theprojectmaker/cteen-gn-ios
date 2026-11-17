@@ -11,14 +11,6 @@ import { snapPhoto } from './photo';
 const doneLabel = (ch: Challenge) => (ch.every === 'day' ? 'Done for today' : 'Done this week');
 const unit = (ch: Challenge, n: number) => (ch.every === 'day' ? `day${n === 1 ? '' : 's'}` : `week${n === 1 ? '' : 's'}`);
 
-function Bar({ ch, count, height = 8 }: { ch: Challenge; count: number; height?: number }) {
-  const hue = HUES[ch.color] ?? HUES.blue;
-  return (
-    <View style={[st.track, { height, borderRadius: height / 2, backgroundColor: hue.pale }]}>
-      <View style={[st.fillBar, { borderRadius: height / 2, width: `${Math.min(100, (count / ch.goal) * 100)}%`, backgroundColor: hue.solid }]} />
-    </View>
-  );
-}
 
 // Home card for a live challenge: one clear line and one clear button.
 export function ChallengeBanner({ ch }: { ch: Challenge }) {
@@ -96,51 +88,33 @@ function ReminderPicker({ value, onChange, ch }: { value: number | null; onChang
   );
 }
 
-// The last 7 days (or weeks), oldest first: done, missed, Shabbat, or today.
-function Week({ ch, light }: { ch: Challenge; light?: boolean }) {
-  const { checks } = useStore();
-  const hue = HUES[ch.color] ?? HUES.blue;
-  const have = new Set(checks[ch.id] ?? []);
-  const days = [...Array(7)].map((_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (6 - i) * (ch.every === 'week' ? 7 : 1));
-    return { key: periodKey(ch.every, d), d };
-  });
-  return (
-    <View style={st.week}>
-      {days.map(({ key, d }, i) => {
-        const on = have.has(key);
-        const today = i === 6;
-        const shabbat = ch.every === 'day' && d.getDay() === 6;
-        return (
-          <View key={key} style={st.weekCol}>
-            <View style={[st.weekDot, on ? { backgroundColor: light ? C.white : hue.solid } : { borderWidth: 2, borderColor: light ? (today ? C.white : 'rgba(255,255,255,0.35)') : today ? hue.solid : C.line }]}>
-              {on ? <Icon name="tick" size={14} color={light ? hue.deep : C.white} stroke={3} /> : null}
-            </View>
-            <Text style={[st.weekLabel, light && { color: 'rgba(255,255,255,0.85)' }, today && { color: light ? C.white : hue.deep }]}>{ch.every === 'week' ? `${d.getMonth() + 1}/${d.getDate()}` : shabbat ? 'Shab' : 'SMTWTFS'[d.getDay()]}</Text>
-          </View>
-        );
-      })}
-    </View>
-  );
-}
 
-// Full page for one challenge (app/challenge/[id].tsx): sign up, then every day snap a photo.
-// Everyone in the challenge shows in a grid: a photo with the time they posted, or a grey slot
-// if they haven't yet. Miss a day and your streak resets; the 2nd miss adds one extra day;
-// the 3rd miss and you're out.
-const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Shabbat'];
+// Full page for one challenge (app/challenge/[id].tsx). Kept simple on purpose:
+// the prize and your progress, one big button for today, and today's board of photos.
+// Rules (server): each missed day (not Shabbat) is a strike; the 3rd strike and you're out.
 const timeOf = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-const nyDay = (back: number) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date(Date.now() - back * 86400000));
+const nyToday = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date());
+const isSat = (ymd: string) => new Date(ymd + 'T12:00:00Z').getUTCDay() === 6;
+const stepDay = (ymd: string, n: number) => { const d = new Date(ymd + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+// how many wrap days (not Shabbat) from start through today
+function wrapDayNumber(start: string, today: string) {
+  let n = 0;
+  for (let d = start; d <= today && n < 400; d = stepDay(d, 1)) if (!isSat(d)) n++;
+  return n;
+}
+// the date of the nth wrap day
+function nthWrapDay(start: string, nth: number) {
+  let n = 0, d = start;
+  for (let i = 0; i < 500; i++, d = stepDay(d, 1)) if (!isSat(d) && ++n === nth) return d;
+  return d;
+}
+const niceDay = (ymd: string) => new Date(ymd + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
 
 export function ChallengePage({ ch }: { ch: Challenge }) {
   const { counts, checks, name, joined, reminders, join, leave, checkin, joinChallenge, fetchWall } = useStore();
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
-  const [setupName, setSetupName] = useState(name);
-  useEffect(() => { if (!setupName && name) setSetupName(name); }, [name]); // saved name loads a moment after the page
   const [hour, setHour] = useState<number | null>(reminders[ch.id] ?? null);
-  const [day, setDay] = useState(0); // 0 = today, 1 = yesterday...
   const [wall, setWall] = useState<WallT | null>(null);
   const [wallErr, setWallErr] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
@@ -156,25 +130,33 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
   const win = timed ? wrapWindow(now) : null;
   const closed = !!win && win.state !== 'open';
 
+  // where we are in the challenge
+  const starts = ch.starts || (ch.id === 'tefillin' ? '2026-11-15' : '');
+  const today = nyToday();
+  const dayNum = starts && ch.every === 'day' ? Math.min(ch.goal, wrapDayNumber(starts, today)) : 0;
+  const lastDay = starts && ch.every === 'day' ? nthWrapDay(starts, ch.goal) : '';
+  const prize = ch.rewards[ch.rewards.length - 1];
+
   useEffect(() => {
     if (!mine || !ch.photo) return;
     let alive = true;
     setWallErr(null);
-    fetchWall(ch.id, nyDay(day)).then((r) => {
+    fetchWall(ch.id, today).then((r) => {
       if (!alive) return;
       if ('error' in r) { setWallErr(r.error); setWall(null); return; }
       setWall(r);
     });
     return () => { alive = false; };
-  }, [ch.id, day, reload, mine]);
+  }, [ch.id, reload, mine]);
 
-  // Numbers come from the server (the same on every phone); fall back to this phone's record.
+  // numbers come from the server (the same on every phone); fall back to this phone's record
   const me: ChallengeStats = wall?.me ?? { count: counts[ch.id] ?? 0, streak: streak(ch, checks), strikes: 0, out: false, goal: ch.goal, done: doneThisPeriod(ch, checks) };
   const done = me.done || doneThisPeriod(ch, checks);
+  const left = Math.max(0, me.goal - me.count);
 
   const doJoin = async () => {
     setBusy(true); setNote(null);
-    const e = await joinChallenge(ch.id, setupName, hour);
+    const e = await joinChallenge(ch.id, name, hour);
     setBusy(false);
     if (e) setNote(e);
     else setReload((k) => k + 1);
@@ -201,146 +183,108 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
       setParty({ count: r.count ?? me.count + 1, streak: me.streak + 1 }); // the sheet turns into the celebration
     }
     setPending(null);
-    setNote(r.already ? 'You already checked in today.' : 'Posted. Nice.');
-    setDay(0);
+    setNote(r.already ? 'You already posted today.' : null);
     setReload((k) => k + 1);
   };
 
-  const labels = [...Array(7)].map((_, i) => (i === 0 ? 'Today' : i === 1 ? 'Yesterday' : DAY_NAMES[new Date(Date.now() - i * 86400000).getDay()]));
   const total = wall ? wall.posts.length + wall.waiting.length : 0;
+  const dayLine = !starts ? '' : today < starts ? `Starts ${niceDay(starts)}` : isSat(today) ? `Shabbat · day ${dayNum} of ${ch.goal}` : `Day ${dayNum} of ${ch.goal}`;
 
   return (
-    <View style={{ paddingBottom: 20 }}>
-      <View style={st.head}>
-        <IconTile icon={challengeIcon(ch)} color={ch.color} size={64} solid />
-        <Text style={st.title}>{ch.title}</Text>
-        <Text style={[T.body, { textAlign: 'center', marginTop: 8, color: C.sub, maxWidth: 380 }]}>{ch.about}</Text>
+    <View style={{ paddingBottom: 24 }}>
+      {/* title */}
+      <View style={st.top}>
+        <IconTile icon={challengeIcon(ch)} color={ch.color} size={54} solid />
+        <View style={{ flex: 1 }}>
+          <Text style={st.topTitle} numberOfLines={2}>{ch.title}</Text>
+          {dayLine ? <Text style={st.topSub}>{dayLine}{lastDay ? ` · ends ${niceDay(lastDay)}` : ''}</Text> : null}
+        </View>
+      </View>
+
+      {/* the prize and your progress */}
+      <View style={st.prize}>
+        <View style={[u.blob, { backgroundColor: hue.solid, opacity: 0.35, right: -80, top: -110 }]} />
+        <Text style={st.prizeEyebrow}>{prize ? `Finish all ${prize.at}, win` : `Goal: ${ch.goal}`}</Text>
+        {prize ? <Text style={st.prizeName}>{prize.prize}</Text> : null}
+        {mine ? (
+          <>
+            <View style={st.prizeTrack}><View style={[st.prizeFill, { width: `${Math.min(100, (me.count / Math.max(1, me.goal)) * 100)}%`, backgroundColor: hue.solid }]} /></View>
+            <View style={st.prizeRow}>
+              <Text style={st.prizeCount}>{me.count} <Text style={st.prizeOf}>of {me.goal} days</Text></Text>
+              <Text style={st.prizeLeft}>{me.out ? 'Out' : left === 0 ? 'Done' : `${left} to go`}</Text>
+            </View>
+          </>
+        ) : (
+          <Text style={st.prizeSub}>Everyone who finishes wins. No luck needed.</Text>
+        )}
       </View>
 
       {!mine ? (
         ch.active ? (
-          <Card style={{ padding: 22 }}>
-            <Text style={T.h2}>Sign up</Text>
-            <Text style={[T.small, { marginTop: 4, fontSize: 14 }]}>Put in your name and you're in. Every day, snap a photo of you wrapping. Everyone in the challenge sees the day's photos.</Text>
-            <RuleCard />
-            <Field label="Your name" value={setupName} onChange={setSetupName} placeholder="Like: Noah S." />
-            <View style={{ marginTop: 18 }}><ReminderPicker value={hour} onChange={setHour} ch={ch} /></View>
-            <View style={{ marginTop: 22 }}>
-              <Button label={busy ? 'Signing you up…' : 'Sign me up'} color={hue.solid} disabled={busy || setupName.trim().length < 2} onPress={doJoin} />
+          <View style={{ marginTop: 18 }}>
+            <View style={st.steps}>
+              <Step icon={challengeIcon(ch)} title={ch.id === 'tefillin' ? 'Wrap tefillin' : 'Do it'} sub={ch.every === 'day' ? "Every day. Shabbat doesn't count." : 'Once a week.'} />
+              {ch.photo ? <Step icon="camera" title="Snap a selfie" sub={timed ? 'Between sunrise and sunset.' : 'Right here in the app.'} /> : null}
+              <Step icon="send" title="Post it here" sub="Everyone in the challenge sees today's photos." last />
+            </View>
+            <View style={{ marginTop: 16 }}><ReminderPicker value={hour} onChange={setHour} ch={ch} /></View>
+            <View style={{ marginTop: 18 }}>
+              <Button label={busy ? 'Joining…' : `Join as ${name.split(' ')[0] || 'me'}`} color={hue.solid} disabled={busy || name.trim().length < 2} onPress={doJoin} />
             </View>
             {note ? <Text style={st.note}>{note}</Text> : null}
-          </Card>
-        ) : <Text style={[T.body, { textAlign: 'center' }]}>This challenge has ended.</Text>
+          </View>
+        ) : <Text style={[T.body, { textAlign: 'center', marginTop: 18 }]}>This challenge has ended.</Text>
       ) : (
         <>
-          <View style={[st.hero, { backgroundColor: me.out ? '#7A8693' : hue.solid }]}>
-            <View style={[u.blob, { backgroundColor: hue.deep, opacity: 0.22, right: -70, top: -90 }]} />
-            <View style={[u.blob, { backgroundColor: '#ffffff', opacity: 0.08, left: -90, bottom: -110 }]} />
-            <View style={st.heroRow}>
-              <Ring size={132} progress={Math.min(1, me.count / Math.max(1, me.goal))}>
-                <Icon name="flame" size={20} color={C.white} stroke={2.2} />
-                <Text style={st.ringBig}>{me.streak}</Text>
-                <Text style={st.ringLabel}>{ch.every === 'day' ? 'day streak' : 'week streak'}</Text>
-              </Ring>
-              <View style={{ flex: 1, gap: 12 }}>
-                <HeroStat label="Today" value={me.out ? 'Out' : done ? 'Done' : 'Not yet'} good={done && !me.out} />
-                <HeroStat label="Check-ins" value={`${me.count} of ${me.goal}`} />
-                <View>
-                  <Text style={st.statLabel}>Strikes</Text>
-                  <View style={st.strikes}>
-                    {[0, 1, 2].map((i) => <View key={i} style={[st.strike, i < me.strikes && st.strikeOn]} />)}
-                  </View>
-                </View>
-              </View>
-            </View>
-            <View style={st.weekOnBlue}><Week ch={ch} light /></View>
-          </View>
-          {win ? <WindowStrip win={win} now={now} /> : null}
-
+          {/* today: one clear thing to do */}
           {me.out ? (
-            <View style={st.outCard}>
-              <Icon name="x" size={22} color="#C0303F" stroke={2.6} />
+            <View style={st.stateCard}>
+              <View style={[st.stateIcon, { backgroundColor: '#FBE4E7' }]}><Icon name="x" size={22} color="#C0303F" stroke={2.6} /></View>
               <View style={{ flex: 1 }}>
-                <Text style={T.h3}>You're out of this challenge</Text>
-                <Text style={T.small}>You missed 3 days. Talk to Rabbi Zevy about the next one.</Text>
+                <Text style={T.h3}>You're out of this one</Text>
+                <Text style={T.small}>3 missed days. Talk to Rabbi Zevy about the next challenge.</Text>
               </View>
             </View>
-          ) : ch.active ? (
-            closed && !done ? (
-              <View style={st.closedCard}>
-                <View style={[st.snapIcon, { backgroundColor: C.line }]}><Icon name={win!.state === 'shabbat' ? 'flame' : win!.state === 'before' ? 'sun' : 'lock'} size={26} color={C.sub} stroke={2} /></View>
-                <View style={{ flex: 1 }}>
-                  <Text style={st.snapTitle}>{win!.state === 'shabbat' ? 'Shabbat. No tefillin today' : win!.state === 'before' ? `Opens at sunrise, ${nyTime(win!.rise)}` : 'Closed for today'}</Text>
-                  <Text style={T.small}>{win!.state === 'before' ? `In ${untilText(win!.rise - now)}. Doesn't count as a miss yet.` : win!.state === 'after' ? `The window ended at sunset, ${nyTime(win!.set)}.` : 'Shabbat never breaks your streak.'}</Text>
-                </View>
+          ) : done ? (
+            <View style={st.stateCard}>
+              <View style={[st.stateIcon, { backgroundColor: C.green }]}><Icon name="tick" size={22} color={C.white} stroke={3} /></View>
+              <View style={{ flex: 1 }}>
+                <Text style={T.h3}>Done for today</Text>
+                <Text style={T.small}>{left > 0 ? `See you tomorrow. ${left} to go.` : 'You did all of it. Rabbi Zevy will be in touch about your prize.'}</Text>
               </View>
-            ) : done ? (
-              <View style={st.doneCard}>
-                <View style={st.doneIcon}><Icon name="tick" size={22} color={C.white} stroke={3} /></View>
-                <View style={{ flex: 1 }}>
-                  <Text style={T.h3}>{doneLabel(ch)}</Text>
-                  <Text style={T.small}>Come back {ch.every === 'day' ? 'tomorrow' : 'next week'} to keep your streak.</Text>
-                </View>
+            </View>
+          ) : closed ? (
+            <View style={st.stateCard}>
+              <View style={[st.stateIcon, { backgroundColor: C.line }]}><Icon name={win!.state === 'before' ? 'sun' : win!.state === 'shabbat' ? 'flame' : 'lock'} size={22} color={C.sub} stroke={2.2} /></View>
+              <View style={{ flex: 1 }}>
+                <Text style={T.h3}>{win!.state === 'shabbat' ? 'Shabbat Shalom' : win!.state === 'before' ? `Opens at ${nyTime(win!.rise)}` : 'Closed for today'}</Text>
+                <Text style={T.small}>{win!.state === 'shabbat' ? "No tefillin today. It doesn't count as a miss." : win!.state === 'before' ? `Sunrise. That's in ${untilText(win!.rise - now)}.` : `Closed at sunset (${nyTime(win!.set)}). Back tomorrow at sunrise.`}</Text>
               </View>
-            ) : (
-              <Pressable onPress={doCheck} disabled={busy} style={({ pressed }) => [st.snapCard, pressed && { transform: [{ scale: 0.98 }] }]} accessibilityRole="button" accessibilityLabel={ch.photo ? "Snap today's photo" : 'Check in'}>
-                <View style={[st.snapIcon, { backgroundColor: hue.solid }]}>
-                  <Icon name={ch.photo ? 'camera' : 'tick'} size={28} color={C.white} stroke={2} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={st.snapTitle}>{busy ? 'Posting…' : ch.photo ? "Snap today's photo" : 'Check in for today'}</Text>
-                  <Text style={T.small}>{win ? `Open until sunset, ${nyTime(win.set)} · ${untilText(win.set - now)} left` : me.strikes > 0 ? `${me.strikes} of 3 strikes. Don't miss today.` : 'Take a quick photo.'}</Text>
-                </View>
-                <Icon name="right" size={20} color={C.faint} stroke={2.4} />
-              </Pressable>
-            )
-          ) : null}
+            </View>
+          ) : (
+            <Pressable onPress={doCheck} disabled={busy || !ch.active} style={({ pressed }) => [st.snap, { backgroundColor: hue.solid }, pressed && { transform: [{ scale: 0.98 }], opacity: 0.95 }]} accessibilityRole="button" accessibilityLabel="Snap today's selfie">
+              <View style={st.snapIconWrap}><Icon name={ch.photo ? 'camera' : 'tick'} size={24} color={hue.solid} stroke={2.2} /></View>
+              <View style={{ flex: 1 }}>
+                <Text style={st.snapText}>{busy ? 'Posting…' : ch.photo ? "Snap today's selfie" : 'Check in for today'}</Text>
+                {win ? <Text style={st.snapSub}>Open until sunset, {nyTime(win.set)}</Text> : null}
+              </View>
+              <Icon name="right" size={20} color="rgba(255,255,255,0.85)" stroke={2.4} />
+            </Pressable>
+          )}
+          {me.strikes > 0 && !me.out ? <Text style={st.strikeNote}>{me.strikes === 1 ? 'You missed 1 day.' : `You missed ${me.strikes} days.`} A 3rd miss and you're out.</Text> : null}
           {note ? <Text style={st.note} accessibilityLiveRegion="polite">{note}</Text> : null}
 
+          {/* today's board */}
           {ch.photo ? (
-            <View style={{ marginTop: 30 }}>
+            <View style={{ marginTop: 28 }}>
               <View style={st.wallHead}>
-                <Text style={st.section0}>{day === 0 ? 'Today' : labels[day]}</Text>
+                <Text style={st.section0}>Today</Text>
                 <Text style={T.small}>{wall ? `${wall.posts.length} of ${total} wrapped` : ''}</Text>
               </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20, flexGrow: 0 }} contentContainerStyle={{ paddingHorizontal: 20, gap: 8, paddingVertical: 4 }}>
-                {labels.map((l, i) => (
-                  <Pressable key={l + i} onPress={() => setDay(i)} style={[u.chip, i === day && u.chipOn]} accessibilityRole="button" accessibilityState={{ selected: i === day }}>
-                    <Text style={[u.chipText, i === day && u.chipTextOn]}>{l}</Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-              {wallErr ? <Text style={[T.small, { marginTop: 12 }]}>{wallErr}</Text> : !wall ? <BoardSkeleton /> : (
-                <>
-                <Board wall={wall} onOpen={setOpen} />
-                <Text style={[st.section, { marginTop: 26 }]}>Who wrapped</Text>
-                <View style={st.grid}>
-                  <Card style={{ padding: 0, width: '100%' }}>
-                    {wall.posts.map((p, i) => (
-                      <Pressable key={p.key} onPress={() => setOpen(p)} style={({ pressed }) => [st.whoRow, i > 0 && st.ruleTop, pressed && { backgroundColor: C.bg }]} accessibilityRole="button" accessibilityLabel={`${p.name}, ${timeOf(p.at)}`}>
-                        <Image source={{ uri: p.url }} style={st.whoThumb} />
-                        <Text style={[T.h3, { flex: 1 }]} numberOfLines={1}>{p.mine ? 'You' : p.name}</Text>
-                        {p.status === 'checked' ? <Icon name="check" size={16} color={C.green} stroke={2.4} /> : null}
-                        <Text style={st.whoTime}>{timeOf(p.at)}</Text>
-                      </Pressable>
-                    ))}
-                    {wall.waiting.map((w, i) => (
-                      <View key={w.name + i} style={[st.whoRow, (wall.posts.length > 0 || i > 0) && st.ruleTop, { opacity: 0.6 }]} accessibilityLabel={`${w.name}, ${w.out ? 'out' : day === 0 ? 'not yet' : 'missed'}`}>
-                        <View style={[st.whoThumb, st.whoEmpty]}><Text style={st.emptyInitial}>{w.name[0]?.toUpperCase()}</Text></View>
-                        <Text style={[T.h3, { flex: 1, color: C.sub }]} numberOfLines={1}>{w.mine ? 'You' : w.name}</Text>
-                        <Text style={st.whoTime}>{w.out ? 'Out' : day === 0 ? 'Not yet' : 'Missed'}</Text>
-                      </View>
-                    ))}
-                  </Card>
-                  {total === 0 ? <Text style={[T.small, { marginTop: 4 }]}>No one has signed up yet.</Text> : null}
-                </View>
-                </>
-              )}
+              {wallErr ? <Text style={[T.small, { marginTop: 12 }]}>{wallErr}</Text> : !wall ? <BoardSkeleton /> : <Board wall={wall} onOpen={setOpen} />}
+              <Text style={st.boardHint}>Tap a photo to see who it is, react and comment.</Text>
             </View>
           ) : null}
-
-          <RuleCard />
-          <Rewards ch={ch} count={me.count} mine={mine} />
 
           <View style={{ marginTop: 30 }}>
             <ReminderPicker value={hour} ch={ch} onChange={(h) => { setHour(h); join(ch.id, h); setNote(h === null ? 'Reminder turned off.' : `Reminder set for ${hourLabel(h)}.`); }} />
@@ -354,7 +298,7 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
               {party ? <Celebrate ch={ch} count={party.count} streak={party.streak} onClose={() => setParty(null)} /> : (
               <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40, maxWidth: 600, width: '100%', alignSelf: 'center' }} keyboardShouldPersistTaps="handled">
                 <View style={st.sheetHead}>
-                  <Text style={[T.h2, { flex: 1 }]}>Today's photo</Text>
+                  <Text style={[T.h2, { flex: 1 }]}>Today's selfie</Text>
                   <Pressable onPress={() => setPending(null)} style={st.sheetClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Cancel"><Icon name="x" size={18} color={C.ink} stroke={2.4} /></Pressable>
                 </View>
                 {pending ? <Image source={{ uri: pending.uri }} style={st.bigPhoto} resizeMode="cover" accessibilityLabel="Your photo" /> : null}
@@ -369,6 +313,18 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
           </Modal>
         </>
       )}
+    </View>
+  );
+}
+
+function Step({ icon, title, sub, last }: { icon: string; title: string; sub: string; last?: boolean }) {
+  return (
+    <View style={[st.step, !last && st.stepLine]}>
+      <View style={st.stepIcon}><Icon name={icon} size={20} color={C.blueDeep} stroke={2} /></View>
+      <View style={{ flex: 1 }}>
+        <Text style={T.h3}>{title}</Text>
+        <Text style={T.small}>{sub}</Text>
+      </View>
     </View>
   );
 }
@@ -404,25 +360,6 @@ function Board({ wall, onOpen }: { wall: WallT; onOpen: (p: WallPost) => void })
   );
 }
 
-// Today's wrap window: sunrise to sunset in Great Neck, with a dot for where "now" is.
-function WindowStrip({ win, now }: { win: ReturnType<typeof wrapWindow>; now: number }) {
-  const pct = Math.max(0, Math.min(1, (now - win.rise) / (win.set - win.rise)));
-  const open = win.state === 'open';
-  return (
-    <View style={st.window} accessibilityLabel={`Tefillin today from ${nyTime(win.rise)} to ${nyTime(win.set)}`}>
-      <View style={st.windowEnds}>
-        <View style={st.windowEnd}><Icon name="sun" size={15} color={C.sub} stroke={2.2} /><Text style={st.windowTime}>{nyTime(win.rise)}</Text></View>
-        <Text style={[st.windowState, open && { color: C.green }]}>{win.state === 'shabbat' ? 'Shabbat' : open ? 'Open now' : win.state === 'before' ? 'Opens soon' : 'Closed'}</Text>
-        <View style={st.windowEnd}><Text style={st.windowTime}>{nyTime(win.set)}</Text><Icon name="clock" size={15} color={C.sub} stroke={2.2} /></View>
-      </View>
-      <View style={st.windowTrack}>
-        <View style={[st.windowFill, { width: `${pct * 100}%`, opacity: open ? 1 : 0.35 }]} />
-        {open ? <View style={[st.windowNow, { left: `${pct * 100}%` }]} /> : null}
-      </View>
-      <Text style={st.windowNote}>Sunrise to sunset in Great Neck. Times change every day.</Text>
-    </View>
-  );
-}
 
 // Grey squares that breathe while the day's photos load.
 function BoardSkeleton() {
@@ -507,66 +444,9 @@ function Celebrate({ ch, count, streak: days, onClose }: { ch: Challenge; count:
   );
 }
 
-function RuleCard() {
-  return (
-    <View style={st.rule}>
-      <Text style={st.ruleTitle}>The rules</Text>
-      <Text style={st.ruleLine}>1. Wrap and snap a photo every day between sunrise and sunset. Shabbat doesn't count.</Text>
-      <Text style={st.ruleLine}>2. Miss a day: your streak resets (strike 1).</Text>
-      <Text style={st.ruleLine}>3. Miss again: streak resets and you add one extra day (strike 2).</Text>
-      <Text style={st.ruleLine}>4. A third miss and you're out.</Text>
-    </View>
-  );
-}
 
-// Circular progress toward the goal, with the streak in the middle.
-function Ring({ size, progress, children }: { size: number; progress: number; children: React.ReactNode }) {
-  const stroke = 10, r = (size - stroke) / 2, c = 2 * Math.PI * r;
-  return (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-      <Svg width={size} height={size} style={{ position: 'absolute', transform: [{ rotate: '-90deg' }] }}>
-        <Circle cx={size / 2} cy={size / 2} r={r} stroke="rgba(255,255,255,0.25)" strokeWidth={stroke} fill="none" />
-        <Circle cx={size / 2} cy={size / 2} r={r} stroke="#ffffff" strokeWidth={stroke} fill="none" strokeLinecap="round" strokeDasharray={`${c} ${c}`} strokeDashoffset={c * (1 - progress)} />
-      </Svg>
-      {children}
-    </View>
-  );
-}
 
-function HeroStat({ label, value, good }: { label: string; value: string; good?: boolean }) {
-  return (
-    <View>
-      <Text style={st.statLabel}>{label}</Text>
-      <Text style={[st.statValue, good && { color: '#D9FFE9' }]}>{value}</Text>
-    </View>
-  );
-}
 
-function Rewards({ ch, count, mine }: { ch: Challenge; count: number; mine: boolean }) {
-  const hue = HUES[ch.color] ?? HUES.blue;
-  if (!ch.rewards.length) return null;
-  return (
-    <>
-      <Text style={st.section}>Rewards</Text>
-      <Card style={{ padding: 0 }}>
-        {ch.rewards.map((r, i) => {
-          const got = mine && count >= r.at;
-          return (
-            <View key={r.at} style={[st.row, i > 0 && st.ruleTop]}>
-              <View style={[st.dot, { backgroundColor: got ? hue.solid : C.bg }]}>
-                <Icon name={got ? 'gift' : 'lock'} size={16} color={got ? C.white : C.faint} stroke={2} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={T.h3}>{r.prize || 'Reward'}</Text>
-                <Text style={T.small}>{got ? 'Unlocked. Show this to Rabbi Zevy.' : `At ${r.at} check-ins`}</Text>
-              </View>
-            </View>
-          );
-        })}
-      </Card>
-    </>
-  );
-}
 
 // Tapping a photo opens it in Apple's card-style sheet (drag down to close), with comments.
 function PhotoSheet({ ch, post, onClose }: { ch: Challenge; post: WallPost | null; onClose: () => void }) {
@@ -644,6 +524,31 @@ function PhotoSheet({ ch, post, onClose }: { ch: Challenge; post: WallPost | nul
 }
 
 const st = StyleSheet.create({
+  top: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 4 },
+  topTitle: { fontSize: 25, lineHeight: 29, fontFamily: F.display, color: C.ink, letterSpacing: -0.5 },
+  topSub: { fontSize: 14, fontWeight: '700', color: C.sub, marginTop: 3 },
+  prize: { marginTop: 18, padding: 20, borderRadius: 26, backgroundColor: '#101C2A', overflow: 'hidden' },
+  prizeEyebrow: { fontSize: 12, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', color: '#F5C542' },
+  prizeName: { fontSize: 22, lineHeight: 27, fontFamily: F.display, color: '#FFFFFF', marginTop: 6, letterSpacing: -0.3 },
+  prizeSub: { fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 8 },
+  prizeTrack: { height: 10, borderRadius: 5, backgroundColor: 'rgba(255,255,255,0.12)', marginTop: 18, overflow: 'hidden' },
+  prizeFill: { height: 10, borderRadius: 5 },
+  prizeRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginTop: 10 },
+  prizeCount: { fontSize: 22, fontFamily: F.display, color: '#FFFFFF', fontVariant: ['tabular-nums'] },
+  prizeOf: { fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.65)', fontFamily: undefined },
+  prizeLeft: { fontSize: 14, fontWeight: '800', color: 'rgba(255,255,255,0.85)' },
+  steps: { borderRadius: 22, backgroundColor: C.card, borderWidth: 1, borderColor: C.line, paddingHorizontal: 16 },
+  step: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14 },
+  stepLine: { borderBottomWidth: 1, borderBottomColor: C.line },
+  stepIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: C.bluePale, alignItems: 'center', justifyContent: 'center' },
+  stateCard: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 16, padding: 16, borderRadius: 22, backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
+  stateIcon: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
+  snap: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 16, paddingHorizontal: 16, height: 72, borderRadius: 24 },
+  snapIconWrap: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  snapText: { fontSize: 18, fontWeight: '800', color: '#FFFFFF' },
+  snapSub: { fontSize: 13, color: 'rgba(255,255,255,0.85)', marginTop: 2, fontWeight: '600' },
+  strikeNote: { fontSize: 13, color: '#B4532A', fontWeight: '700', marginTop: 10, textAlign: 'center' },
+  boardHint: { fontSize: 12, color: C.faint, marginTop: 10 },
   party: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28, maxWidth: 520, width: '100%', alignSelf: 'center' },
   partyStage: { width: 220, height: 200, alignItems: 'center', justifyContent: 'center' },
   partyCheck: { width: 108, height: 108, borderRadius: 54, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 20, shadowOffset: { width: 0, height: 10 } },
