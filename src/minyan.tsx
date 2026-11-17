@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { C, F } from './theme';
 import { Icon } from './icons';
@@ -14,6 +14,7 @@ export const MINYAN_FALLBACK: Minyan = {
     { label: 'Mincha & Maariv', time: '' },
   ],
   shabbat: [
+    { label: 'Teen Minyan', time: '10:00 AM' },
     { label: 'Friday night', time: 'Candle lighting' },
     { label: 'Shabbat morning', time: '9:25 AM' },
     { label: 'Mincha', time: '' },
@@ -39,17 +40,45 @@ export function minyanTime(t: string, sh: { candlesAt?: number; havdalahAt?: num
 export function MinyanCard() {
   const { content } = useStore();
   const sh = useShabbat();
+  const [more, setMore] = useState(false);
   const m = content.minyan ?? MINYAN_FALLBACK;
   const shab = sh && sh !== 'error' ? sh : null;
+  // The Teen Minyan is the one for this app: any row named "Teen ..." becomes the big card on top.
+  const isTeen = (r: MinyanRow) => /teen/i.test(r.label);
+  const teen = m.shabbat.find(isTeen) ?? m.weekday.find(isTeen);
+  const teenDay = teen && m.shabbat.includes(teen) ? 'Shabbat morning' : 'Weekdays';
+  const t = teen?.time ? minyanTime(teen.time, shab) : null;
   return (
-    <View style={st.card}>
-      <Section title="Weekdays" rows={m.weekday} sh={shab} />
-      <Section title={shab?.parsha ? `Shabbat · ${shab.parsha}` : 'Shabbat'} rows={m.shabbat} sh={shab} top />
-      {m.note ? <Text style={st.note}>{m.note}</Text> : null}
-      <Pressable onPress={() => open('tel:' + CHAPTER.phone.replace(/[^0-9]/g, ''))} style={({ pressed }) => [st.call, pressed && { opacity: 0.7 }]} accessibilityRole="button">
-        <Icon name="phone" size={15} color={C.blue} stroke={2.2} />
-        <Text style={st.callText}>Questions? Call {CHAPTER.phone}</Text>
-      </Pressable>
+    <View>
+      {teen ? (
+        <View style={st.teen}>
+          <View style={st.teenIcon}><Icon name="book" size={24} color="#FFFFFF" stroke={2} /></View>
+          <View style={{ flex: 1 }}>
+            <Text style={st.teenEyebrow}>{teenDay}{shab?.parsha && teenDay === 'Shabbat morning' ? ` · ${shab.parsha}` : ''}</Text>
+            <Text style={st.teenTitle}>{teen.label}</Text>
+            <Text style={st.teenWhere}>{CHAPTER.org}</Text>
+          </View>
+          <Text style={st.teenTime}>{t ? t.time : 'Ask'}</Text>
+        </View>
+      ) : null}
+      <View style={[st.card, teen && { marginTop: 12 }]}>
+        {teen && !more ? (
+          <Pressable onPress={() => setMore(true)} style={({ pressed }) => [st.moreRow, pressed && { opacity: 0.7 }]} accessibilityRole="button">
+            <Text style={st.moreText}>Show the full shul schedule</Text>
+            <Icon name="right" size={16} color={C.blue} stroke={2.4} />
+          </Pressable>
+        ) : (
+          <>
+            <Section title="Weekdays" rows={m.weekday.filter((r) => r !== teen)} sh={shab} />
+            <Section title={shab?.parsha ? `Shabbat · ${shab.parsha}` : 'Shabbat'} rows={m.shabbat.filter((r) => r !== teen)} sh={shab} top />
+            {m.note ? <Text style={st.note}>{m.note}</Text> : null}
+          </>
+        )}
+        <Pressable onPress={() => open('tel:' + CHAPTER.phone.replace(/[^0-9]/g, ''))} style={({ pressed }) => [st.call, pressed && { opacity: 0.7 }]} accessibilityRole="button">
+          <Icon name="phone" size={15} color={C.blue} stroke={2.2} />
+          <Text style={st.callText}>Questions? Call {CHAPTER.phone}</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -75,6 +104,14 @@ function Section({ title, rows, sh, top }: { title: string; rows: MinyanRow[]; s
 }
 
 const st = StyleSheet.create({
+  teen: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 18, borderRadius: 24, backgroundColor: C.blue },
+  teenIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+  teenEyebrow: { fontSize: 12, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase', color: 'rgba(255,255,255,0.85)' },
+  teenTitle: { fontSize: 20, fontFamily: F.display, color: '#FFFFFF', marginTop: 2 },
+  teenWhere: { fontSize: 13, color: 'rgba(255,255,255,0.85)', marginTop: 1 },
+  teenTime: { fontSize: 24, fontFamily: F.display, color: '#FFFFFF' },
+  moreRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  moreText: { fontSize: 15, fontWeight: '800', color: C.blue },
   card: { padding: 16, borderRadius: 22, backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
   section: { fontSize: 12, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', color: C.sub, marginBottom: 4 },
   sectionTop: { marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: C.line },

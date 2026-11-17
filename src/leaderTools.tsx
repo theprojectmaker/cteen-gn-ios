@@ -212,7 +212,7 @@ export function WhatsAppImport({ onDone }: { onDone: (msg: string) => void }) {
           <Field label="Headline" value={title} onChange={setTitle} />
           <Field label="Message" value={body} onChange={setBody} multiline />
           <Text style={[st.label, { marginTop: 14 }]}>Type</Text>
-          <Chips options={['News', 'Events', 'Photos', 'Rewards'] as const} value={kind} onChange={setKind} />
+          <Chips options={['News', 'Events', 'Photos', 'Rewards', 'Food'] as const} value={kind} onChange={setKind} />
           {draft.event ? (
             <View style={st.eventBox}>
               <View style={{ flex: 1 }}>
@@ -228,6 +228,41 @@ export function WhatsAppImport({ onDone }: { onDone: (msg: string) => void }) {
           </View>
         </View>
       ) : null}
+      {err ? <Text style={st.err}>{err}</Text> : null}
+    </View>
+  );
+}
+
+// ── Food: what's being served ──
+// Shows on Home as "On the menu" for 4 days, and in the Feed. Every phone gets a notification.
+export function FoodForm({ onDone }: { onDone: (msg: string) => void }) {
+  const { content, saveContent, uploadPhoto } = useStore();
+  const [what, setWhat] = useState('');
+  const [when, setWhen] = useState('');
+  const [photos, setPhotos] = useState<Snap[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const post = async () => {
+    if (what.trim().length < 2) return setErr("Write what's on the menu.");
+    setBusy(true); setErr(null);
+    const urls = await publishPhotos(photos, uploadPhoto);
+    if (typeof urls === 'string') { setBusy(false); return setErr(urls); }
+    const p = { id: 'p-' + Date.now().toString(36), kind: 'Food' as const, pinned: false, title: what.trim(), body: when.trim(), eventId: '', challengeId: '', photos: urls, linkLabel: '', linkUrl: '', at: new Date().toISOString() };
+    const e = await saveContent({ ...content, posts: [p, ...content.posts] });
+    setBusy(false);
+    if (e) return setErr(e);
+    onDone("Food announced. It's on Home under On the menu, and every phone got a notification.");
+  };
+  return (
+    <View>
+      <Text style={T.h2}>Announce the food</Text>
+      <Text style={[T.small, { marginTop: 4 }]}>Shows at the top of Home as "On the menu" for 4 days.</Text>
+      <Field label="What's on the menu" value={what} onChange={setWhat} placeholder="Like: Pizza, wings and ice cream" />
+      <Field label="When and where (optional)" value={when} onChange={setWhen} placeholder="Like: Friday night dinner after services" multiline />
+      <PhotoPicker photos={photos} onChange={setPhotos} />
+      <View style={{ marginTop: 20 }}>
+        <Button label={busy ? 'Posting…' : 'Announce it'} disabled={busy} onPress={post} />
+      </View>
       {err ? <Text style={st.err}>{err}</Text> : null}
     </View>
   );

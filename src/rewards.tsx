@@ -4,6 +4,7 @@ import Svg, { Circle } from 'react-native-svg';
 import { C, HUES, R, T, F } from './theme';
 import { Icon, challengeIcon } from './icons';
 import { nyTime, untilText, wrapWindow } from './zmanim';
+import { Pulse, leftText, useWrapStatus } from './wrap';
 import { doneThisPeriod, hourLabel, periodKey, streak, tap, useStore, type Challenge, type ChallengeStats, type Wall as WallT, type WallPost } from './store';
 import { Button, Card, Chips, Field, IconTile, s as u } from './ui';
 import { snapPhoto } from './photo';
@@ -15,13 +16,16 @@ const unit = (ch: Challenge, n: number) => (ch.every === 'day' ? `day${n === 1 ?
 // Home card for a live challenge: one clear line and one clear button.
 export function ChallengeBanner({ ch }: { ch: Challenge }) {
   const { checks, joined, openChallenge } = useStore();
+  const w = useWrapStatus();
+  const wrapNow = ch.id === 'tefillin' && !!w && w.needed;
   const hue = HUES[ch.color] ?? HUES.blue;
   const mine = joined.includes(ch.id);
   const done = doneThisPeriod(ch, checks);
   const fire = streak(ch, checks);
-  const line = !mine ? 'Tap to join. Rewards to win.' : done ? `${fire} ${unit(ch, fire)} in a row. See you tomorrow.` : fire > 0 ? `${fire} ${unit(ch, fire)} in a row. Keep it alive.` : 'Start your streak today.';
+  const line = wrapNow && w ? (w.lastHour ? `Only ${leftText(w.left)} left to wrap today` : `${leftText(w.left)} left to wrap today`) : !mine ? 'Tap to join. Win the backpack.' : done ? `${fire} ${unit(ch, fire)} in a row. See you tomorrow.` : fire > 0 ? `${fire} ${unit(ch, fire)} in a row. Keep it alive.` : 'Start your streak today.';
   const action = !mine ? 'Join' : done ? 'Done' : ch.photo ? 'Snap' : 'Check in';
   return (
+    <Pulse on={wrapNow || (!mine && ch.active)} color={w?.lastHour ? '#E8742A' : hue.solid} radius={R.card}>
     <Card style={st.banner} onPress={() => openChallenge(ch.id)} label={`${ch.title}. ${line}`}>
       <IconTile icon={challengeIcon(ch)} color={ch.color} size={52} solid />
       <View style={{ flex: 1 }}>
@@ -33,6 +37,7 @@ export function ChallengeBanner({ ch }: { ch: Challenge }) {
         <Text style={[st.pillText, done && { color: hue.deep }]}>{action}</Text>
       </View>
     </Card>
+    </Pulse>
   );
 }
 
@@ -129,6 +134,7 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
   useEffect(() => { if (!timed) return; const t = setInterval(() => setNow(Date.now()), 30000); return () => clearInterval(t); }, [timed]);
   const win = timed ? wrapWindow(now) : null;
   const closed = !!win && win.state !== 'open';
+  const ws = useWrapStatus();
 
   // where we are in the challenge
   const starts = ch.starts || (ch.id === 'tefillin' ? '2026-11-15' : '');
@@ -262,14 +268,18 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
               </View>
             </View>
           ) : (
-            <Pressable onPress={doCheck} disabled={busy || !ch.active} style={({ pressed }) => [st.snap, { backgroundColor: hue.solid }, pressed && { transform: [{ scale: 0.98 }], opacity: 0.95 }]} accessibilityRole="button" accessibilityLabel="Snap today's selfie">
+            <Pulse on={!busy} color={ws?.lastHour ? '#E8742A' : hue.solid} radius={24} style={{ marginTop: 16 }}>
+            <Pressable onPress={doCheck} disabled={busy || !ch.active} style={({ pressed }) => [st.snap, { marginTop: 0, backgroundColor: ws?.lastHour ? '#E8742A' : hue.solid }, pressed && { transform: [{ scale: 0.98 }], opacity: 0.95 }]} accessibilityRole="button" accessibilityLabel="Snap today's selfie">
               <View style={st.snapIconWrap}><Icon name={ch.photo ? 'camera' : 'tick'} size={24} color={hue.solid} stroke={2.2} /></View>
               <View style={{ flex: 1 }}>
                 <Text style={st.snapText}>{busy ? 'Posting…' : ch.photo ? "Snap today's selfie" : 'Check in for today'}</Text>
-                {win ? <Text style={st.snapSub}>Open until sunset, {nyTime(win.set)}</Text> : null}
+                {win ? <Text style={st.snapSub}>{win.friday ? 'Before candle lighting' : 'Before sunset'}, {nyTime(win.set)}</Text> : null}
               </View>
-              <Icon name="right" size={20} color="rgba(255,255,255,0.85)" stroke={2.4} />
+              {ws && ws.left > 0 ? (
+                <View style={st.snapTimer}><Text style={st.snapTimerText}>{leftText(ws.left)}</Text><Text style={st.snapTimerLabel}>left</Text></View>
+              ) : <Icon name="right" size={20} color="rgba(255,255,255,0.85)" stroke={2.4} />}
             </Pressable>
+            </Pulse>
           )}
           {me.strikes > 0 && !me.out ? <Text style={st.strikeNote}>{me.strikes === 1 ? 'You missed 1 day.' : `You missed ${me.strikes} days.`} A 3rd miss and you're out.</Text> : null}
           {note ? <Text style={st.note} accessibilityLiveRegion="polite">{note}</Text> : null}
@@ -524,6 +534,9 @@ function PhotoSheet({ ch, post, onClose }: { ch: Challenge; post: WallPost | nul
 }
 
 const st = StyleSheet.create({
+  snapTimer: { alignItems: 'flex-end' },
+  snapTimerText: { fontSize: 20, fontFamily: F.display, color: '#FFFFFF', fontVariant: ['tabular-nums'] },
+  snapTimerLabel: { fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.85)', marginTop: -2 },
   top: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 4 },
   topTitle: { fontSize: 25, lineHeight: 29, fontFamily: F.display, color: C.ink, letterSpacing: -0.5 },
   topSub: { fontSize: 14, fontWeight: '700', color: C.sub, marginTop: 3 },

@@ -19,7 +19,7 @@ export type EventItem = {
   gender?: 'all' | 'boys' | 'girls'; minAge?: number | null; maxAge?: number | null;
 };
 export type Challenge = { id: string; title: string; icon: string; color: ColorKey; every: 'day' | 'week'; goal: number; about: string; active: boolean; photo?: boolean; starts?: string; rewards: { at: number; prize: string }[] };
-export type Post = { id: string; kind: 'News' | 'Events' | 'Photos' | 'Rewards'; pinned?: boolean; title: string; body: string; eventId?: string; challengeId?: string; photos?: string[]; linkLabel?: string; linkUrl?: string; at: string };
+export type Post = { id: string; kind: 'News' | 'Events' | 'Photos' | 'Rewards' | 'Food'; pinned?: boolean; title: string; body: string; eventId?: string; challengeId?: string; photos?: string[]; linkLabel?: string; linkUrl?: string; at: string };
 export type Info = { id: string; icon: string; title: string; body: string };
 export type Alert = { id: string; on: boolean; title: string; text: string; target: Target; until: string };
 export type Popup = { on: boolean; id: string; title: string; body: string; button: string; target: { type: 'event' | 'challenge' | 'post'; id: string } | null };
@@ -602,7 +602,11 @@ export function greeting() {
   const h = new Date().getHours();
   return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
 }
+// Opens the event as a calendar file: on iPhone this shows Apple's "Add to Calendar" screen.
 export function calendarUrl(e: EventItem) {
+  return `${API}/events/${e.id}/ics`;
+}
+export function googleCalendarUrl(e: EventItem) {
   const fmt = (s: string, plus = 0) => {
     const d = day(s);
     d.setDate(d.getDate() + plus);

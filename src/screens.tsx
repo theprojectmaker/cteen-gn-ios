@@ -6,7 +6,7 @@ import { Icon } from './icons';
 import { CHAPTER, calendarUrl, countdown, dateLabel, open, sortPosts, tap, upcoming, useShabbat, useStore, type ColorKey, type EventItem, type Post } from './store';
 import { audienceLabel, Button, Card, Chips, Cover, Empty, EventCard, EventMeta, Field, IconTile, ScopeBadge, SectionHead, Sheet, s as u } from './ui';
 import { ChallengeBanner, NameGate } from './rewards';
-import { PostCard } from './feed';
+import { PostCard, timeAgo } from './feed';
 import { MinyanCard } from './minyan';
 import { greetingNow } from './shell';
 
@@ -18,48 +18,80 @@ export function Home() {
   const up = upcoming(content.events).filter(fits);
   const next = up.find((e) => e.scope === 'gn') ?? up[0];
   const live = content.challenges.filter((c) => c.active);
-  const latest = sortPosts(content.posts)[0];
+  const posts = sortPosts(content.posts).filter((p) => p.kind !== 'Food');
+  const food = [...content.posts].filter((p) => p.kind === 'Food' && Date.now() - new Date(p.at).getTime() < 4 * 864e5).sort((a, b) => b.at.localeCompare(a.at))[0];
   const first = name.trim().split(' ')[0];
+  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/New_York' });
   return (
     <>
       <Text style={st.helloLine} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} accessibilityRole="header">{greetingNow()}{first ? `, ${first}` : ''}</Text>
+      <Text style={st.todayLine}>{today}</Text>
       <LinkAppleCard />
-      {next ? (
-        <Pressable onPress={() => openEvent(next.id)} style={({ pressed }) => [st.hero, pressed && u.pressed]} accessibilityRole="button" accessibilityLabel={next.title}>
-          <Cover e={next} style={StyleSheet.absoluteFill} iconSize={150} />
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: next.image ? 'rgba(13,60,110,0.5)' : 'rgba(19,32,44,0.18)' }]} />
-          <ScopeBadge scope={next.scope} style={{ position: 'absolute', left: 18, top: 18 }} />
-          <Text style={st.heroKicker}>Up next · {countdown(next)}</Text>
-          <Text style={st.heroTitle}>{next.title}</Text>
-          <Text style={st.heroDate}>{dateLabel(next)}{next.time ? ` · ${next.time}` : ''}</Text>
-          <View style={st.heroBtn}>
-            <Text style={st.heroBtnText}>{next.signup === 'app' ? 'Sign up' : 'View details'}</Text>
-            <Icon name="right" size={15} color={C.night} stroke={2.4} />
+
+      {food ? (
+        <Pressable onPress={() => router.push(`/post/${food.id}`)} style={({ pressed }) => [st.food, pressed && u.pressed]} accessibilityRole="button" accessibilityLabel={`On the menu: ${food.title}`}>
+          <View style={st.foodIcon}><Icon name="food" size={22} color="#9A5A16" stroke={2.1} /></View>
+          <View style={{ flex: 1 }}>
+            <Text style={st.foodEyebrow}>On the menu</Text>
+            <Text style={st.foodTitle} numberOfLines={2}>{food.title}</Text>
+            {food.body ? <Text style={T.small} numberOfLines={2}>{food.body}</Text> : null}
           </View>
         </Pressable>
       ) : null}
 
+      {next ? (
+        <>
+          <Text style={st.homeSection}>Up next</Text>
+          <Pressable onPress={() => openEvent(next.id)} style={({ pressed }) => [st.hero, pressed && u.pressed]} accessibilityRole="button" accessibilityLabel={next.title}>
+            <Cover e={next} style={StyleSheet.absoluteFill} iconSize={150} />
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: next.image ? 'rgba(13,60,110,0.45)' : 'rgba(19,32,44,0.18)' }]} />
+            <ScopeBadge scope={next.scope} style={{ position: 'absolute', left: 18, top: 18 }} />
+            <Text style={st.heroKicker}>{countdown(next)}</Text>
+            <Text style={st.heroTitle}>{next.title}</Text>
+            <Text style={st.heroDate}>{dateLabel(next)}{next.time ? ` · ${next.time}` : ''}</Text>
+            <View style={st.heroBtn}>
+              <Text style={st.heroBtnText}>{next.signup === 'app' ? 'RSVP' : 'View details'}</Text>
+              <Icon name="right" size={15} color={C.night} stroke={2.4} />
+            </View>
+          </Pressable>
+        </>
+      ) : null}
+
       {live.length ? (
         <>
-          <Text style={st.section}>{live.length === 1 ? 'Your challenge' : 'Your challenges'}</Text>
+          <Text style={st.homeSection}>Today</Text>
           <View style={{ gap: 12 }}>
             {live.map((c) => <ChallengeBanner key={c.id} ch={c} />)}
           </View>
         </>
       ) : null}
 
-      {latest ? (
+      {posts.length ? (
         <>
-          <SectionHead title="New from Rabbi Zevy" action="Feed" onAction={() => go('Feed')} />
-          <PostCard post={latest} compact />
+          <View style={st.homeHeadRow}>
+            <Text style={[st.homeSection, { marginTop: 0, marginBottom: 0, flex: 1 }]}>From Rabbi Zevy</Text>
+            <Pressable onPress={() => go('Feed')} hitSlop={10} accessibilityRole="button"><Text style={u.link}>See all</Text></Pressable>
+          </View>
+          <View style={st.latest}>
+            {posts.slice(0, 2).map((p, i) => (
+              <Pressable key={p.id} onPress={() => router.push(`/post/${p.id}`)} style={({ pressed }) => [st.latestRow, i > 0 && st.rule, pressed && { backgroundColor: C.bg }]} accessibilityRole="button" accessibilityLabel={p.title}>
+                <View style={st.latestDot}><Icon name={p.kind === 'Events' ? 'calendar' : p.kind === 'Photos' ? 'camera' : p.kind === 'Rewards' ? 'gift' : 'megaphone'} size={18} color={C.blueDeep} stroke={2} /></View>
+                <View style={{ flex: 1 }}>
+                  <Text style={T.h3} numberOfLines={1}>{p.title}</Text>
+                  <Text style={T.small} numberOfLines={1}>{p.pinned ? 'Pinned · ' : ''}{p.kind} · {timeAgo(p.at)}</Text>
+                </View>
+                <Icon name="right" size={16} color={C.faint} stroke={2.4} />
+              </Pressable>
+            ))}
+          </View>
         </>
       ) : null}
 
-      <Text style={st.section}>This Shabbat</Text>
+      <Text style={st.homeSection}>This Shabbat</Text>
       <ShabbatCard />
 
       {push === 'off' ? (
-        <Card style={st.notify} onPress={turnOnPush} label="Turn on notifications">
+        <Card style={[st.notify, { marginTop: 28 }]} onPress={turnOnPush} label="Turn on notifications">
           <IconTile icon="bell" size={44} />
           <View style={{ flex: 1 }}>
             <Text style={T.h3}>Turn on notifications</Text>
@@ -68,7 +100,6 @@ export function Home() {
           <Icon name="right" size={17} color={C.faint} stroke={2.4} />
         </Card>
       ) : null}
-
     </>
   );
 }
@@ -156,7 +187,7 @@ export function EventDetails({ e }: { e: EventItem }) {
           {e.signup === 'app' ? <InAppSignup e={e} /> : <WebsiteSignup e={e} />}
         </View>
         <View style={{ marginTop: 10 }}>
-          <Button kind="ghost" icon="calendar" label="Add to calendar" onPress={() => open(calendarUrl(e))} />
+          <Button kind="ghost" icon="calendar" label="Add to Apple Calendar" onPress={() => open(calendarUrl(e))} />
         </View>
       </View>
     </>
@@ -397,6 +428,16 @@ function LinkRow({ icon, title, sub, url, first }: { icon: string; title: string
 }
 
 const st = StyleSheet.create({
+  todayLine: { fontSize: 14, fontWeight: '700', color: C.sub, marginTop: -10, marginBottom: 18 },
+  homeSection: { fontSize: 20, fontFamily: F.display, color: C.ink, letterSpacing: -0.3, marginTop: 32, marginBottom: 12 },
+  homeHeadRow: { flexDirection: 'row', alignItems: 'center', marginTop: 32, marginBottom: 12 },
+  latest: { borderRadius: 22, backgroundColor: C.card, borderWidth: 1, borderColor: C.line, overflow: 'hidden' },
+  latestRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 14 },
+  latestDot: { width: 40, height: 40, borderRadius: 12, backgroundColor: C.bluePale, alignItems: 'center', justifyContent: 'center' },
+  food: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderRadius: 22, backgroundColor: '#FDF0E3', borderWidth: 1, borderColor: '#F4D2AE' },
+  foodIcon: { width: 46, height: 46, borderRadius: 23, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  foodEyebrow: { fontSize: 11, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', color: '#9A5A16' },
+  foodTitle: { fontSize: 17, fontWeight: '800', color: '#3B2412', marginTop: 2 },
   appleCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, paddingRight: 30, borderRadius: 22, backgroundColor: C.card, borderWidth: 1, borderColor: C.line, marginBottom: 16 },
   appleBadge: { width: 42, height: 42, borderRadius: 21, backgroundColor: C.inverse, alignItems: 'center', justifyContent: 'center' },
   appleGlyph: { color: C.onInverse, fontSize: 20, marginTop: -2 },

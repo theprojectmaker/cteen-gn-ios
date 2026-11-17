@@ -7,6 +7,7 @@ import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { C, HUES, IS_DARK as IS_DARK_UI, PREFS, R, F } from './theme';
 import { Icon, challengeIcon } from './icons';
 import { wrapWindow } from './zmanim';
+import { WrapBanner, useWrapStatus } from './wrap';
 import { Glass, LIQUID } from './glass';
 import { CHAPTER, doneThisPeriod, open, useShabbat, useStore, type Alert } from './store';
 
@@ -69,6 +70,7 @@ export function Screen({ children }: { children: React.ReactNode }) {
         <View style={st.col}>
           <Header />
           {liveAlert && !LIQUID ? <TopAlert alert={liveAlert} /> : null}
+          <WrapBanner />
           <ShabbatBanner />
           <Animated.View style={{ opacity: enter, transform: [{ translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }] }}>
             {children}
@@ -148,6 +150,7 @@ function HeaderButtons() {
 // Fridays: candle-lighting time. In the last hour: a live countdown. During Shabbat: Shabbat Shalom.
 function ShabbatBanner() {
   const sh = useShabbat();
+  const wrap = useWrapStatus();
   const [now, setNow] = useState(Date.now());
   const candles = sh && sh !== 'error' ? sh.candlesAt : undefined;
   const ends = sh && sh !== 'error' ? sh.havdalahAt : undefined;
@@ -161,6 +164,7 @@ function ShabbatBanner() {
     return () => clearInterval(tick);
   }, [candles, counting]);
   if (!sh || sh === 'error' || !candles) return null;
+  if (wrap?.lastHour && wrap.win.friday) return null; // the wrap-before-Shabbat banner comes first
   if (!(sameDay && left > 0) && !during) return null;
   const pad = (n: number) => String(n).padStart(2, '0');
   const mm = Math.floor(left / 60000), ss = Math.floor((left % 60000) / 1000);

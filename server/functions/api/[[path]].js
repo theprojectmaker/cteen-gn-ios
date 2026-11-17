@@ -80,9 +80,10 @@ function wrapClosed(now = Date.now()) {
   if (now < TEST_OPEN_UNTIL) return '';
   const day = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short' }).format(new Date(now));
   if (day === 'Sat') return 'No tefillin on Shabbat. See you Sunday.';
-  const { rise, set } = sunTimes(nyDate(new Date(now)));
+  const { rise, set: sunset } = sunTimes(nyDate(new Date(now)));
+  const set = day === 'Fri' ? sunset - 18 * 60000 : sunset; // Fridays: before candle lighting
   if (now < rise) return `Tefillin opens at sunrise, ${nyClock(rise)}.`;
-  if (now > set) return `Today's window closed at sunset (${nyClock(set)}). Come back tomorrow from ${nyClock(sunTimes(nyDate(new Date(now + 864e5))).rise)}.`;
+  if (now > set) return `Today's window closed at ${day === 'Fri' ? 'candle lighting' : 'sunset'} (${nyClock(set)}). Come back tomorrow from ${nyClock(sunTimes(nyDate(new Date(now + 864e5))).rise)}.`;
   return '';
 }
 
@@ -252,7 +253,7 @@ async function getContent(env) {
   return c;
 }
 
-const KINDS = ['News', 'Events', 'Photos', 'Rewards'];
+const KINDS = ['News', 'Events', 'Photos', 'Rewards', 'Food'];
 const COLORS = ['blue', 'orange', 'purple', 'green', 'pink', 'yellow'];
 const dateOk = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
 const urlOk = (v) => typeof v === 'string' && /^(https:\/\/|mailto:|tel:)/.test(v) && v.length < 400;
@@ -267,6 +268,7 @@ const MINYAN_DEFAULT = {
     { label: 'Mincha & Maariv', time: '' },
   ],
   shabbat: [
+    { label: 'Teen Minyan', time: '10:00 AM' },
     { label: 'Friday night', time: 'Candle lighting' },
     { label: 'Shabbat morning', time: '9:25 AM' },
     { label: 'Mincha', time: '' },
@@ -573,6 +575,30 @@ export async function onRequest({ request, env, params, waitUntil }) {
       evs.forEach((e, i) => { counts[e.id] = (rows[i] || []).length; });
       return json({ counts });
     });
+    // An event as a calendar file (Apple Calendar opens it with "Add to Calendar").
+    let im = /^events\/([a-z0-9-]+)\/ics$/.exec(path);
+    if (im && method === 'GET') {
+      const ev = (await getContent(env)).events.find((e) => e.id === im[1]);
+      if (!ev) return bad('Not found.', 404);
+      const esc = (s) => String(s || '').replace(/([\\;,])/g, '\\$1').replace(/\n/g, '\\n');
+      const d = (s) => s.replace(/-/g, '');
+      const next = (s) => { const x = new Date(s + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() + 1); return x.toISOString().slice(0, 10).replace(/-/g, ''); };
+      const tm = /^(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i.exec(ev.time || '');
+      let when;
+      if (tm) {
+        const h = (Number(tm[1]) % 12) + (/pm/i.test(tm[3]) ? 12 : 0);
+        const mi = tm[2] || '00';
+        const hh = String(h).padStart(2, '0'), endH = String(Math.min(23, h + 2)).padStart(2, '0');
+        when = 'DTSTART;TZID=America/New_York:' + d(ev.start) + 'T' + hh + mi + '00\r\nDTEND;TZID=America/New_York:' + d(ev.end || ev.start) + 'T' + endH + mi + '00';
+      } else {
+        when = 'DTSTART;VALUE=DATE:' + d(ev.start) + '\r\nDTEND;VALUE=DATE:' + next(ev.end || ev.start);
+      }
+      const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//CTeen GN//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'BEGIN:VEVENT',
+        'UID:' + ev.id + '@cteen-gn', 'DTSTAMP:' + new Date().toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z', when,
+        'SUMMARY:' + esc(ev.title + ' (CTeen Great Neck)'), ev.place ? 'LOCATION:' + esc(ev.place) : '', ev.about ? 'DESCRIPTION:' + esc(ev.about) : '',
+        'END:VEVENT', 'END:VCALENDAR'].filter(Boolean).join('\r\n');
+      return new Response(ics, { headers: { 'Content-Type': 'text/calendar; charset=utf-8', 'Content-Disposition': 'inline; filename="' + ev.id + '.ics"', ...CORS } });
+    }
     let m = /^events\/([a-z0-9-]+)\/(signup|cancel)$/.exec(path);
     if (m && method === 'POST') {
       const [, id, action] = m;
@@ -854,7 +880,7 @@ export async function onRequest({ request, env, params, waitUntil }) {
         const text = clean(body.text, 4000);
         if (text.length < 5) return bad('Paste the WhatsApp message first.');
         const out = await aiJson(env,
-          'You turn a WhatsApp announcement from Rabbi Zevy (CTeen Great Neck, a Jewish teen chapter at Chabad of Great Neck, NY) into a post for the chapter app Feed. Reply with JSON only: {"title","body","kind","event"}. title: max 60 chars, clear and friendly. body: max 600 chars, plain sentences for teens, keep every fact (dates, times, places, prices, names, links) exactly as given and add NOTHING that is not in the message. NO emojis, no hashtags, no asterisks or markdown. kind: one of "News","Events","Photos","Rewards". event: if the message announces a specific event with a date, {"title","date":"YYYY-MM-DD","time","place"} using today\'s date to resolve words like "this Sunday"; otherwise null.',
+          'You turn a WhatsApp announcement from Rabbi Zevy (CTeen Great Neck, a Jewish teen chapter at Chabad of Great Neck, NY) into a post for the chapter app Feed. Reply with JSON only: {"title","body","kind","event"}. title: max 60 chars, clear and friendly. body: max 600 chars, plain sentences for teens, keep every fact (dates, times, places, prices, names, links) exactly as given and add NOTHING that is not in the message. NO emojis, no hashtags, no asterisks or markdown. kind: one of "News","Events","Photos","Rewards","Food" (Food when it is about what food is being served). event: if the message announces a specific event with a date, {"title","date":"YYYY-MM-DD","time","place"} using today\'s date to resolve words like "this Sunday"; otherwise null.',
           `Today is ${nyDate()} (${new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: 'America/New_York' })}).\nWhatsApp message:\n${text}`);
         if (!out || !out.title) return bad('The AI could not read that. Try again, or write the post yourself.', 502);
         const noEmoji = (s) => String(s || '').replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu, '').replace(/[*_#]/g, '').replace(/\s+\n/g, '\n').trim();

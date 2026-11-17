@@ -195,7 +195,10 @@ export function PostCard({ post, full, compact }: { post: Post; full?: boolean; 
   );
 }
 
-// Comments under a post (on the post's own page).
+// Comments under a post (on the post's own page): soft bubbles, a colored initial, a pill to reply.
+const AVATAR_HUES = ['#159FDC', '#F2913D', '#7C5CFC', '#1FA971', '#F0569A', '#E0A400'];
+const hueFor = (name: string) => AVATAR_HUES[[...name].reduce((a, c) => a + c.charCodeAt(0), 0) % AVATAR_HUES.length];
+
 export function PostComments({ postId }: { postId: string }) {
   const { loadComments, addComment, deletePostComment, leader, name } = useStore();
   const [list, setList] = useState<PostComment[] | null>(null);
@@ -216,31 +219,45 @@ export function PostComments({ postId }: { postId: string }) {
   };
   return (
     <View style={st.comments}>
-      <Text style={st.commentsTitle}>Comments</Text>
-      {list === null ? <Text style={T.small}>Loading…</Text> : list.length === 0 ? <Text style={T.small}>No comments yet. Say something nice.</Text> : (
-        list.map((c) => (
-          <View key={c.at + c.name} style={st.comment}>
-            <View style={st.cAvatar}><Text style={st.cInitial}>{c.name[0]?.toUpperCase()}</Text></View>
-            <View style={{ flex: 1 }}>
-              <Text style={st.cText}><Text style={st.cName}>{c.name}  </Text>{c.text}</Text>
-              <Text style={st.cAgo}>{timeAgo(c.at)}</Text>
+      <Text style={st.commentsTitle}>Comments{list && list.length ? <Text style={st.commentsCount}>  {list.length}</Text> : null}</Text>
+      {list === null ? <Text style={[T.small, { paddingVertical: 8 }]}>Loading…</Text> : list.length === 0 ? (
+        <View style={st.noComments}>
+          <Icon name="chat" size={26} color={C.faint} stroke={1.8} />
+          <Text style={st.noCommentsText}>No comments yet. Be the first.</Text>
+        </View>
+      ) : (
+        <View style={{ gap: 12 }}>
+          {list.map((c) => (
+            <View key={c.at + c.name} style={st.comment}>
+              <View style={[st.cAvatar, { backgroundColor: hueFor(c.name) }]}><Text style={st.cInitial}>{c.name[0]?.toUpperCase()}</Text></View>
+              <View style={{ flex: 1 }}>
+                <View style={st.bubble}>
+                  <Text style={st.cName}>{c.name}</Text>
+                  <Text style={st.cText}>{c.text}</Text>
+                </View>
+                <View style={st.cMeta}>
+                  <Text style={st.cAgo}>{timeAgo(c.at)}</Text>
+                  {leader ? (
+                    <Pressable onPress={async () => { if (await deletePostComment(postId, c.at)) setList((l) => (l || []).filter((x) => x.at !== c.at)); }} hitSlop={8} accessibilityRole="button" accessibilityLabel="Delete comment">
+                      <Text style={st.cDelete}>Delete</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              </View>
             </View>
-            {leader ? (
-              <Pressable onPress={async () => { if (await deletePostComment(postId, c.at)) setList((l) => (l || []).filter((x) => x.at !== c.at)); }} hitSlop={8} accessibilityRole="button" accessibilityLabel="Delete comment">
-                <Icon name="x" size={15} color={C.faint} stroke={2.4} />
-              </Pressable>
-            ) : null}
-          </View>
-        ))
+          ))}
+        </View>
       )}
       <View style={st.inputRow}>
-        <View style={st.cAvatar}><Text style={st.cInitial}>{name[0]?.toUpperCase() || '?'}</Text></View>
-        <TextInput value={text} onChangeText={setText} placeholder="Add a comment…" placeholderTextColor={C.faint} style={st.input} maxLength={300} onSubmitEditing={send} returnKeyType="send" accessibilityLabel="Add a comment" />
-        <Pressable onPress={send} disabled={busy || !text.trim()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Post comment">
-          <Text style={[st.postText, (!text.trim() || busy) && { opacity: 0.4 }]}>{busy ? '…' : 'Post'}</Text>
-        </Pressable>
+        <View style={[st.cAvatar, { backgroundColor: hueFor(name || '?') }]}><Text style={st.cInitial}>{name[0]?.toUpperCase() || '?'}</Text></View>
+        <View style={st.inputPill}>
+          <TextInput value={text} onChangeText={setText} placeholder="Add a comment…" placeholderTextColor={C.faint} style={st.input} maxLength={300} onSubmitEditing={send} returnKeyType="send" multiline accessibilityLabel="Add a comment" />
+          <Pressable onPress={send} disabled={busy || !text.trim()} hitSlop={6} style={[st.sendBtn, (!text.trim() || busy) && { opacity: 0.35 }]} accessibilityRole="button" accessibilityLabel="Post comment">
+            <Icon name="send" size={16} color="#FFFFFF" stroke={2.4} />
+          </Pressable>
+        </View>
       </View>
-      {err ? <Text style={[T.small, { color: '#C0303F', marginTop: 6 }]}>{err}</Text> : null}
+      {err ? <Text style={[T.small, { color: '#C0303F', marginTop: 8 }]}>{err}</Text> : null}
     </View>
   );
 }
@@ -277,15 +294,22 @@ const st = StyleSheet.create({
   attach: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 14, marginTop: 12, padding: 10, borderRadius: 16, backgroundColor: C.bg },
   attachImg: { width: 48, height: 48, borderRadius: 12 },
   viewComments: { fontSize: 14, color: C.faint, fontWeight: '600' },
-  comments: { marginTop: 18, padding: 16, borderRadius: 22, backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
-  commentsTitle: { fontSize: 17, fontFamily: F.display, color: C.ink, marginBottom: 12 },
-  comment: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 8 },
-  cAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: C.bluePale, alignItems: 'center', justifyContent: 'center' },
-  cInitial: { fontSize: 13, fontWeight: '900', color: C.blueDeep },
-  cName: { fontWeight: '800', color: C.ink },
-  cText: { fontSize: 14, lineHeight: 20, color: C.ink },
-  cAgo: { fontSize: 12, color: C.faint, marginTop: 2 },
-  inputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: C.line },
-  input: { flex: 1, minHeight: 40, fontSize: 15, color: C.ink, paddingVertical: 8 },
-  postText: { fontSize: 15, fontWeight: '800', color: C.blue },
+  comments: { marginTop: 18, padding: 16, borderRadius: 24, backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
+  commentsTitle: { fontSize: 18, fontFamily: F.display, color: C.ink, marginBottom: 14 },
+  commentsCount: { fontSize: 15, fontFamily: undefined, fontWeight: '700', color: C.faint },
+  noComments: { alignItems: 'center', gap: 8, paddingVertical: 18 },
+  noCommentsText: { fontSize: 14, color: C.sub, fontWeight: '600' },
+  comment: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  cAvatar: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  cInitial: { fontSize: 14, fontWeight: '900', color: '#FFFFFF' },
+  bubble: { alignSelf: 'flex-start', maxWidth: '100%', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 18, borderTopLeftRadius: 6, backgroundColor: C.bg },
+  cName: { fontSize: 13, fontWeight: '800', color: C.ink, marginBottom: 2 },
+  cText: { fontSize: 15, lineHeight: 21, color: C.ink },
+  cMeta: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 4, marginLeft: 12 },
+  cAgo: { fontSize: 12, color: C.faint, fontWeight: '600' },
+  cDelete: { fontSize: 12, color: '#C0303F', fontWeight: '700' },
+  inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 10, marginTop: 16, paddingTop: 14, borderTopWidth: 1, borderTopColor: C.line },
+  inputPill: { flex: 1, flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingLeft: 14, paddingRight: 5, paddingVertical: 5, borderRadius: 22, backgroundColor: C.bg, borderWidth: 1, borderColor: C.line },
+  input: { flex: 1, minHeight: 32, maxHeight: 110, fontSize: 15, color: C.ink, paddingTop: 7, paddingBottom: 7 },
+  sendBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: C.blue, alignItems: 'center', justifyContent: 'center' },
 });

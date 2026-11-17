@@ -24,7 +24,8 @@ export const nyDate = (t = new Date()) => new Intl.DateTimeFormat('en-CA', { tim
 export const nyTime = (ms: number) => new Date(ms).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' });
 export const isSaturday = (t = new Date()) => new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short' }).format(t) === 'Sat';
 
-export type WrapWindow = { rise: number; set: number; state: 'before' | 'open' | 'after' | 'shabbat' };
+export type WrapWindow = { rise: number; set: number; state: 'before' | 'open' | 'after' | 'shabbat'; friday?: boolean };
+export const isFriday = (t = new Date()) => new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short' }).format(t) === 'Fri';
 // TEST: photo slots open for testing until this moment, then back to normal by itself. Remove later.
 export const TEST_OPEN_UNTIL = Date.parse('2026-11-17T05:28:00Z');
 
@@ -32,7 +33,10 @@ export function wrapWindow(now = Date.now()): WrapWindow {
   const t = sunTimes(nyDate(new Date(now)));
   if (now < TEST_OPEN_UNTIL) return { rise: Math.min(t.rise, now), set: TEST_OPEN_UNTIL, state: 'open' };
   if (isSaturday(new Date(now))) return { ...t, state: 'shabbat' };
-  return { ...t, state: now < t.rise ? 'before' : now > t.set ? 'after' : 'open' };
+  // Fridays: wrap before candle lighting (18 min before sunset), when Shabbat begins
+  const friday = isFriday(new Date(now));
+  const set = friday ? t.set - 18 * 60000 : t.set;
+  return { rise: t.rise, set, friday, state: now < t.rise ? 'before' : now > set ? 'after' : 'open' };
 }
 
 // "2h 14m" / "38m"

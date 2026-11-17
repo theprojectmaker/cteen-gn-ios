@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { MinyanEditor, PhotoPicker, PopupEditor, WhatsAppImport, publishPhotos } from './leaderTools';
+import { FoodForm, MinyanEditor, PhotoPicker, PopupEditor, WhatsAppImport, publishPhotos } from './leaderTools';
 import type { Snap } from './photo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, T, F } from './theme';
@@ -392,6 +392,7 @@ export function AdminPanel() {
                     <Text style={st.backText}>All tasks</Text>
                   </Pressable>
                   {task === 'post' || task === 'event' || task === 'alert' ? <SimpleForm kind={task} onDone={(msg) => { setNote(msg); setTask(null); }} />
+                    : task === 'food' ? <FoodForm onDone={(msg) => { setNote(msg); setTask(null); }} />
                     : task === 'whatsapp' ? <WhatsAppImport onDone={(msg) => { setNote(msg); setTask(null); }} />
                     : task === 'popup' ? <PopupEditor onDone={(msg) => { setNote(msg); setTask(null); }} />
                     : task === 'minyan' ? <MinyanEditor onDone={(msg) => { setNote(msg); setTask(null); }} />
@@ -412,11 +413,12 @@ export function AdminPanel() {
 }
 
 // ───────── Simple mode ─────────
-type Task = 'post' | 'whatsapp' | 'event' | 'alert' | 'popup' | 'minyan' | 'signups' | 'photos' | 'people' | 'inbox';
+type Task = 'post' | 'whatsapp' | 'food' | 'event' | 'alert' | 'popup' | 'minyan' | 'signups' | 'photos' | 'people' | 'inbox';
 const TASK_SECTION: Partial<Record<Task, Section>> = { signups: 'Sign-ups', photos: 'Photos', people: 'People', inbox: 'Inbox' };
 const TASKS: { k: Task; icon: string; color: 'blue' | 'orange' | 'purple' | 'green' | 'pink' | 'yellow'; title: string; sub: string }[] = [
   { k: 'post', icon: 'chat', color: 'blue', title: 'Post an update', sub: 'Write something, add photos' },
   { k: 'whatsapp', icon: 'send', color: 'green', title: 'Import from WhatsApp', sub: 'Paste an announcement, AI turns it into a post' },
+  { k: 'food', icon: 'food', color: 'orange', title: 'Announce the food', sub: "What's being served. Shows on Home" },
   { k: 'event', icon: 'calendar', color: 'orange', title: 'Add an event', sub: 'Name, day, time and place' },
   { k: 'alert', icon: 'megaphone', color: 'pink', title: 'Send a quick alert', sub: 'A banner on every phone, plus a notification' },
   { k: 'popup', icon: 'bell', color: 'purple', title: 'Pop-up message', sub: 'Shows every time someone opens the app' },

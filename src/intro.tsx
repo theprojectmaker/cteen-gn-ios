@@ -2,9 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Image, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { C, PREFS } from './theme';
 
-// Opening animation (about 2 seconds, tap to skip). The CTeen logo settles in with a soft glow
-// while light drifts across the blue, GREAT NECK rises in letter by letter over a line that draws
-// itself, then everything zooms gently toward you and fades to reveal the app.
+// Opening animation (about 2 seconds, tap to skip). Plain background like a real launch screen:
+// the CTeen logo settles in, GREAT NECK rises in letter by letter over a line that draws itself,
+// then everything zooms gently toward you and fades to reveal the app.
 // A plain overlay (never a second window). Off when Settings > Opening animation or Reduce motion is set.
 const ND = Platform.OS !== 'web';
 const WORD = 'GREAT NECK';
@@ -49,29 +49,11 @@ export function Intro({ onDone }: { onDone?: () => void }) {
   };
   return (
     <Animated.View style={[StyleSheet.absoluteFill, st.root, { opacity: out.interpolate({ inputRange: [0, 0.7, 1], outputRange: [1, 0.85, 0] }) }]}>
-      {/* soft light drifting across the blue */}
-      <Animated.View pointerEvents="none" style={[st.blobLight, {
-        transform: [
-          { translateX: drift.interpolate({ inputRange: [0, 1], outputRange: [-40, 30] }) },
-          { translateY: drift.interpolate({ inputRange: [0, 1], outputRange: [-30, 20] }) },
-          { scale: drift.interpolate({ inputRange: [0, 1], outputRange: [1, 1.15] }) },
-        ],
-      }]} />
-      <Animated.View pointerEvents="none" style={[st.blobDeep, {
-        transform: [
-          { translateX: drift.interpolate({ inputRange: [0, 1], outputRange: [30, -20] }) },
-          { scale: drift.interpolate({ inputRange: [0, 1], outputRange: [1.1, 0.95] }) },
-        ],
-      }]} />
       <Pressable style={StyleSheet.absoluteFill} onPress={skip} accessibilityRole="button" accessibilityLabel="Skip intro" />
       <Animated.View pointerEvents="none" style={[st.center, {
         transform: [{ scale: out.interpolate({ inputRange: [0, 1], outputRange: [1, 1.16] }) }],
       }]}>
         <View style={st.logoWrap}>
-          <Animated.View style={[st.glow, {
-            opacity: glow.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0.9, 0.45] }),
-            transform: [{ scale: glow.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1.25] }) }],
-          }]} />
           <Animated.View style={{
             opacity: logo,
             transform: [
@@ -101,14 +83,11 @@ export function Intro({ onDone }: { onDone?: () => void }) {
 }
 
 const st = StyleSheet.create({
-  root: { backgroundColor: '#0C7FC0', zIndex: 1000, overflow: 'hidden' },
-  blobLight: { position: 'absolute', top: -420, left: -380, width: 900, height: 900, borderRadius: 450, backgroundColor: '#35C4F4', opacity: 0.28 },
-  blobDeep: { position: 'absolute', bottom: -480, right: -420, width: 1000, height: 1000, borderRadius: 500, backgroundColor: '#0A4F86', opacity: 0.35 },
+  root: { backgroundColor: C.card, zIndex: 1000, overflow: 'hidden' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   logoWrap: { width: 180, height: 190, alignItems: 'center', justifyContent: 'center' },
-  glow: { position: 'absolute', width: 170, height: 170, borderRadius: 85, backgroundColor: 'rgba(255,255,255,0.22)' },
   logo: { width: 88, height: 155 },
   word: { flexDirection: 'row', marginTop: 18 },
-  letter: { color: C.white, fontSize: 21, fontWeight: '800', letterSpacing: 5 },
-  line: { width: 120, height: 2, borderRadius: 1, backgroundColor: 'rgba(255,255,255,0.7)', marginTop: 14 },
+  letter: { color: C.blue, fontSize: 20, fontWeight: '900', letterSpacing: 5 },
+  line: { width: 120, height: 3, borderRadius: 2, backgroundColor: C.blue, opacity: 0.25, marginTop: 14 },
 });
