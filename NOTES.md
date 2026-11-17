@@ -13,6 +13,8 @@ Remove your line when it ships.
 
 ## Log
 
+- 2026-11-16 · Solomon · REAL LAUNCH-CRASH FIX: removed expo-sqlite. It compiles its own copy of SQLite into the app, which clashes with the system SQLite that expo-updates opens natively at launch, so builds 0121b70 and 383c73d crash on opening (no OTA can fix that). Settings are now a small JSON file via expo-file-system (src/prefs.native.ts). Never add expo-sqlite back while expo-updates is in the app.
+
 - 2026-11-16 · Solomon · Opening animation plays first for everyone again (every launch unless turned off in Settings); the sign-up screen waits until it ends, so only one layer ever opens at a time (app/_layout.tsx introDone).
 
 - 2026-11-16 · Solomon · Launch-crash hardening (34dbc9f): no native calls while the app loads (prefs store loads lazily, dark-mode switch after the first frame), opening animation is a plain overlay and only for people already set up (never two sheets at once), app/_layout.tsx ErrorBoundary shows a "Try again" screen instead of closing. Then: tefillin icon (src/icons.tsx `tefillin`, `challengeIcon()`), wrap window sunrise to sunset in Great Neck worked out daily (src/zmanim.ts; the server enforces the same window and blocks Shabbat; server deployed), header icon pulses only while the window is open, tefillin reminders 7/8 AM, 12/3 PM. Headlines now use Bricolage Grotesque (theme `F.display`, loaded in app/_layout.tsx), bigger card radius, softer shadows.
