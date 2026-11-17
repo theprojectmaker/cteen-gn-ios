@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import SEED from '../shared/seed.json';
+import MANAGED from '../shared/managed.json';
 import { API } from './config';
 import { PREFS } from './theme';
 import { enablePush, onNotificationTap, pushState, setReminder, type PushState } from './push';
@@ -26,6 +27,16 @@ export type MinyanRow = { label: string; time: string };
 export type Minyan = { weekday: MinyanRow[]; shabbat: MinyanRow[]; note: string };
 export type PostComment = { name: string; text: string; at: string };
 export type Content = { alert: Alert; events: EventItem[]; challenges: Challenge[]; posts: Post[]; info: Info[]; popup?: Popup; minyan?: Minyan };
+// Events and challenges Solomon sets in shared/managed.json (shipped by OTA) win over the server copy.
+export function withManaged(c: Content): Content {
+  const ev = ((MANAGED as { events?: EventItem[] }).events ?? []) as EventItem[];
+  const ch = ((MANAGED as { challenges?: Challenge[] }).challenges ?? []) as Challenge[];
+  if (!ev.length && !ch.length) return c;
+  const evIds = new Set(ev.map((e) => e.id)), chIds = new Set(ch.map((x) => x.id));
+  return { ...c, events: [...ev, ...c.events.filter((e) => !evIds.has(e.id))], challenges: [...ch, ...c.challenges.filter((x) => !chIds.has(x.id))] };
+}
+export type AiDraft = { title: string; body: string; kind: Post['kind']; event: { title: string; date: string; time: string; place: string } | null };
+
 export const sortPosts = (posts: Post[]) => [...posts].sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || b.at.localeCompare(a.at));
 export type Tab = 'Home' | 'Events' | 'Feed' | 'Chapter';
 const TAB_PATH = { Home: '/', Events: '/events', Feed: '/feed', Chapter: '/chapter' } as const;
@@ -117,6 +128,9 @@ type Ctx = Local & {
   loadPeople: () => Promise<Person[] | null>; setLeaderFor: (id: string, on: boolean) => Promise<string | null>;
   leaderLogin: (code: string) => Promise<string | null>; leaderLogout: () => void;
   saveContent: (next: Content) => Promise<string | null>;
+  uploadPhoto: (base64: string) => Promise<string | { error: string }>;
+  aiDraft: (text: string) => Promise<AiDraft | { error: string }>;
+  minyanFromText: (text: string) => Promise<Minyan | { error: string }>;
   sendAlert: (a: { title: string; text: string; target: Target; hours: number; push: boolean } | null) => Promise<string>;
   sendPush: (title: string, text: string, target: Target) => Promise<string>;
   loadSignups: () => Promise<{ signups: Record<string, SignupRow[]>; phones: number } | null>;
@@ -162,7 +176,7 @@ export async function fetchBoard(id: string) {
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [local, setLocal] = useState<Local>(blank);
-  const [content, setContent] = useState<Content>(SEED as Content);
+  const [content, setContent] = useState<Content>(() => withManaged(SEED as Content));
   const [online, setOnline] = useState<boolean | null>(null);
   const [googleReady, setGoogleReady] = useState(false);
   const [appleReady, setAppleReady] = useState(false);
@@ -184,7 +198,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
   const keep = useCallback((c: Content) => {
-    setContent(c);
+    setContent(withManaged(c));
     AsyncStorage.setItem(CACHE, JSON.stringify(c)).catch(() => {});
   }, []);
 
@@ -212,7 +226,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         ref.current = saved;
         setLocal(saved);
         AsyncStorage.setItem(KEY, JSON.stringify(saved)).catch(() => {});
-        if (cached) setContent({ ...(SEED as Content), ...JSON.parse(cached) });
+        if (cached) setContent(withManaged({ ...(SEED as Content), ...JSON.parse(cached) }));
       } catch {}
       refresh();
       api<{ google: boolean }>('/auth/config').then((r) => setGoogleReady(!!r.google)).catch(() => {});
@@ -506,6 +520,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       }
     },
     leaderLogout: () => { setLeader(null); setAdminOpen(false); },
+    uploadPhoto: async (base64) => {
+      try { return (await api<{ url: string }>('/admin/media', { method: 'POST', body: { photo: base64 }, leader })).url; } catch (e) { return { error: msg(e) }; }
+    },
+    aiDraft: async (text) => {
+      try { return await api<AiDraft>('/admin/ai-draft', { method: 'POST', body: { text }, leader }); } catch (e) { return { error: msg(e) }; }
+    },
+    minyanFromText: async (text) => {
+      try { return (await api<{ minyan: Minyan }>('/admin/minyan-from-text', { method: 'POST', body: { text }, leader })).minyan; } catch (e) { return { error: msg(e) }; }
+    },
     saveContent: async (next) => {
       try {
         keep(await api<Content>('/admin/content', { method: 'PUT', body: next, leader }));

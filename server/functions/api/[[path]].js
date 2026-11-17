@@ -15,6 +15,10 @@
 //   GET  /api/posts/:id/comments           comments on a post
 //   POST /api/posts/:id/comment            { id, token, text }
 //   POST /api/admin/post-comment-delete    { post, at }
+//   POST /api/admin/media                  { photo } (base64 JPEG) -> { url } for Feed photos
+//   GET  /api/media/:id                    a Feed photo
+//   POST /api/admin/ai-draft               { text } WhatsApp text -> { title, body, kind, event }
+//   POST /api/admin/minyan-from-text       { text } AI reads a pasted schedule and returns updated minyan times (not saved)
 //   POST /api/challenges/:id/checkin       { id, token, photo? } one per day or week; photo is a small JPEG (base64)
 //   GET  /api/challenges/:id/board         top names + counts
 //   POST /api/challenges/:id/join          { id, token } join (needed to see the photo wall)
@@ -35,6 +39,7 @@
 //   POST /api/admin/photo-status           { key, status: 'checked' | 'hidden' | '' }
 //   POST /api/admin/comment-delete         { key, at }
 import SEED from '../../../shared/seed.json';
+import MANAGED from '../../../shared/managed.json';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -221,8 +226,24 @@ function memberStats(ch, row, joinedAt) {
   return { count: (row && row.count) || 0, streak, strikes, out: strikes >= STRIKES_OUT, goal: ch.goal + (strikes >= 2 ? 1 : 0), done: days.has(today) };
 }
 
+const managedIds = (k) => new Set(((MANAGED && MANAGED[k]) || []).map((x) => x.id));
+function withManaged(c) {
+  const ev = (MANAGED && MANAGED.events) || [], ch = (MANAGED && MANAGED.challenges) || [];
+  if (!ev.length && !ch.length) return c;
+  const evIds = managedIds('events'), chIds = managedIds('challenges');
+  return {
+    ...c,
+    events: [...ev.map((e) => ({ ...e, managed: true })), ...(c.events || []).filter((e) => !evIds.has(e.id))],
+    challenges: [...ch.map((x) => ({ ...x, managed: true })), ...(c.challenges || []).filter((x) => !chIds.has(x.id))],
+  };
+}
+function withoutManaged(c) {
+  const evIds = managedIds('events'), chIds = managedIds('challenges');
+  return { ...c, events: (c.events || []).filter((e) => !evIds.has(e.id)), challenges: (c.challenges || []).filter((x) => !chIds.has(x.id)) };
+}
+
 async function getContent(env) {
-  const c = { ...((await env.CTEEN.get('content', 'json')) || SEED) };
+  const c = withManaged({ ...((await env.CTEEN.get('content', 'json')) || SEED) });
   if (!c.minyan) c.minyan = MINYAN_DEFAULT;
   if (!c.popup) c.popup = { on: false, id: '', title: '', body: '', button: '', target: null };
   if (c.alert && c.alert.on && c.alert.until && c.alert.until < new Date().toISOString()) c.alert = { ...c.alert, on: false };
@@ -327,6 +348,45 @@ async function verifyApple(env, jwt) {
 // Only app links of this app may receive a sign-in ticket.
 const APP_RETURN = /^(cteengn:\/\/|exp:\/\/|exps:\/\/|https?:\/\/localhost(:\d+)?\/)/;
 
+// ── AI (Groq first, Cloudflare Workers AI as a fallback). Returns parsed JSON or null. ──
+async function aiJson(env, system, user) {
+  const parse = (s) => { try { const m = String(s || '').match(/\{[\s\S]*\}/); return m ? JSON.parse(m[0]) : null; } catch { return null; } };
+  if (env.GROQ_API_KEY) {
+    try {
+      const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: 'Bearer ' + env.GROQ_API_KEY },
+        body: JSON.stringify({ model: 'openai/gpt-oss-120b', temperature: 0.2, reasoning_format: 'hidden', reasoning_effort: 'low', response_format: { type: 'json_object' }, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }),
+      });
+      if (r.ok) { const j = await r.json(); const out = parse(j.choices?.[0]?.message?.content); if (out) return out; }
+    } catch {}
+  }
+  if (env.AI) {
+    try {
+      const r = await env.AI.run('@cf/openai/gpt-oss-120b', { instructions: system, input: user });
+      const text = (r.output || []).flatMap((o) => o.content || []).map((c) => c.text || '').join('');
+      const out = parse(text || r.response);
+      if (out) return out;
+    } catch {}
+  }
+  return null;
+}
+
+const TIME_OK = /^(\d{1,2}:\d{2}\s*(AM|PM)(\s*(&|and|,)\s*\d{1,2}:\d{2}\s*(AM|PM))*|Candle lighting|\d+ min after Shabbat ends)$/i;
+// Reads a schedule the rabbi pasted and fills in rows it clearly states. Never invents, never blanks.
+async function minyanFromText(env, cur, text) {
+  const out = await aiJson(env,
+    'You update a synagogue minyan schedule from a message the rabbi pasted. Reply with JSON only: {"weekday":[{"label","time"}],"shabbat":[{"label","time"}]}. Keep the same rows and labels you are given. Change a row ONLY if the message clearly gives its time. Never invent a time. Rows the message does not mention keep their current value exactly (even if empty). Times look like "7:00 AM" or "7:00 AM & 9:00 AM"; keep "Candle lighting" and "N min after Shabbat ends" as words.',
+    `Today is ${nyDate()}.\nCurrent schedule: ${JSON.stringify(cur)}\nThe rabbi's message:\n${text}`);
+  if (!out) return null;
+  const merge = (rows, next) => rows.map((r) => {
+    const n = (next || []).find((x) => x && x.label === r.label);
+    const time = n && typeof n.time === 'string' ? n.time.trim() : '';
+    return time && TIME_OK.test(time) ? { label: r.label, time } : r;
+  });
+  return { weekday: merge(cur.weekday, out.weekday), shabbat: merge(cur.shabbat, out.shabbat), note: cur.note };
+}
+
 // Short edge cache for GETs every phone makes on every open, so lots of users barely touch storage.
 async function edgeCached(request, seconds, make) {
   let cache = null;
@@ -341,7 +401,7 @@ async function edgeCached(request, seconds, make) {
   return out;
 }
 
-export async function onRequest({ request, env, params }) {
+export async function onRequest({ request, env, params, waitUntil }) {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
   if (!env.CTEEN) return bad('Storage is not connected.', 503);
   const url = new URL(request.url);
@@ -351,7 +411,19 @@ export async function onRequest({ request, env, params }) {
   if ((method === 'POST' || method === 'PUT') && !body) return bad('Bad request.');
 
   try {
-    if (path === 'content' && method === 'GET') return edgeCached(request, 10, async () => json(await getContent(env)));
+    if (path === 'content' && method === 'GET') {
+      return edgeCached(request, 10, async () => {
+        const c = await getContent(env);
+        return json(c);
+      });
+    }
+    let mm = /^media\/([a-z0-9]{6,40})$/.exec(path);
+    if (mm && method === 'GET') {
+      const data = await env.CTEEN.get('media:' + mm[1]);
+      if (!data) return bad('Not found.', 404);
+      const bin = Uint8Array.from(atob(data), (ch) => ch.charCodeAt(0));
+      return new Response(bin, { headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=31536000, immutable', ...CORS } });
+    }
 
     // ── feed posts: likes and comments ──
     if (path === 'posts/meta' && method === 'GET') {
@@ -682,7 +754,8 @@ export async function onRequest({ request, env, params }) {
       };
       if (path === 'admin/content' && method === 'PUT') {
         const current = await getContent(env);
-        const next = sanitize(body, current.alert || SEED.alert);
+        const raw = (await env.CTEEN.get('content', 'json')) || {};
+        const next = sanitize(withoutManaged(body), current.alert || SEED.alert);
         const err = await save(next);
         if (err) return err;
         // Anything new gets a notification on every phone (at most 3 per save).
@@ -692,7 +765,7 @@ export async function onRequest({ request, env, params }) {
           ...next.posts.filter((p) => !oldPosts.has(p.id)).map((p) => ({ title: p.title, body: (p.body || 'New from CTeen Great Neck').slice(0, 150), target: p.eventId ? { type: 'event', id: p.eventId } : null })),
         ].slice(0, 3);
         for (const n of fresh) await pushAll(env, n.title, n.body, { target: n.target });
-        return json(next);
+        return json(withManaged(next));
       }
       if (path === 'admin/alert' && method === 'POST') {
         const current = await getContent(env);
@@ -766,6 +839,32 @@ export async function onRequest({ request, env, params }) {
         const status = ['checked', 'hidden'].includes(body.status) ? body.status : '';
         const ok = await editPhotoEntry(env, String(body.key || ''), (p) => { p.status = status; });
         return ok ? json({ ok: true }) : bad('That photo is gone.', 404);
+      }
+      if (path === 'admin/media' && method === 'POST') {
+        const photo = typeof body.photo === 'string' ? body.photo.replace(/^data:image\/\w+;base64,/, '') : '';
+        if (!/^[A-Za-z0-9+/=]{2000,}$/.test(photo)) return bad('That photo did not come through. Try again.');
+        if (photo.length > 1500000) return bad('That photo is too big.');
+        const mid = Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+        await env.CTEEN.put('media:' + mid, photo);
+        return json({ url: new URL('/api/media/' + mid, request.url).toString() });
+      }
+      if (path === 'admin/ai-draft' && method === 'POST') {
+        const text = clean(body.text, 4000);
+        if (text.length < 5) return bad('Paste the WhatsApp message first.');
+        const out = await aiJson(env,
+          'You turn a WhatsApp announcement from Rabbi Zevy (CTeen Great Neck, a Jewish teen chapter at Chabad of Great Neck, NY) into a post for the chapter app Feed. Reply with JSON only: {"title","body","kind","event"}. title: max 60 chars, clear and friendly. body: max 600 chars, plain sentences for teens, keep every fact (dates, times, places, prices, names, links) exactly as given and add NOTHING that is not in the message. NO emojis, no hashtags, no asterisks or markdown. kind: one of "News","Events","Photos","Rewards". event: if the message announces a specific event with a date, {"title","date":"YYYY-MM-DD","time","place"} using today\'s date to resolve words like "this Sunday"; otherwise null.',
+          `Today is ${nyDate()} (${new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: 'America/New_York' })}).\nWhatsApp message:\n${text}`);
+        if (!out || !out.title) return bad('The AI could not read that. Try again, or write the post yourself.', 502);
+        const noEmoji = (s) => String(s || '').replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu, '').replace(/[*_#]/g, '').replace(/\s+\n/g, '\n').trim();
+        const ev = out.event && typeof out.event === 'object' && dateOk(out.event.date) ? { title: clean(noEmoji(out.event.title || out.title), 80), date: out.event.date, time: clean(out.event.time, 40), place: clean(out.event.place, 120) } : null;
+        return json({ title: clean(noEmoji(out.title), 120), body: clean(noEmoji(out.body), 1500), kind: KINDS.includes(out.kind) ? out.kind : 'News', event: ev });
+      }
+      if (path === 'admin/minyan-from-text' && method === 'POST') {
+        const text = clean(body.text, 4000);
+        if (text.length < 5) return bad('Paste the schedule first.');
+        const cur = (await getContent(env)).minyan || MINYAN_DEFAULT;
+        const minyan = await minyanFromText(env, cur, text);
+        return minyan ? json({ minyan }) : bad('The AI could not read that. Try again, or type the times yourself.', 502);
       }
       if (path === 'admin/post-comment-delete' && method === 'POST') {
         if (!idOk(body.post)) return bad('Bad request.');

@@ -5,3 +5,6 @@ compatibility_date = "2024-09-23"
 [[kv_namespaces]]
 binding = "CTEEN"
 id = "5d70a0a5c47b4691bf6e91b83d632eb1"
+
+[ai]
+binding = "AI"

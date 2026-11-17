@@ -138,6 +138,22 @@ from `src/theme.ts`, no `fontWeight` with it), body in Apple's system font, whit
 background, floating glass header and tab bar. International events carry an "International"
 badge and register on the CTeen website; Great Neck events sign up inside the app.
 
+## Events and challenges from code (`shared/managed.json`)
+
+Solomon can run events and challenges from code instead of the leader panel: put them in
+`shared/managed.json` (same fields the leader panel uses; look at an event in the live
+`/api/content` for the shape), commit and push. Phones get it as an OTA update. Then redeploy the
+server (Solomon's Claude) so RSVPs and check-ins know the new items too. An item there replaces one
+with the same id from the leader panel, and the leader panel can't overwrite it. Empty arrays =
+the rabbi runs everything.
+
+## AI on the server
+
+`/api/admin/ai-draft` (WhatsApp text to a Feed post) and `/api/admin/minyan-from-text` (pasted
+schedule to minyan times) use Groq (`GROQ_API_KEY` Pages secret, `openai/gpt-oss-120b`) with
+Cloudflare Workers AI (`[ai]` binding) as the fallback. chabadgn.com blocks automated reading, so
+nothing scrapes it; Shabbat times update weekly by themselves from Hebcal.
+
 ## Server changes
 
 The app reads and writes through `https://cteen-gn.pages.dev/api`. The code is in

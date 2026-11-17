@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Icon } from './icons';
+import { pickPhotos, type Snap } from './photo';
 import { C, T } from './theme';
-import { useStore, type MinyanRow, type Popup } from './store';
+import { useStore, type AiDraft, type MinyanRow, type Popup } from './store';
 import { Button, Chips, Field, Toggle } from './ui';
 import { MINYAN_FALLBACK } from './minyan';
 
@@ -59,15 +61,28 @@ export function PopupEditor({ onDone }: { onDone: (msg: string) => void }) {
 }
 
 // "Label | time" per line, the easiest thing to type on a phone.
-const toText = (rows: MinyanRow[]) => rows.map((r) => (r.time ? `${r.label} | ${r.time}` : r.label)).join('\n');
+// older saved times used codes; show them to the rabbi as plain words
+const friendly = (time: string) => (time === '@candles' ? 'Candle lighting' : time.replace(/^@havdalah\+(\d+)$/, '$1 min after Shabbat ends'));
+const toText = (rows: MinyanRow[]) => rows.map((r) => (r.time ? `${r.label} | ${friendly(r.time)}` : r.label)).join('\n');
 const fromText = (s: string): MinyanRow[] => s.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => {
   const [label, ...rest] = l.split('|');
   return { label: label.trim(), time: rest.join('|').trim() };
 });
 
 export function MinyanEditor({ onDone }: { onDone: (msg: string) => void }) {
-  const { content, saveContent } = useStore();
+  const { content, saveContent, minyanFromText } = useStore();
   const m = content.minyan ?? MINYAN_FALLBACK;
+  const [paste, setPaste] = useState('');
+  const [reading, setReading] = useState(false);
+  const [aiNote, setAiNote] = useState<string | null>(null);
+  const fillFromPaste = async () => {
+    setReading(true); setErr(null); setAiNote(null);
+    const r = await minyanFromText(paste);
+    setReading(false);
+    if ('error' in r) return setErr(r.error);
+    setWeekday(toText(r.weekday)); setShabbat(toText(r.shabbat));
+    setAiNote('Filled in from your message. Check the times below, then tap Save.');
+  };
   const [weekday, setWeekday] = useState(toText(m.weekday));
   const [shabbat, setShabbat] = useState(toText(m.shabbat));
   const [note, setNote] = useState(m.note);
@@ -84,6 +99,13 @@ export function MinyanEditor({ onDone }: { onDone: (msg: string) => void }) {
     <View>
       <Text style={T.h2}>Minyan times</Text>
       <Text style={[T.small, { marginTop: 4 }]}>One line each: name | time. Leave the time off to show "Call for times". Write "Candle lighting" or "10 min after Shabbat ends" and the app fills in this week's time.</Text>
+      <View style={st.draft}>
+        <Text style={T.h3}>Got the schedule on WhatsApp?</Text>
+        <Text style={T.small}>Paste it here and the AI fills in the times for you. Nothing changes until you tap Save.</Text>
+        <Field label="Schedule message" value={paste} onChange={setPaste} placeholder="Paste it here" multiline />
+        <View style={{ marginTop: 10 }}><Button kind="ghost" icon="send" label={reading ? 'Reading…' : 'Fill in the times'} disabled={reading || paste.trim().length < 5} onPress={fillFromPaste} /></View>
+        {aiNote ? <Text style={[st.draftTag, { marginTop: 10 }]}>{aiNote}</Text> : null}
+      </View>
       <Field label="Weekdays" value={weekday} onChange={setWeekday} multiline />
       <Field label="Shabbat" value={shabbat} onChange={setShabbat} multiline />
       <Field label="Note (optional)" value={note} onChange={setNote} multiline />
@@ -95,8 +117,132 @@ export function MinyanEditor({ onDone }: { onDone: (msg: string) => void }) {
   );
 }
 
+// ── Photos on posts ──
+// Uploads each photo and returns their links, or an error message.
+export async function publishPhotos(photos: Snap[], upload: (b64: string) => Promise<string | { error: string }>): Promise<string[] | string> {
+  const urls: string[] = [];
+  for (const p of photos) {
+    const r = await upload(p.base64);
+    if (typeof r !== 'string') return r.error;
+    urls.push(r);
+  }
+  return urls;
+}
+
+export function PhotoPicker({ photos, onChange }: { photos: Snap[]; onChange: (p: Snap[]) => void }) {
+  const [err, setErr] = useState<string | null>(null);
+  const add = async () => {
+    setErr(null);
+    const r = await pickPhotos(4 - photos.length);
+    if (!r) return;
+    if ('error' in r) return setErr(r.error);
+    onChange([...photos, ...r].slice(0, 4));
+  };
+  return (
+    <View style={{ marginTop: 14 }}>
+      <Text style={st.label}>Photos (up to 4)</Text>
+      <View style={st.thumbs}>
+        {photos.map((p, i) => (
+          <View key={p.uri + i} style={st.thumb}>
+            <Image source={{ uri: p.uri }} style={StyleSheet.absoluteFill} />
+            <Pressable onPress={() => onChange(photos.filter((_, j) => j !== i))} style={st.thumbX} hitSlop={6} accessibilityRole="button" accessibilityLabel="Remove photo">
+              <Icon name="x" size={12} color="#FFFFFF" stroke={3} />
+            </Pressable>
+          </View>
+        ))}
+        {photos.length < 4 ? (
+          <Pressable onPress={add} style={({ pressed }) => [st.thumb, st.thumbAdd, pressed && { opacity: 0.7 }]} accessibilityRole="button" accessibilityLabel="Add photos">
+            <Icon name="camera" size={22} color={C.blueDeep} stroke={2} />
+            <Text style={st.thumbAddText}>Add</Text>
+          </Pressable>
+        ) : null}
+      </View>
+      {err ? <Text style={st.err}>{err}</Text> : null}
+    </View>
+  );
+}
+
+// ── WhatsApp → Feed post ──
+// Paste the announcement, the AI writes a clean post (no emojis, same facts), the rabbi checks it and posts.
+export function WhatsAppImport({ onDone }: { onDone: (msg: string) => void }) {
+  const { content, saveContent, aiDraft, uploadPhoto } = useStore();
+  const [raw, setRaw] = useState('');
+  const [draft, setDraft] = useState<AiDraft | null>(null);
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
+  const [kind, setKind] = useState<AiDraft['kind']>('News');
+  const [addEvent, setAddEvent] = useState(true);
+  const [photos, setPhotos] = useState<Snap[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const read = async () => {
+    setBusy(true); setErr(null);
+    const r = await aiDraft(raw);
+    setBusy(false);
+    if ('error' in r) return setErr(r.error);
+    setDraft(r); setTitle(r.title); setBody(r.body); setKind(r.kind); setAddEvent(!!r.event);
+  };
+  const post = async () => {
+    if (title.trim().length < 2) return setErr('Add a headline.');
+    setBusy(true); setErr(null);
+    const urls = await publishPhotos(photos, uploadPhoto);
+    if (typeof urls === 'string') { setBusy(false); return setErr(urls); }
+    const ev = draft?.event && addEvent ? {
+      id: 'e-' + Date.now().toString(36), title: draft.event.title || title.trim(), icon: 'star', color: 'blue' as const, scope: 'gn' as const,
+      start: draft.event.date, end: draft.event.date, time: draft.event.time, place: draft.event.place || 'Chabad of Great Neck', price: '', who: '', about: body.trim(),
+      signup: 'app' as const, url: '', payUrl: '', gender: 'all' as const, minAge: null, maxAge: null,
+    } : null;
+    const p = { id: 'p-' + Date.now().toString(36), kind, pinned: false, title: title.trim(), body: body.trim(), eventId: ev ? ev.id : '', challengeId: '', photos: urls, linkLabel: '', linkUrl: '', at: new Date().toISOString() };
+    const e = await saveContent({ ...content, posts: [p, ...content.posts], events: ev ? [...content.events, ev] : content.events });
+    setBusy(false);
+    if (e) return setErr(e);
+    onDone(ev ? 'Posted, and the event was added with RSVP. Every phone got a notification.' : 'Posted to the Feed. Every phone got a notification.');
+  };
+  return (
+    <View>
+      <Text style={T.h2}>Import from WhatsApp</Text>
+      <Text style={[T.small, { marginTop: 4 }]}>In WhatsApp, press and hold the message, tap Copy, then paste it here.</Text>
+      <Field label="WhatsApp message" value={raw} onChange={setRaw} placeholder="Paste it here" multiline />
+      <View style={{ marginTop: 12 }}>
+        <Button kind={draft ? 'ghost' : 'primary'} icon="send" label={busy && !draft ? 'Reading…' : draft ? 'Try again' : 'Turn it into a post'} disabled={busy || raw.trim().length < 5} onPress={read} />
+      </View>
+      {draft ? (
+        <View style={st.draft}>
+          <Text style={st.draftTag}>AI draft. Check it, change anything, then post.</Text>
+          <Field label="Headline" value={title} onChange={setTitle} />
+          <Field label="Message" value={body} onChange={setBody} multiline />
+          <Text style={[st.label, { marginTop: 14 }]}>Type</Text>
+          <Chips options={['News', 'Events', 'Photos', 'Rewards'] as const} value={kind} onChange={setKind} />
+          {draft.event ? (
+            <View style={st.eventBox}>
+              <View style={{ flex: 1 }}>
+                <Text style={T.h3}>Also add it as an event</Text>
+                <Text style={T.small}>{[draft.event.title, draft.event.date, draft.event.time, draft.event.place].filter(Boolean).join(' · ')}</Text>
+              </View>
+              <Toggle value={addEvent} onChange={setAddEvent} label="Also add it as an event" />
+            </View>
+          ) : null}
+          <PhotoPicker photos={photos} onChange={setPhotos} />
+          <View style={{ marginTop: 18 }}>
+            <Button label={busy ? 'Posting…' : 'Post it'} disabled={busy} onPress={post} />
+          </View>
+        </View>
+      ) : null}
+      {err ? <Text style={st.err}>{err}</Text> : null}
+    </View>
+  );
+}
+
 const st = StyleSheet.create({
   toggleRow: { flexDirection: 'row', alignItems: 'center', marginTop: 18, padding: 14, borderRadius: 16, backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
   label: { fontSize: 13, fontWeight: '800', color: C.sub },
   err: { color: '#C0303F', marginTop: 10, fontSize: 14 },
+  thumbs: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
+  thumb: { width: 76, height: 76, borderRadius: 14, overflow: 'hidden', backgroundColor: C.line },
+  thumbX: { position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },
+  thumbAdd: { alignItems: 'center', justifyContent: 'center', backgroundColor: C.bluePale, borderWidth: 1, borderColor: C.blue, borderStyle: 'dashed' },
+  thumbAddText: { fontSize: 12, fontWeight: '800', color: C.blueDeep, marginTop: 2 },
+  draft: { marginTop: 18, padding: 14, borderRadius: 18, backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
+  draftTag: { fontSize: 12, fontWeight: '800', color: C.green },
+  eventBox: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 16, padding: 12, borderRadius: 14, backgroundColor: C.bg },
 });

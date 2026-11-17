@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { MinyanEditor, PopupEditor } from './leaderTools';
+import { MinyanEditor, PhotoPicker, PopupEditor, WhatsAppImport, publishPhotos } from './leaderTools';
+import type { Snap } from './photo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, T, F } from './theme';
 import { EVENT_ICONS, Icon } from './icons';
@@ -391,6 +392,7 @@ export function AdminPanel() {
                     <Text style={st.backText}>All tasks</Text>
                   </Pressable>
                   {task === 'post' || task === 'event' || task === 'alert' ? <SimpleForm kind={task} onDone={(msg) => { setNote(msg); setTask(null); }} />
+                    : task === 'whatsapp' ? <WhatsAppImport onDone={(msg) => { setNote(msg); setTask(null); }} />
                     : task === 'popup' ? <PopupEditor onDone={(msg) => { setNote(msg); setTask(null); }} />
                     : task === 'minyan' ? <MinyanEditor onDone={(msg) => { setNote(msg); setTask(null); }} />
                     : body}
@@ -410,10 +412,11 @@ export function AdminPanel() {
 }
 
 // ───────── Simple mode ─────────
-type Task = 'post' | 'event' | 'alert' | 'popup' | 'minyan' | 'signups' | 'photos' | 'people' | 'inbox';
+type Task = 'post' | 'whatsapp' | 'event' | 'alert' | 'popup' | 'minyan' | 'signups' | 'photos' | 'people' | 'inbox';
 const TASK_SECTION: Partial<Record<Task, Section>> = { signups: 'Sign-ups', photos: 'Photos', people: 'People', inbox: 'Inbox' };
 const TASKS: { k: Task; icon: string; color: 'blue' | 'orange' | 'purple' | 'green' | 'pink' | 'yellow'; title: string; sub: string }[] = [
-  { k: 'post', icon: 'chat', color: 'blue', title: 'Post an update', sub: 'Write something for the Feed' },
+  { k: 'post', icon: 'chat', color: 'blue', title: 'Post an update', sub: 'Write something, add photos' },
+  { k: 'whatsapp', icon: 'send', color: 'green', title: 'Import from WhatsApp', sub: 'Paste an announcement, AI turns it into a post' },
   { k: 'event', icon: 'calendar', color: 'orange', title: 'Add an event', sub: 'Name, day, time and place' },
   { k: 'alert', icon: 'megaphone', color: 'pink', title: 'Send a quick alert', sub: 'A banner on every phone, plus a notification' },
   { k: 'popup', icon: 'bell', color: 'purple', title: 'Pop-up message', sub: 'Shows every time someone opens the app' },
@@ -466,13 +469,17 @@ function SimpleForm({ kind, onDone }: { kind: 'post' | 'event' | 'alert'; onDone
   const [notify, setNotify] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [photos, setPhotos] = useState<Snap[]>([]);
+  const { uploadPhoto } = useStore();
   const days = nextDays();
   const go = async () => {
     if (title.trim().length < 2) return setErr(kind === 'event' ? 'Give the event a name.' : 'Write a headline first.');
     setBusy(true); setErr(null);
     let msg = '';
     if (kind === 'post') {
-      const post = { id: 'p-' + Date.now().toString(36), kind: 'News' as const, pinned: false, title: title.trim(), body: text.trim(), eventId: '', challengeId: '', photos: [], linkLabel: '', linkUrl: '', at: iso(new Date()) };
+      const urls = await publishPhotos(photos, uploadPhoto);
+      if (typeof urls === 'string') { setBusy(false); return setErr(urls); }
+      const post = { id: 'p-' + Date.now().toString(36), kind: (urls.length && !text.trim() ? 'Photos' : 'News') as 'Photos' | 'News', pinned: false, title: title.trim(), body: text.trim(), eventId: '', challengeId: '', photos: urls, linkLabel: '', linkUrl: '', at: new Date().toISOString() };
       const e = await saveContent({ ...content, posts: [post, ...content.posts] });
       if (e) { setBusy(false); return setErr(e); }
       msg = 'Posted to the Feed. Every phone got a notification.';
@@ -509,6 +516,7 @@ function SimpleForm({ kind, onDone }: { kind: 'post' | 'event' | 'alert'; onDone
         </>
       ) : null}
       <Field label={kind === 'event' ? 'Details (optional)' : kind === 'alert' ? 'More detail (optional)' : 'Message'} value={text} onChange={setText} multiline />
+      {kind === 'post' ? <PhotoPicker photos={photos} onChange={setPhotos} /> : null}
       {kind === 'alert' ? (
         <View style={st.toggle}>
           <Text style={[T.h3, { flex: 1, fontSize: 16 }]}>Send a notification to every phone</Text>

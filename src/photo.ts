@@ -24,3 +24,23 @@ export async function snapPhoto(): Promise<Snap | { error: string } | null> {
     return { error: "Couldn't open the camera. Try again." };
   }
 }
+
+// Leader panel: pick up to 4 photos from the camera roll for a Feed post, shrunk to ~1080px JPEGs.
+export async function pickPhotos(max = 4): Promise<Snap[] | { error: string } | null> {
+  try {
+    if (Platform.OS !== 'web') {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) return { error: 'CTeen GN needs access to your photos. Turn it on in Settings.' };
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, selectionLimit: max, quality: 1 });
+    if (result.canceled || !result.assets?.length) return null;
+    const out: Snap[] = [];
+    for (const a of result.assets.slice(0, max)) {
+      const small = await manipulateAsync(a.uri, [{ resize: { width: 1080 } }], { compress: 0.72, format: SaveFormat.JPEG, base64: true });
+      if (small.base64) out.push({ uri: small.uri, base64: small.base64.replace(/^data:image\/\w+;base64,/, '') });
+    }
+    return out.length ? out : { error: "Couldn't read those photos. Try again." };
+  } catch {
+    return { error: "Couldn't open your photos. Try again." };
+  }
+}

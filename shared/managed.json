@@ -1,0 +1,5 @@
+{
+  "_how": "Events and challenges Solomon controls from code. Add or change one here, push to main (phones get it as an OTA update), and have Claude redeploy the server so RSVPs and check-ins know it too. Same fields as the leader panel uses. An item here replaces one with the same id from the leader panel. Leave the arrays empty to let the rabbi run everything.",
+  "events": [],
+  "challenges": []
+}
