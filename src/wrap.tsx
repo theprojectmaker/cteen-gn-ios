@@ -78,7 +78,7 @@ export function WrapBanner() {
     <View style={{ marginBottom: 18 }}>
       <Pressable onPress={() => router.push(`/challenge/${w.id}`)} style={({ pressed }) => [st.banner, friday && st.bannerFri, pressed && { opacity: 0.92 }]} accessibilityRole="button" accessibilityLiveRegion="polite"
         accessibilityLabel={`${friday ? 'Wrap tefillin before Shabbat' : 'Last hour to wrap tefillin'}, ${leftText(w.left)} left`}>
-        <View style={st.icon}><Fire size={30} lit={false} /></View>
+        <View style={st.icon}><Fire size={28} lit={false} tint="#FFFFFF" /></View>
         <View style={{ flex: 1 }}>
           <Text style={st.title}>{friday ? 'Wrap before Shabbat' : 'Last hour to wrap'}</Text>
           <Text style={st.sub}>{friday ? `Candle lighting at ${nyTime(w.win.set)}. Wrap, snap, then get ready for Shabbat.` : `Closes at sunset, ${nyTime(w.win.set)}. ${w.mine ? 'Snap your selfie now.' : 'Join and wrap today.'}`}</Text>

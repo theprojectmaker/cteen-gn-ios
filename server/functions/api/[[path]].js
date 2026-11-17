@@ -29,6 +29,7 @@
 //   POST /api/push/register                { token, device }
 //   POST /api/push/prefs                   { device, photos } photo alerts on/off (on unless turned off)
 //   POST /api/admin/push-me                { device } this leader phone gets a notification for every comment
+//   GET  /api/broadcasts                   everything sent to everyone, newest first (the Inbox in Settings)
 //   POST /api/ask                          { name, text, device } question for the rabbi
 // Leaders: Authorization: Bearer <passcode> (the rabbi, "owner"), or X-Account: <id>:<token> for an
 // account the rabbi made a leader. New events and Feed posts notify every phone automatically.
@@ -257,7 +258,7 @@ const KINDS = ['News', 'Events', 'Photos', 'Rewards', 'Food'];
 const COLORS = ['blue', 'orange', 'purple', 'green', 'pink', 'yellow'];
 const dateOk = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
 const urlOk = (v) => typeof v === 'string' && /^(https:\/\/|mailto:|tel:)/.test(v) && v.length < 400;
-const targetOk = (t) => (t && ['event', 'challenge'].includes(t.type) && idOk(t.id) ? { type: t.type, id: t.id } : null);
+const targetOk = (t) => (t && ['event', 'challenge', 'post'].includes(t.type) && idOk(t.id) ? { type: t.type, id: t.id } : null);
 const ageOk = (v) => { const n = Number(v); return v !== '' && v != null && Number.isFinite(n) && n >= 10 && n <= 25 ? Math.round(n) : null; };
 
 // Rebuild the document field by field so nothing unexpected is ever stored.
@@ -332,6 +333,13 @@ async function pushLeaders(env, title, body, data, exceptDevice) {
   const tokens = Object.keys(leaders).filter((d) => d !== exceptDevice && all[d]).map((d) => all[d]);
   if (!tokens.length) return;
   await fetch('https://exp.host/--/api/v2/push/send', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(tokens.map((to) => ({ to, title, body, sound: 'default', data: data || {} }))) }).catch(() => null);
+}
+
+// The Inbox: notifications, live banners, pop-ups and new posts/events, newest first (last 100).
+async function logBroadcast(env, kind, title, text, target) {
+  const list = (await env.CTEEN.get('broadcasts', 'json')) || [];
+  list.unshift({ id: newId('b'), kind, title: clean(title, 120), text: clean(text, 300), target: target || null, at: new Date().toISOString() });
+  await env.CTEEN.put('broadcasts', JSON.stringify(list.slice(0, 100)));
 }
 
 async function pushAll(env, title, body, data) {
@@ -774,6 +782,9 @@ export async function onRequest({ request, env, params, waitUntil }) {
       }
     }
 
+    if (path === 'broadcasts' && method === 'GET') {
+      return edgeCached(request, 10, async () => json({ items: (await env.CTEEN.get('broadcasts', 'json')) || [] }));
+    }
     if (path === 'push/prefs' && method === 'POST') {
       const device = clean(body.device, 40);
       if (!device) return bad('Bad request.');
@@ -839,7 +850,8 @@ export async function onRequest({ request, env, params, waitUntil }) {
             target: p.eventId ? { type: 'event', id: p.eventId } : { type: 'post', id: p.id },
           })))),
         ].slice(0, 3);
-        for (const n of fresh) await pushAll(env, n.title, n.body, { target: n.target });
+        for (const n of fresh) { await pushAll(env, n.title, n.body, { target: n.target }); await logBroadcast(env, n.target && n.target.type === 'event' ? 'event' : 'post', n.title, n.body, n.target); }
+        if (next.popup && next.popup.on && next.popup.title && (!current.popup || current.popup.id !== next.popup.id)) await logBroadcast(env, 'popup', next.popup.title, next.popup.body, next.popup.target);
         return json(withManaged(next));
       }
       if (path === 'admin/alert' && method === 'POST') {
@@ -855,12 +867,16 @@ export async function onRequest({ request, env, params, waitUntil }) {
         const err = await save(next);
         if (err) return err;
         const push = !body.clear && body.push ? await pushAll(env, alert.title, alert.text, { target: alert.target }) : null;
+        if (!body.clear) await logBroadcast(env, 'banner', alert.title, alert.text, alert.target);
         return json({ content: next, push });
       }
       if (path === 'admin/push' && method === 'POST') {
         const title = clean(body.title, 60), text = clean(body.text, 160);
         if (title.length < 2) return bad('Add a title.');
-        return json({ push: await pushAll(env, title, text, { target: targetOk(body.target) }) });
+        const target = targetOk(body.target);
+        const push = await pushAll(env, title, text, { target });
+        await logBroadcast(env, 'notification', title, text, target);
+        return json({ push });
       }
       if (path === 'admin/signups' && method === 'GET') {
         const content = await getContent(env);

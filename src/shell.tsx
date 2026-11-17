@@ -9,6 +9,7 @@ import { Icon, challengeIcon } from './icons';
 import { wrapWindow } from './zmanim';
 import { WrapBanner, useWrapStatus } from './wrap';
 import { Glass, LIQUID } from './glass';
+import { Cover } from './ui';
 import { CHAPTER, challengeFits, doneThisPeriod, open, useShabbat, useStore, type Alert } from './store';
 
 const NATIVE_DRIVER = Platform.OS !== 'web';
@@ -69,7 +70,7 @@ export function Screen({ children }: { children: React.ReactNode }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.blue} colors={[C.blue]} progressViewOffset={insets.top} />}>
         <View style={st.col}>
           <Header />
-          {liveAlert && !LIQUID ? <TopAlert alert={liveAlert} /> : null}
+          {liveAlert ? <TopAlert alert={liveAlert} /> : null}
           <WrapBanner />
           <ShabbatBanner />
           <Animated.View style={{ opacity: enter, transform: [{ translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }] }}>
@@ -201,22 +202,41 @@ function ShabbatBanner() {
   );
 }
 
+// The rabbi's live banner: a card at the top of every page. LIVE tag with a breathing dot, the message,
+// the event's photo when it points to an event. Tap to open, x to dismiss.
 function TopAlert({ alert }: { alert: Alert }) {
-  const { dismissAlert, openTarget } = useStore();
+  const { dismissAlert, openTarget, content } = useStore();
+  const ev = alert.target?.type === 'event' ? content.events.find((e) => e.id === alert.target!.id) : undefined;
+  const dot = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (PREFS.reduceMotion) return;
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(dot, { toValue: 1, duration: 900, useNativeDriver: NATIVE_DRIVER }),
+      Animated.timing(dot, { toValue: 0, duration: 900, useNativeDriver: NATIVE_DRIVER }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, []);
   return (
-    <Glass style={st.alert}>
-      <Pressable style={st.alertMain} onPress={() => openTarget(alert.target)} disabled={!alert.target} accessibilityRole={alert.target ? 'button' : 'text'} accessibilityLabel={`${alert.title}. ${alert.text}`}>
-        <View style={st.liveDot} />
+    <View style={st.live}>
+      <Pressable style={st.liveMain} onPress={() => openTarget(alert.target)} disabled={!alert.target} accessibilityRole={alert.target ? 'button' : 'text'} accessibilityLabel={`Live: ${alert.title}. ${alert.text}`}>
         <View style={{ flex: 1 }}>
-          <Text style={st.alertTitle} numberOfLines={2}>{alert.title}</Text>
-          {alert.text ? <Text style={st.alertText} numberOfLines={2}>{alert.text}</Text> : null}
+          <View style={st.liveTag}>
+            <Animated.View style={[st.liveTagDot, { opacity: dot.interpolate({ inputRange: [0, 1], outputRange: [1, 0.35] }) }]} />
+            <Text style={st.liveTagText}>Live</Text>
+          </View>
+          <Text style={st.liveTitle} numberOfLines={2}>{alert.title}</Text>
+          {alert.text ? <Text style={st.liveText} numberOfLines={2}>{alert.text}</Text> : null}
+          {alert.target ? <Text style={st.liveCta}>{ev ? 'See the event' : 'Open'}</Text> : null}
         </View>
-        {alert.target ? <Icon name="right" size={16} color={C.ink} stroke={2.4} /> : null}
+        {ev ? (
+          <View style={st.liveThumb}><Cover e={ev} style={StyleSheet.absoluteFill} iconSize={28} /></View>
+        ) : null}
       </Pressable>
-      <Pressable onPress={dismissAlert} hitSlop={10} style={st.alertClose} accessibilityRole="button" accessibilityLabel="Dismiss banner">
-        <Icon name="x" size={15} color={C.sub} stroke={2.4} />
+      <Pressable onPress={dismissAlert} hitSlop={10} style={st.liveClose} accessibilityRole="button" accessibilityLabel="Dismiss banner">
+        <Icon name="x" size={13} color={C.sub} stroke={2.6} />
       </Pressable>
-    </Glass>
+    </View>
   );
 }
 
@@ -269,6 +289,16 @@ function Footer() {
 }
 
 const st = StyleSheet.create({
+  live: { marginBottom: 16, borderRadius: 22, backgroundColor: C.card, borderWidth: 1, borderColor: C.line, overflow: 'hidden', borderLeftWidth: 4, borderLeftColor: '#E8364F' },
+  liveMain: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, paddingRight: 40 },
+  liveTag: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', paddingHorizontal: 8, height: 20, borderRadius: 10, backgroundColor: '#FDE7EA' },
+  liveTagDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#E8364F' },
+  liveTagText: { fontSize: 11, fontWeight: '900', letterSpacing: 0.8, textTransform: 'uppercase', color: '#C21F3A' },
+  liveTitle: { fontSize: 16, lineHeight: 21, fontWeight: '800', color: C.ink, marginTop: 6 },
+  liveText: { fontSize: 14, lineHeight: 19, color: C.sub, marginTop: 2 },
+  liveCta: { fontSize: 13, fontWeight: '800', color: C.blue, marginTop: 6 },
+  liveThumb: { width: 64, height: 64, borderRadius: 14, overflow: 'hidden', backgroundColor: C.line },
+  liveClose: { position: 'absolute', top: 10, right: 10, width: 26, height: 26, borderRadius: 13, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' },
   root: { flex: 1, backgroundColor: C.bg },
   col: { width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 20 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 22, paddingHorizontal: 14, paddingVertical: 9, marginBottom: 18, zIndex: 5 },

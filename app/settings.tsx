@@ -13,7 +13,7 @@ import { Card, IconTile, Toggle } from '../src/ui';
 // Profile picture -> Settings: your profile, appearance, how the app feels, notifications, about.
 export default function SettingsRoute() {
   const insets = useSafeAreaInsets();
-  const { name, grade, age, account, push, turnOnPush, setAdminOpen, leader, signOut, appleReady, signInWithApple, setPhotoAlerts } = useStore();
+  const { name, grade, age, account, push, turnOnPush, setAdminOpen, leader, signOut, appleReady, signInWithApple, setPhotoAlerts, inboxUnread } = useStore();
   const [appleErr, setAppleErr] = React.useState<string | null>(null);
   const [prefs, setPrefs] = useState({ ...PREFS });
   const [restartNote, setRestartNote] = useState(false);
@@ -81,7 +81,8 @@ export default function SettingsRoute() {
 
         <Text style={st.section}>Notifications</Text>
         <Card style={{ padding: 0 }}>
-          <Row icon="bell" color="blue" title="Notifications" sub={push === 'on' ? 'On' : push === 'off' ? 'Off. Tap to turn on.' : push === 'blocked' ? "Off in your phone's Settings" : 'Work in the app on your phone'} onPress={push === 'off' ? turnOnPush : undefined}>
+          <Row icon="megaphone" color="pink" title="Inbox" sub={inboxUnread ? `${inboxUnread} new` : 'Every notification, banner and pop-up'} onPress={() => router.push('/inbox')} chevron />
+          <Row rule icon="bell" color="blue" title="Notifications" sub={push === 'on' ? 'On' : push === 'off' ? 'Off. Tap to turn on.' : push === 'blocked' ? "Off in your phone's Settings" : 'Work in the app on your phone'} onPress={push === 'off' ? turnOnPush : undefined}>
             {push === 'on' ? <Icon name="check" size={20} color={C.green} /> : null}
           </Row>
           <Row icon="camera" color="orange" title="Tefillin photo alerts" sub="When someone posts their photo" rule>

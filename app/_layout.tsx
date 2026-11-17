@@ -51,6 +51,7 @@ function Root() {
         <Stack.Screen name="challenges" options={page} />
         <Stack.Screen name="account" options={page} />
         <Stack.Screen name="settings" options={page} />
+        <Stack.Screen name="inbox" options={page} />
       </Stack>
       <AdminPanel />
       <Composer />

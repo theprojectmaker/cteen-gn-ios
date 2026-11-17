@@ -14,11 +14,6 @@ export default function TabsLayout() {
   if (Platform.OS === 'web') return <WebTabs />;
   return (
     <NativeTabs tintColor={C.blue} minimizeBehavior="onScrollDown" labelStyle={{ fontWeight: '600' }}>
-      {liveAlert && LIQUID ? (
-        <NativeTabs.BottomAccessory>
-          <LiveAccessory alert={liveAlert} />
-        </NativeTabs.BottomAccessory>
-      ) : null}
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Icon sf={{ default: 'house', selected: 'house.fill' }} />
         <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>

@@ -26,6 +26,7 @@ export type Popup = { on: boolean; id: string; title: string; body: string; butt
 export type MinyanRow = { label: string; time: string };
 export type Minyan = { weekday: MinyanRow[]; shabbat: MinyanRow[]; note: string };
 export type PostComment = { name: string; text: string; at: string };
+export type Broadcast = { id: string; kind: 'notification' | 'banner' | 'popup' | 'post' | 'event'; title: string; text: string; target: Target; at: string };
 export type Content = { alert: Alert; events: EventItem[]; challenges: Challenge[]; posts: Post[]; info: Info[]; popup?: Popup; minyan?: Minyan };
 // Events and challenges Solomon sets in shared/managed.json (shipped by OTA) win over the server copy.
 export function withManaged(c: Content): Content {
@@ -82,7 +83,7 @@ export const IMAGES: Record<string, ImageSourcePropType> = {
 // ───────── device-local state ─────────
 type Local = {
   device: string; name: string; grade: string; age: number | null; gender: Gender; school: string;
-  account: Account | null; onboarded: boolean;
+  account: Account | null; onboarded: boolean; inboxSeen?: string;
   seenPosts: string[]; seenInit: boolean; seenEvents: string[]; tipSeen: boolean;
   saved: string[]; liked: string[]; going: string[]; joined: string[]; dismissed: string[];
   checks: Record<string, string[]>; // challenge id -> period keys checked in
@@ -134,6 +135,9 @@ type Ctx = Local & {
   saveContent: (next: Content) => Promise<string | null>;
   uploadPhoto: (base64: string) => Promise<string | { error: string }>;
   setPhotoAlerts: (on: boolean) => Promise<void>;
+  loadBroadcasts: () => Promise<Broadcast[] | null>;
+  markInboxSeen: () => void;
+  inboxUnread: number;
   aiDraft: (text: string) => Promise<AiDraft | { error: string }>;
   minyanFromText: (text: string) => Promise<Minyan | { error: string }>;
   sendAlert: (a: { title: string; text: string; target: Target; hours: number; push: boolean } | null) => Promise<string>;
@@ -192,6 +196,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [push, setPush] = useState<PushState>('unsupported');
   const [goingCount, setGoingCount] = useState<Record<string, number>>({});
   const [postMeta, setPostMeta] = useState<Record<string, { likes: number; comments: number }>>({});
+  const [broadcasts, setBroadcasts] = useState<Broadcast[]>([]);
   const lastRefresh = useRef(0);
   const ref = useRef(local);
   ref.current = local;
@@ -216,6 +221,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setOnline(true);
       api<{ counts: Record<string, number> }>('/events/counts').then((r) => setGoingCount(r.counts || {})).catch(() => {});
       api<{ meta: Record<string, { likes: number; comments: number }> }>('/posts/meta').then((r) => setPostMeta(r.meta || {})).catch(() => {});
+      api<{ items: Broadcast[] }>('/broadcasts').then((r) => setBroadcasts(r.items || [])).catch(() => {});
     } catch {
       setOnline(false);
     }
@@ -539,6 +545,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     },
     leaderLogout: () => { setLeader(null); setAdminOpen(false); },
     composerOpen, setComposerOpen,
+    loadBroadcasts: async () => {
+      try { const r = await api<{ items: Broadcast[] }>('/broadcasts'); setBroadcasts(r.items || []); return r.items || []; } catch { return null; }
+    },
+    markInboxSeen: () => patch((s) => ({ ...s, inboxSeen: new Date().toISOString() })),
+    inboxUnread: broadcasts.filter((b) => !local.inboxSeen || b.at > local.inboxSeen).length,
     setPhotoAlerts: async (on) => {
       try { await api('/push/prefs', { method: 'POST', body: { device: ref.current.device, photos: on } }); } catch {}
     },
@@ -583,7 +594,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     removeQuestion: (id) => api('/admin/inbox/remove', { method: 'POST', body: { id }, leader }).then(() => {}).catch(() => {}),
     loadPhotos: (cid) => api<{ photos: PhotoRow[] }>(`/admin/photos?challenge=${cid}`, { leader }).then((r) => r.photos).catch(() => null),
     loadPhoto: (key) => api<{ photo: string }>(`/admin/photo?key=${encodeURIComponent(key)}`, { leader }).then((r) => r.photo).catch(() => null),
-  }), [local, content, online, leader, isOwner, adminOpen, composerOpen, push, liveAlert, googleReady, appleReady, unreadFeed, newEvents, goingCount, postMeta, flip, patch, refresh, keep, openTarget, registerToken]);
+  }), [local, content, online, leader, isOwner, adminOpen, composerOpen, push, liveAlert, googleReady, appleReady, unreadFeed, newEvents, goingCount, postMeta, broadcasts, flip, patch, refresh, keep, openTarget, registerToken]);
 
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>;
 }

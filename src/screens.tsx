@@ -374,59 +374,92 @@ export { Feed, PostCard } from './feed';
 // ───────────────────────── Chapter ─────────────────────────
 export function Chapter() {
   const { content, leader, setAdminOpen, online } = useStore();
+  const [askOpen, setAskOpen] = useState(0);
+  const actions = [
+    { icon: 'phone', label: 'Call', onPress: () => open('tel:' + CHAPTER.phone.replace(/\D/g, '')) },
+    { icon: 'pin', label: 'Directions', onPress: () => open('https://maps.apple.com/?q=' + encodeURIComponent(CHAPTER.org + ', ' + CHAPTER.address)) },
+    { icon: 'camera', label: 'Instagram', onPress: () => open(CHAPTER.instagram) },
+    { icon: 'question', label: 'Ask', onPress: () => setAskOpen((n) => n + 1) },
+  ];
   return (
     <>
-      <Text style={T.eyebrow}>Your chapter</Text>
-      <Text style={[T.h1, { marginTop: 6 }]}>{CHAPTER.name}</Text>
-
-      <Card style={st.about}>
-        <Image source={require('../assets/logo.png')} style={st.aboutLogo} resizeMode="contain" />
-        <View style={{ flex: 1 }}>
-          <Text style={T.h3}>The home for Jewish teens in Great Neck</Text>
-          <Text style={[T.small, { marginTop: 4 }]}>Led by {CHAPTER.leaders}. Make friends, do good, and be proud of who you are.</Text>
+      {/* a real chapter photo, the name, the people */}
+      <View style={st.chHero}>
+        <Image source={require('../assets/welcome/UDxu12904575.jpg')} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityLabel="CTeen Great Neck teens" />
+        <View style={st.chShade} />
+        <View style={st.chHeroText}>
+          <View style={st.chLogoWrap}><Image source={require('../assets/logo.png')} style={st.chLogo} resizeMode="contain" /></View>
+          <View style={{ flex: 1 }}>
+            <Text style={st.chName}>{CHAPTER.name}</Text>
+            <Text style={st.chWith}>with {CHAPTER.leaders}</Text>
+          </View>
         </View>
-      </Card>
-      <SectionHead title="Minyan times" />
+      </View>
+      <Text style={st.chAbout}>The home for Jewish teens in Great Neck. Make friends, do good, and be proud of who you are.</Text>
+
+      <View style={st.chActions}>
+        {actions.map((a) => (
+          <Pressable key={a.label} onPress={a.onPress} style={({ pressed }) => [st.chAction, pressed && { opacity: 0.7 }]} accessibilityRole="button" accessibilityLabel={a.label}>
+            <View style={st.chActionIcon}><Icon name={a.icon} size={20} color={C.blue} stroke={2.1} /></View>
+            <Text style={st.chActionText}>{a.label}</Text>
+          </Pressable>
+        ))}
+      </View>
+
+      <Text style={st.homeSection}>Minyan</Text>
       <MinyanCard />
 
-      <AskRabbi />
+      <AskRabbi openSignal={askOpen} />
 
-      <SectionHead title="Good to know" />
-      <Card style={{ padding: 0 }}>
-        {content.info.map((i, n) => (
-          <View key={i.id} style={[st.infoRow, n > 0 && st.rule]}>
-            <IconTile icon={i.icon || 'star'} size={40} />
-            <View style={{ flex: 1 }}>
-              <Text style={T.h3}>{i.title}</Text>
-              <Text style={[T.small, { marginTop: 3, fontSize: 14, lineHeight: 20 }]}>{i.body}</Text>
-            </View>
+      {content.info.length ? (
+        <>
+          <Text style={st.homeSection}>Good to know</Text>
+          <View style={st.chInfo}>
+            {content.info.map((i, n) => (
+              <View key={i.id} style={[st.chInfoRow, n > 0 && st.rule]}>
+                <Icon name={i.icon || 'star'} size={19} color={C.blueDeep} stroke={2} />
+                <View style={{ flex: 1 }}>
+                  <Text style={st.chInfoTitle}>{i.title}</Text>
+                  <Text style={st.chInfoBody}>{i.body}</Text>
+                </View>
+              </View>
+            ))}
           </View>
-        ))}
-      </Card>
+        </>
+      ) : null}
 
-      <SectionHead title="Get in touch" />
-      <Card style={{ padding: 0 }}>
-        <LinkRow icon="phone" title="Call" sub={CHAPTER.phone} url={'tel:' + CHAPTER.phone.replace(/\D/g, '')} first />
-        <LinkRow icon="pin" title="Find us" sub={CHAPTER.address} url={'https://maps.apple.com/?q=' + encodeURIComponent(CHAPTER.address)} />
-        <LinkRow icon="camera" title="Instagram" sub={CHAPTER.instagramHandle} url={CHAPTER.instagram} />
-        <LinkRow icon="users" title="Facebook" sub="Chabad GN Teens" url={CHAPTER.facebook} />
-        <LinkRow icon="globe" title="CTeen portal" sub="International events, orders and service hours" url={CHAPTER.portal} />
-        <LinkRow icon="external" title="Chapter sign-up" sub="On chabadgn.com" url={CHAPTER.join} />
-        <LinkRow icon="gift" title="Donate" sub={`Support ${CHAPTER.name}`} url={CHAPTER.donate} />
-      </Card>
+      <Text style={st.homeSection}>More</Text>
+      <View style={st.chInfo}>
+        <MoreRow icon="users" title="Facebook" url={CHAPTER.facebook} first />
+        <MoreRow icon="globe" title="CTeen portal" url={CHAPTER.portal} />
+        <MoreRow icon="external" title="Chapter sign-up" url={CHAPTER.join} />
+        <MoreRow icon="gift" title="Donate" url={CHAPTER.donate} />
+      </View>
+      <Text style={st.chAddress}>{CHAPTER.org} · {CHAPTER.address} · {CHAPTER.phone}</Text>
 
       <Pressable onPress={() => setAdminOpen(true)} style={st.leaderLink} hitSlop={8} accessibilityRole="button">
-        <Icon name={leader ? 'edit' : 'lock'} size={15} color={C.ink} stroke={2.2} />
-        <Text style={st.leaderText}>{leader ? 'Open leader panel' : 'Leader sign-in'}</Text>
+        <Icon name={leader ? 'edit' : 'lock'} size={14} color={C.sub} stroke={2.2} />
+        <Text style={[st.leaderText, { color: C.sub }]}>{leader ? 'Open leader panel' : 'Leader sign-in'}</Text>
       </Pressable>
-      <Text style={st.endNote}>{CHAPTER.org} · Part of the CTeen network{online === false ? '\nOffline: showing the last saved info' : ''}</Text>
+      {online === false ? <Text style={st.endNote}>Offline: showing the last saved info</Text> : null}
     </>
   );
 }
 
-function AskRabbi() {
+function MoreRow({ icon, title, url, first }: { icon: string; title: string; url: string; first?: boolean }) {
+  return (
+    <Pressable onPress={() => open(url)} style={({ pressed }) => [st.chInfoRow, { alignItems: 'center' }, !first && st.rule, pressed && { backgroundColor: C.bg }]} accessibilityRole="link">
+      <Icon name={icon} size={19} color={C.sub} stroke={2} />
+      <Text style={[st.chInfoTitle, { flex: 1 }]}>{title}</Text>
+      <Icon name="right" size={16} color={C.faint} stroke={2.4} />
+    </Pressable>
+  );
+}
+
+function AskRabbi({ openSignal = 0 }: { openSignal?: number }) {
   const { name, ask } = useStore();
   const [openForm, setOpenForm] = useState(false);
+  useEffect(() => { if (openSignal) setOpenForm(true); }, [openSignal]);
   const [needName, setNeedName] = useState(false);
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -479,6 +512,23 @@ function LinkRow({ icon, title, sub, url, first }: { icon: string; title: string
 }
 
 const st = StyleSheet.create({
+  chHero: { height: 220, borderRadius: 28, overflow: 'hidden', backgroundColor: C.blueDeep, justifyContent: 'flex-end' },
+  chShade: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(8,20,32,0.38)' },
+  chHeroText: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 },
+  chLogoWrap: { width: 46, height: 46, borderRadius: 14, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  chLogo: { width: 20, height: 36 },
+  chName: { fontSize: 22, fontFamily: F.display, color: '#FFFFFF', letterSpacing: -0.3 },
+  chWith: { fontSize: 13, color: 'rgba(255,255,255,0.9)', fontWeight: '600', marginTop: 1 },
+  chAbout: { fontSize: 15, lineHeight: 21, color: C.sub, marginTop: 14 },
+  chActions: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 18 },
+  chAction: { alignItems: 'center', gap: 6, flex: 1 },
+  chActionIcon: { width: 52, height: 52, borderRadius: 26, backgroundColor: C.bluePale, alignItems: 'center', justifyContent: 'center' },
+  chActionText: { fontSize: 12, fontWeight: '700', color: C.ink },
+  chInfo: { borderRadius: 22, backgroundColor: C.card, borderWidth: 1, borderColor: C.line, overflow: 'hidden' },
+  chInfoRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
+  chInfoTitle: { fontSize: 15, fontWeight: '800', color: C.ink },
+  chInfoBody: { fontSize: 14, lineHeight: 20, color: C.sub, marginTop: 2 },
+  chAddress: { fontSize: 12, color: C.faint, textAlign: 'center', marginTop: 18, lineHeight: 17 },
   helloRow: { flexDirection: 'row', alignItems: 'baseline', gap: 10, marginBottom: 12 },
   helloSmall: { flex: 1, fontSize: 19, fontFamily: F.display, color: C.ink, letterSpacing: -0.3 },
   todaySmall: { fontSize: 13, fontWeight: '700', color: C.faint },

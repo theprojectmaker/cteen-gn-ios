@@ -389,9 +389,9 @@ export function AdminPanel() {
                 <View>
                   <Pressable onPress={() => setTask(null)} style={st.backRow} hitSlop={8} accessibilityRole="button">
                     <View style={{ transform: [{ scaleX: -1 }] }}><Icon name="right" size={18} color={C.blueDeep} stroke={2.4} /></View>
-                    <Text style={st.backText}>All tasks</Text>
+                    <Text style={st.backText}>Back</Text>
                   </Pressable>
-                  {task === 'post' || task === 'event' || task === 'alert' ? <SimpleForm kind={task} onDone={(msg) => { setNote(msg); setTask(null); }} />
+                  {task === 'post' || task === 'event' || task === 'alert' || task === 'notify' ? <SimpleForm kind={task} onDone={(msg) => { setNote(msg); setTask(null); }} />
                     : task === 'food' ? <FoodForm onDone={(msg) => { setNote(msg); setTask(null); }} />
                     : task === 'whatsapp' ? <WhatsAppImport onDone={(msg) => { setNote(msg); setTask(null); }} />
                     : task === 'popup' ? <PopupEditor onDone={(msg) => { setNote(msg); setTask(null); }} />
@@ -413,7 +413,7 @@ export function AdminPanel() {
 }
 
 // ───────── Simple mode ─────────
-type Task = 'post' | 'whatsapp' | 'food' | 'event' | 'alert' | 'popup' | 'minyan' | 'signups' | 'photos' | 'people' | 'inbox';
+type Task = 'post' | 'notify' | 'whatsapp' | 'food' | 'event' | 'alert' | 'popup' | 'minyan' | 'signups' | 'photos' | 'people' | 'inbox';
 const TASK_SECTION: Partial<Record<Task, Section>> = { signups: 'Sign-ups', photos: 'Photos', people: 'People', inbox: 'Inbox' };
 const TASKS: { k: Task; icon: string; color: 'blue' | 'orange' | 'purple' | 'green' | 'pink' | 'yellow'; title: string; sub: string }[] = [
   { k: 'post', icon: 'chat', color: 'blue', title: 'Post an update', sub: 'Write something, add photos' },
@@ -430,22 +430,77 @@ const TASKS: { k: Task; icon: string; color: 'blue' | 'orange' | 'purple' | 'gre
 ];
 
 function SimpleHome({ onPick }: { onPick: (k: Task) => void }) {
+  const { content, sendAlert, saveContent, setComposerOpen, setAdminOpen, leader } = useStore();
+  const [busy, setBusy] = useState<string | null>(null);
+  const alertOn = content.alert?.on ? content.alert : null;
+  const popupOn = content.popup?.on && content.popup.title ? content.popup : null;
+  const share: { k: Task | 'compose'; icon: string; color: 'blue' | 'orange' | 'purple' | 'green' | 'pink' | 'yellow'; title: string }[] = [
+    { k: 'compose', icon: 'camera', color: 'blue', title: 'New post' },
+    { k: 'notify', icon: 'bell', color: 'purple', title: 'Notification' },
+    { k: 'alert', icon: 'megaphone', color: 'pink', title: 'Live banner' },
+    { k: 'event', icon: 'calendar', color: 'orange', title: 'Event' },
+    { k: 'food', icon: 'food', color: 'yellow', title: 'Food' },
+    { k: 'popup', icon: 'star', color: 'purple', title: 'Pop-up' },
+    { k: 'whatsapp', icon: 'send', color: 'green', title: 'From WhatsApp' },
+  ];
+  const manage: { k: Task; icon: string; title: string }[] = [
+    { k: 'signups', icon: 'users', title: "Who's coming" },
+    { k: 'photos', icon: 'camera', title: 'Tefillin photos' },
+    { k: 'people', icon: 'user', title: 'People & leaders' },
+    { k: 'inbox', icon: 'question', title: 'Questions from teens' },
+    { k: 'minyan', icon: 'clock', title: 'Minyan times' },
+  ];
+  const pick = (k: Task | 'compose') => {
+    if (k === 'compose') { setAdminOpen(false); setTimeout(() => setComposerOpen(true), 450); return; }
+    onPick(k);
+  };
   return (
     <View>
-      <Text style={st.simpleHello}>What would you like to do?</Text>
-      <View style={{ gap: 12, marginTop: 16 }}>
-        {TASKS.map((x) => (
-          <Card key={x.k} style={st.task} onPress={() => onPick(x.k)} label={x.title}>
-            <IconTile icon={x.icon} color={x.color} size={52} solid />
-            <View style={{ flex: 1 }}>
-              <Text style={st.taskTitle}>{x.title}</Text>
-              <Text style={st.taskSub}>{x.sub}</Text>
+      <Text style={st.hiLine}>Hi{leader && !leader.startsWith('acct:') ? ' Rabbi Zevy' : ''}. What do you want to share?</Text>
+
+      {alertOn || popupOn ? (
+        <View style={st.liveBox}>
+          <Text style={st.liveBoxHead}>Live now</Text>
+          {alertOn ? (
+            <View style={st.liveRow}>
+              <View style={[st.liveDot, { backgroundColor: '#E8364F' }]} />
+              <Text style={st.liveRowText} numberOfLines={1}>Banner: {alertOn.title}</Text>
+              <Pressable disabled={busy === 'alert'} onPress={async () => { setBusy('alert'); await sendAlert(null); setBusy(null); }} hitSlop={8} accessibilityRole="button"><Text style={st.turnOff}>{busy === 'alert' ? '…' : 'Turn off'}</Text></Pressable>
             </View>
-            <Icon name="right" size={20} color={C.faint} stroke={2.4} />
-          </Card>
+          ) : null}
+          {popupOn ? (
+            <View style={st.liveRow}>
+              <View style={[st.liveDot, { backgroundColor: '#7C5CFC' }]} />
+              <Text style={st.liveRowText} numberOfLines={1}>Pop-up: {popupOn.title}</Text>
+              <Pressable disabled={busy === 'popup'} onPress={async () => { setBusy('popup'); await saveContent({ ...content, popup: { ...popupOn, on: false } }); setBusy(null); }} hitSlop={8} accessibilityRole="button"><Text style={st.turnOff}>{busy === 'popup' ? '…' : 'Turn off'}</Text></Pressable>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
+      <Text style={st.groupHead}>Share</Text>
+      <View style={st.grid}>
+        {share.map((x) => (
+          <Pressable key={x.k} onPress={() => pick(x.k)} style={({ pressed }) => [st.tile, pressed && { transform: [{ scale: 0.97 }], opacity: 0.9 }]} accessibilityRole="button" accessibilityLabel={x.title}>
+            <View style={st.tileCard}>
+              <IconTile icon={x.icon} color={x.color} size={40} />
+              <Text style={st.tileTitle}>{x.title}</Text>
+            </View>
+          </Pressable>
         ))}
       </View>
-      <Text style={[T.small, { marginTop: 22, textAlign: 'center' }]}>Need more options, like colors, age limits or challenges? Switch to Expert.</Text>
+
+      <Text style={st.groupHead}>Manage</Text>
+      <View style={st.manage}>
+        {manage.map((x, i) => (
+          <Pressable key={x.k} onPress={() => onPick(x.k)} style={({ pressed }) => [st.manageRow, i > 0 && st.manageRule, pressed && { backgroundColor: C.bg }]} accessibilityRole="button">
+            <Icon name={x.icon} size={19} color={C.sub} stroke={2} />
+            <Text style={st.manageText}>{x.title}</Text>
+            <Icon name="right" size={16} color={C.faint} stroke={2.4} />
+          </Pressable>
+        ))}
+      </View>
+      <Text style={[T.small, { marginTop: 18, textAlign: 'center' }]}>Need colors, age limits or challenges? Switch to Expert at the top.</Text>
     </View>
   );
 }
@@ -461,7 +516,7 @@ function nextDays() {
 }
 
 // Three plain forms: only the fields the rabbi needs, big text, one button.
-function SimpleForm({ kind, onDone }: { kind: 'post' | 'event' | 'alert'; onDone: (msg: string) => void }) {
+function SimpleForm({ kind, onDone }: { kind: 'post' | 'event' | 'alert' | 'notify'; onDone: (msg: string) => void }) {
   const { content, saveContent, sendPush, sendAlert } = useStore();
   const [title, setTitle] = useState('');
   const [text, setText] = useState('');
@@ -472,6 +527,9 @@ function SimpleForm({ kind, onDone }: { kind: 'post' | 'event' | 'alert'; onDone
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [photos, setPhotos] = useState<Snap[]>([]);
+  const [linkTo, setLinkTo] = useState('');
+  const linkOpts = [{ v: '', l: 'Nothing' }, ...content.events.filter((e) => e.end >= iso(new Date())).map((e) => ({ v: e.id, l: e.title }))];
+  const linkTarget = linkTo ? { type: 'event' as const, id: linkTo } : null;
   const { uploadPhoto } = useStore();
   const days = nextDays();
   const go = async () => {
@@ -490,17 +548,20 @@ function SimpleForm({ kind, onDone }: { kind: 'post' | 'event' | 'alert'; onDone
       const e = await saveContent({ ...content, events: [...content.events, ev] });
       if (e) { setBusy(false); return setErr(e); }
       msg = 'Event added. Every phone got a notification, and teens can sign up in the app.';
+    } else if (kind === 'notify') {
+      msg = await sendPush(title.trim(), text.trim(), linkTarget);
     } else {
-      msg = await sendAlert({ title: title.trim(), text: text.trim(), target: null, hours: 24, push: notify });
+      msg = await sendAlert({ title: title.trim(), text: text.trim(), target: linkTarget, hours: 24, push: notify });
     }
     setBusy(false);
     onDone(msg.trim());
   };
-  const heading = kind === 'post' ? 'Post an update' : kind === 'event' ? 'Add an event' : 'Send a quick alert';
+  const heading = kind === 'post' ? 'Post an update' : kind === 'event' ? 'Add an event' : kind === 'notify' ? 'Send a notification' : 'Live banner';
   return (
     <Card style={{ padding: 20 }}>
       <Text style={st.simpleHello}>{heading}</Text>
-      <Field label={kind === 'event' ? 'Event name' : 'Headline'} value={title} onChange={setTitle} placeholder={kind === 'event' ? 'Pizza and Torah night' : kind === 'alert' ? 'Tonight is moved to 8 PM' : 'Great turnout at the Shabbaton'} />
+      {kind === 'notify' ? <Text style={[T.small, { marginTop: 4 }]}>Goes straight to every phone. No banner, no post.</Text> : kind === 'alert' ? <Text style={[T.small, { marginTop: 4 }]}>A banner at the top of the app for 24 hours. Link it to an event to promote it.</Text> : null}
+      <Field label={kind === 'event' ? 'Event name' : kind === 'notify' ? 'Title' : 'Headline'} value={title} onChange={setTitle} placeholder={kind === 'event' ? 'Pizza and Torah night' : kind === 'alert' ? 'Tonight is moved to 8 PM' : kind === 'notify' ? 'See you at 7 tonight' : 'Great turnout at the Shabbaton'} />
       {kind === 'event' ? (
         <>
           <View style={{ marginTop: 16 }}>
@@ -517,9 +578,15 @@ function SimpleForm({ kind, onDone }: { kind: 'post' | 'event' | 'alert'; onDone
           <Field label="Where" value={place} onChange={setPlace} />
         </>
       ) : null}
-      <Field label={kind === 'event' ? 'Details (optional)' : kind === 'alert' ? 'More detail (optional)' : 'Message'} value={text} onChange={setText} multiline />
+      <Field label={kind === 'event' ? 'Details (optional)' : kind === 'alert' || kind === 'notify' ? 'More detail (optional)' : 'Message'} value={text} onChange={setText} multiline />
+      {kind === 'alert' || kind === 'notify' ? (
+        <View style={{ marginTop: 14 }}>
+          <Text style={u.fieldLabel}>Links to</Text>
+          <Chips wrap options={linkOpts.map((o) => o.l)} value={linkOpts.find((o) => o.v === linkTo)?.l ?? 'Nothing'} onChange={(l) => setLinkTo(linkOpts.find((o) => o.l === l)?.v ?? '')} />
+        </View>
+      ) : null}
       {kind === 'post' ? <PhotoPicker photos={photos} onChange={setPhotos} /> : null}
-      {kind === 'alert' ? (
+      {kind === 'notify' ? null : kind === 'alert' ? (
         <View style={st.toggle}>
           <Text style={[T.h3, { flex: 1, fontSize: 16 }]}>Send a notification to every phone</Text>
           <Toggle value={notify} onChange={setNotify} label="Send a notification" />
@@ -532,7 +599,7 @@ function SimpleForm({ kind, onDone }: { kind: 'post' | 'event' | 'alert'; onDone
       )}
       {err ? <Text style={{ color: '#C0303F', fontWeight: '700', marginTop: 12 }}>{err}</Text> : null}
       <View style={{ marginTop: 20 }}>
-        <Button label={busy ? 'Sending…' : kind === 'post' ? 'Post it' : kind === 'event' ? 'Add the event' : 'Send the alert'} disabled={busy} onPress={go} />
+        <Button label={busy ? 'Sending…' : kind === 'post' ? 'Post it' : kind === 'event' ? 'Add the event' : kind === 'notify' ? 'Send to everyone' : 'Put the banner up'} disabled={busy} onPress={go} />
       </View>
     </Card>
   );
@@ -630,6 +697,22 @@ function PhotoReview() {
 }
 
 const st = StyleSheet.create({
+  hiLine: { fontSize: 20, fontFamily: F.display, color: C.ink, letterSpacing: -0.3 },
+  liveBox: { marginTop: 16, padding: 14, borderRadius: 18, backgroundColor: C.card, borderWidth: 1, borderColor: C.line, gap: 10 },
+  liveBoxHead: { fontSize: 11, fontWeight: '900', letterSpacing: 0.8, textTransform: 'uppercase', color: C.sub },
+  liveRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  liveDot: { width: 8, height: 8, borderRadius: 4 },
+  liveRowText: { flex: 1, fontSize: 14, fontWeight: '700', color: C.ink },
+  turnOff: { fontSize: 14, fontWeight: '800', color: '#C0303F' },
+  groupHead: { fontSize: 13, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase', color: C.sub, marginTop: 24, marginBottom: 10 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -5 },
+  tile: { width: '50%', padding: 5 },
+  tileCard: { padding: 14, borderRadius: 18, backgroundColor: C.card, borderWidth: 1, borderColor: C.line, minHeight: 104, justifyContent: 'space-between' },
+  tileTitle: { fontSize: 15, fontWeight: '800', color: C.ink, marginTop: 10 },
+  manage: { borderRadius: 18, backgroundColor: C.card, borderWidth: 1, borderColor: C.line, overflow: 'hidden' },
+  manageRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 15 },
+  manageRule: { borderTopWidth: 1, borderTopColor: C.line },
+  manageText: { flex: 1, fontSize: 16, fontWeight: '700', color: C.ink },
   autoNote: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 16, backgroundColor: C.bluePale, borderRadius: 12, padding: 12 },
   person: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
   personAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: C.bluePale, alignItems: 'center', justifyContent: 'center' },
