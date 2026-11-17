@@ -10,6 +10,7 @@ import { wrapWindow } from './zmanim';
 import { WrapBanner, useWrapStatus } from './wrap';
 import { Glass, LIQUID } from './glass';
 import { Cover } from './ui';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { CHAPTER, challengeFits, doneThisPeriod, open, useShabbat, useStore, type Alert } from './store';
 
 const NATIVE_DRIVER = Platform.OS !== 'web';
@@ -54,6 +55,7 @@ export function Screen({ children }: { children: React.ReactNode }) {
   const { refresh, liveAlert } = useStore();
   const wrap = useWrapStatus();
   const [refreshing, setRefreshing] = useState(false);
+  const [barH, setBarH] = useState(64);
   const enter = useRef(new Animated.Value(PREFS.reduceMotion ? 1 : 0)).current;
   // Ease in once when the page first opens; coming back to a tab is instant (no flicker).
   useEffect(() => {
@@ -71,11 +73,11 @@ export function Screen({ children }: { children: React.ReactNode }) {
       <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive"
         style={{ flex: 1 }}
         contentInsetAdjustmentBehavior="never"
-        contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: insets.bottom + (Platform.OS === 'web' ? 110 : 32) }}
+        contentContainerStyle={{ paddingTop: insets.top + 8 + barH + 16, paddingBottom: insets.bottom + (Platform.OS === 'web' ? 110 : 32) }}
+        scrollIndicatorInsets={{ top: insets.top + barH }}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.blue} colors={[C.blue]} progressViewOffset={insets.top} />}>
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.blue} colors={[C.blue]} progressViewOffset={insets.top + barH + 8} />}>
         <View style={st.col}>
-          <Header />
           {/* at most one banner at a time, the most urgent one */}
           {wrap?.lastHour ? <WrapBanner /> : liveAlert ? <TopAlert alert={liveAlert} /> : <ShabbatBanner />}
           <Animated.View style={{ opacity: enter, transform: [{ translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }] }}>
@@ -83,6 +85,18 @@ export function Screen({ children }: { children: React.ReactNode }) {
           </Animated.View>
         </View>
       </ScrollView>
+      {/* pinned: a soft fade under the status bar / Dynamic Island, then the Liquid Glass bar */}
+      <View pointerEvents="none" style={[st.topFade, { height: insets.top + 26 }]}>
+        <Svg width="100%" height="100%">
+          <Defs><LinearGradient id="tf" x1="0" y1="0" x2="0" y2="1"><Stop offset="0" stopColor={C.bg} stopOpacity={1} /><Stop offset="0.7" stopColor={C.bg} stopOpacity={0.85} /><Stop offset="1" stopColor={C.bg} stopOpacity={0} /></LinearGradient></Defs>
+          <Rect x="0" y="0" width="100%" height="100%" fill="url(#tf)" />
+        </Svg>
+      </View>
+      <View style={[st.pinned, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
+        <View style={st.col} pointerEvents="box-none" onLayout={(e) => setBarH(e.nativeEvent.layout.height)}>
+          <Header />
+        </View>
+      </View>
     </View>
   );
 }
@@ -300,7 +314,9 @@ const st = StyleSheet.create({
   liveClose: { position: 'absolute', top: 10, right: 10, width: 26, height: 26, borderRadius: 13, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' },
   root: { flex: 1, backgroundColor: C.bg },
   col: { width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 20 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 22, paddingHorizontal: 14, paddingVertical: 9, marginBottom: 18, zIndex: 5 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 22, paddingHorizontal: 14, paddingVertical: 9, zIndex: 5, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 14, shadowOffset: { width: 0, height: 4 } },
+  pinned: { position: 'absolute', left: 0, right: 0, top: 0, zIndex: 20 },
+  topFade: { position: 'absolute', left: 0, right: 0, top: 0, zIndex: 19 },
   logo: { width: 20, height: 35 },
   topEyebrow: { fontSize: 10, fontWeight: '800', letterSpacing: 0.8, color: C.sub },
   topName: { fontSize: 16, fontWeight: '900', color: C.ink, letterSpacing: -0.2 },

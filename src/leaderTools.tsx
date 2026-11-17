@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon } from './icons';
 import { pickPhotos, type Snap } from './photo';
-import { C, T } from './theme';
+import { C, HUES, T } from './theme';
+import { challengeRules } from './challengeRules';
 import { useStore, type AiDraft, type MinyanRow, type Popup } from './store';
 import { Button, Chips, Field, Toggle } from './ui';
 import { MINYAN_FALLBACK } from './minyan';
@@ -268,10 +269,102 @@ export function FoodForm({ onDone }: { onDone: (msg: string) => void }) {
   );
 }
 
+// ── Challenges: title, description, rules, prize, color, cover photo, on/off ──
+const HUE_KEYS = ['blue', 'orange', 'purple', 'green', 'pink', 'yellow'] as const;
+export function ChallengeEditor({ onDone }: { onDone: (msg: string) => void }) {
+  const { content, saveContent, uploadPhoto } = useStore();
+  const list = content.challenges.filter((c) => !(c as { managed?: boolean }).managed);
+  const [id, setId] = useState(list.find((c) => c.id === 'tefillin')?.id ?? list[0]?.id ?? '');
+  const ch = list.find((c) => c.id === id);
+  const [title, setTitle] = useState(ch?.title ?? '');
+  const [about, setAbout] = useState(ch?.about ?? '');
+  const [rules, setRules] = useState((ch ? challengeRules(ch) : []).join('\n'));
+  const [prize, setPrize] = useState(ch?.rewards[ch.rewards.length - 1]?.prize ?? '');
+  const [color, setColor] = useState<(typeof HUE_KEYS)[number]>((ch?.color as (typeof HUE_KEYS)[number]) ?? 'blue');
+  const [active, setActive] = useState(ch?.active ?? true);
+  const [cover, setCover] = useState<Snap[]>([]);
+  const [image, setImage] = useState(ch?.image ?? '');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const pick = (cid: string) => {
+    const c = list.find((x) => x.id === cid);
+    if (!c) return;
+    setId(cid); setTitle(c.title); setAbout(c.about); setRules(challengeRules(c).join('\n'));
+    setPrize(c.rewards[c.rewards.length - 1]?.prize ?? ''); setColor((c.color as (typeof HUE_KEYS)[number]) ?? 'blue');
+    setActive(c.active); setCover([]); setImage(c.image ?? ''); setErr(null);
+  };
+  if (!ch) return <Text style={T.small}>No challenges yet. Add one in Expert mode.</Text>;
+  const save = async () => {
+    if (title.trim().length < 2) return setErr('Give it a name.');
+    setBusy(true); setErr(null);
+    let img = image;
+    if (cover.length) {
+      const r = await uploadPhoto(cover[0].base64);
+      if (typeof r !== 'string') { setBusy(false); return setErr(r.error); }
+      img = r;
+    }
+    const rewards = ch.rewards.length
+      ? ch.rewards.map((r, i) => (i === ch.rewards.length - 1 ? { ...r, prize: prize.trim() || r.prize } : r))
+      : prize.trim() ? [{ at: ch.goal, prize: prize.trim() }] : [];
+    const next = {
+      ...ch, title: title.trim(), about: about.trim(), color, active, image: img,
+      rules: rules.split('\n').map((l) => l.replace(/^\s*\d+[.)]\s*/, '').trim()).filter(Boolean).slice(0, 12),
+      rewards,
+    };
+    const e = await saveContent({ ...content, challenges: content.challenges.map((c) => (c.id === ch.id ? next : c)) });
+    setBusy(false);
+    if (e) return setErr(e);
+    onDone(`${next.title} saved. Teens see the new rules and look right away.`);
+  };
+  return (
+    <View>
+      <Text style={T.h2}>Challenges</Text>
+      <Text style={[T.small, { marginTop: 4 }]}>Change how a challenge looks and what its rules say.</Text>
+      {list.length > 1 ? (
+        <View style={{ marginTop: 14 }}>
+          <Chips wrap options={list.map((c) => c.title)} value={ch.title} onChange={(t) => pick(list.find((c) => c.title === t)?.id ?? id)} />
+        </View>
+      ) : null}
+      <View style={st.toggleRow}>
+        <Text style={[T.h3, { flex: 1 }]}>Live</Text>
+        <Toggle value={active} onChange={setActive} label="Challenge is live" />
+      </View>
+      <Field label="Name" value={title} onChange={setTitle} />
+      <Field label="Short description" value={about} onChange={setAbout} multiline />
+      <Field label="Rules (one per line)" value={rules} onChange={setRules} multiline hint="These show in the Rules pop-up, numbered." />
+      <Field label="Prize for finishing" value={prize} onChange={setPrize} placeholder="Like: Luxury EZRI backpack" />
+      <Text style={[st.label, { marginTop: 14 }]}>Color</Text>
+      <View style={st.colors}>
+        {HUE_KEYS.map((k) => (
+          <Pressable key={k} onPress={() => setColor(k)} style={[st.swatch, { backgroundColor: HUES[k].solid }, color === k && st.swatchOn]} accessibilityRole="button" accessibilityLabel={k} accessibilityState={{ selected: color === k }} />
+        ))}
+      </View>
+      <Text style={[st.label, { marginTop: 14 }]}>Cover photo (optional)</Text>
+      {image && !cover.length ? (
+        <View style={st.coverRow}>
+          <Image source={{ uri: image }} style={st.coverThumb} />
+          <Pressable onPress={() => setImage('')} hitSlop={8} accessibilityRole="button"><Text style={st.removeText}>Remove cover</Text></Pressable>
+        </View>
+      ) : null}
+      <PhotoPicker photos={cover} onChange={(p) => setCover(p.slice(-1))} />
+      <View style={{ marginTop: 20 }}>
+        <Button label={busy ? 'Saving…' : 'Save'} disabled={busy} onPress={save} />
+      </View>
+      {err ? <Text style={st.err}>{err}</Text> : null}
+    </View>
+  );
+}
+
 const st = StyleSheet.create({
   toggleRow: { flexDirection: 'row', alignItems: 'center', marginTop: 18, padding: 14, borderRadius: 16, backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
   label: { fontSize: 13, fontWeight: '800', color: C.sub },
   err: { color: '#C0303F', marginTop: 10, fontSize: 14 },
+  colors: { flexDirection: 'row', gap: 12, marginTop: 8 },
+  swatch: { width: 36, height: 36, borderRadius: 18 },
+  swatchOn: { borderWidth: 3, borderColor: C.ink },
+  coverRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 },
+  coverThumb: { width: 96, height: 60, borderRadius: 12, backgroundColor: C.line },
+  removeText: { fontSize: 14, fontWeight: '700', color: '#C0303F' },
   thumbs: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
   thumb: { width: 76, height: 76, borderRadius: 14, overflow: 'hidden', backgroundColor: C.line },
   thumbX: { position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },

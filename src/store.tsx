@@ -18,7 +18,7 @@ export type EventItem = {
   signup: 'app' | 'link'; url?: string; payUrl?: string;
   gender?: 'all' | 'boys' | 'girls'; minAge?: number | null; maxAge?: number | null;
 };
-export type Challenge = { id: string; title: string; icon: string; color: ColorKey; every: 'day' | 'week'; goal: number; about: string; active: boolean; photo?: boolean; starts?: string; rewards: { at: number; prize: string }[] };
+export type Challenge = { id: string; title: string; icon: string; color: ColorKey; every: 'day' | 'week'; goal: number; about: string; active: boolean; photo?: boolean; starts?: string; rules?: string[]; image?: string; rewards: { at: number; prize: string }[] };
 export type Post = { id: string; kind: 'News' | 'Events' | 'Photos' | 'Rewards' | 'Food'; pinned?: boolean; title: string; body: string; eventId?: string; challengeId?: string; photos?: string[]; linkLabel?: string; linkUrl?: string; at: string };
 export type Info = { id: string; icon: string; title: string; body: string };
 export type Alert = { id: string; on: boolean; title: string; text: string; target: Target; until: string };

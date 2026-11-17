@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { FoodForm, MinyanEditor, PhotoPicker, PopupEditor, WhatsAppImport, publishPhotos } from './leaderTools';
+import { ChallengeEditor, FoodForm, MinyanEditor, PhotoPicker, PopupEditor, WhatsAppImport, publishPhotos } from './leaderTools';
 import type { Snap } from './photo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, T, F } from './theme';
@@ -392,6 +392,7 @@ export function AdminPanel() {
                     <Text style={st.backText}>Back</Text>
                   </Pressable>
                   {task === 'post' || task === 'event' || task === 'alert' || task === 'notify' ? <SimpleForm kind={task} onDone={(msg) => { setNote(msg); setTask(null); }} />
+                    : task === 'challenge' ? <ChallengeEditor onDone={(msg) => { setNote(msg); setTask(null); }} />
                     : task === 'food' ? <FoodForm onDone={(msg) => { setNote(msg); setTask(null); }} />
                     : task === 'whatsapp' ? <WhatsAppImport onDone={(msg) => { setNote(msg); setTask(null); }} />
                     : task === 'popup' ? <PopupEditor onDone={(msg) => { setNote(msg); setTask(null); }} />
@@ -413,7 +414,7 @@ export function AdminPanel() {
 }
 
 // ───────── Simple mode ─────────
-type Task = 'post' | 'notify' | 'whatsapp' | 'food' | 'event' | 'alert' | 'popup' | 'minyan' | 'signups' | 'photos' | 'people' | 'inbox';
+type Task = 'post' | 'notify' | 'challenge' | 'whatsapp' | 'food' | 'event' | 'alert' | 'popup' | 'minyan' | 'signups' | 'photos' | 'people' | 'inbox';
 const TASK_SECTION: Partial<Record<Task, Section>> = { signups: 'Sign-ups', photos: 'Photos', people: 'People', inbox: 'Inbox' };
 const TASKS: { k: Task; icon: string; color: 'blue' | 'orange' | 'purple' | 'green' | 'pink' | 'yellow'; title: string; sub: string }[] = [
   { k: 'post', icon: 'chat', color: 'blue', title: 'Post an update', sub: 'Write something, add photos' },
@@ -448,6 +449,7 @@ function SimpleHome({ onPick }: { onPick: (k: Task) => void }) {
     { k: 'photos', icon: 'camera', title: 'Tefillin photos' },
     { k: 'people', icon: 'user', title: 'People & leaders' },
     { k: 'inbox', icon: 'question', title: 'Questions from teens' },
+    { k: 'challenge', icon: 'tefillin', title: 'Challenges and rules' },
     { k: 'minyan', icon: 'clock', title: 'Minyan times' },
   ];
   const pick = (k: Task | 'compose') => {

@@ -48,6 +48,7 @@ function Root() {
         {/* Apple's card pop-up (like Carbix): slides up, the page behind shrinks back, drag down to close. */}
         <Stack.Screen name="event/[id]" options={{ presentation: 'modal', headerShown: false, contentStyle: { backgroundColor: C.bg } }} />
         <Stack.Screen name="post/[id]" options={{ presentation: 'modal', headerShown: false, contentStyle: { backgroundColor: C.bg } }} />
+        <Stack.Screen name="challenge-rules/[id]" options={{ presentation: 'modal', headerShown: false, contentStyle: { backgroundColor: C.bg } }} />
         <Stack.Screen name="challenges" options={page} />
         <Stack.Screen name="account" options={page} />
         <Stack.Screen name="settings" options={page} />

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AppState, Animated, Easing, Image, KeyboardAvoidingView, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import { challengeRules } from './challengeRules';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Fire, FireBadge } from './fire';
 import Svg, { Circle } from 'react-native-svg';
@@ -213,6 +214,8 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
   }
   return (
     <View style={{ paddingBottom: 24 }}>
+      {/* the leader's cover photo, when there is one */}
+      {ch.image ? <View style={st.cover}><Image source={{ uri: ch.image }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityLabel={ch.title} /></View> : null}
       {/* title */}
       <View style={st.top}>
         {timed ? <Fire size={58} lit={done} /> : <IconTile icon={challengeIcon(ch)} color={ch.color} size={54} solid />}
@@ -221,6 +224,16 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
           {dayLine ? <Text style={st.topSub}>{dayLine}{lastDay ? ` · ends ${niceDay(lastDay)}` : ''}</Text> : null}
         </View>
       </View>
+
+      {/* the rules, in a decorated pop-up */}
+      <Pressable onPress={() => router.push(`/challenge-rules/${ch.id}`)} style={({ pressed }) => [st.rulesBanner, { borderColor: hue.pale }, pressed && { opacity: 0.85 }]} accessibilityRole="button" accessibilityLabel="Read the rules">
+        <View style={[st.rulesIcon, { backgroundColor: hue.pale }]}><Icon name="book" size={19} color={hue.deep} stroke={2.1} /></View>
+        <View style={{ flex: 1 }}>
+          <Text style={st.rulesTitle}>The rules</Text>
+          <Text style={T.small}>{challengeRules(ch).length} quick rules. Tap to read.</Text>
+        </View>
+        <Icon name="right" size={17} color={C.faint} stroke={2.4} />
+      </Pressable>
 
       {/* the prize and your progress */}
       <View style={st.prize}>
@@ -537,6 +550,10 @@ function PhotoViewer({ ch, posts, start, onClose, onChanged }: { ch: Challenge; 
 }
 
 const st = StyleSheet.create({
+  cover: { height: 170, borderRadius: 26, overflow: 'hidden', backgroundColor: C.line, marginBottom: 16 },
+  rulesBanner: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 14, padding: 14, borderRadius: 20, backgroundColor: C.card, borderWidth: 1.5 },
+  rulesIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  rulesTitle: { fontSize: 16, fontWeight: '800', color: C.ink },
   liveRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#E8364F' },
   square: { width: '100%', aspectRatio: 1, borderRadius: 16, overflow: 'hidden', backgroundColor: C.line },

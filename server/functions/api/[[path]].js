@@ -294,6 +294,8 @@ function sanitize(doc, alert) {
       id: c.id, title: clean(c.title, 60), icon: clean(c.icon, 20), color: color(c.color), every: c.every === 'week' ? 'week' : 'day',
       goal: Math.min(366, Math.max(1, Number(c.goal) || 1)), about: clean(c.about, 400), active: c.active !== false, photo: !!c.photo,
       starts: /^\d{4}-\d{2}-\d{2}$/.test(c.starts || '') ? c.starts : '',
+      rules: list(c.rules, 12).map((r) => clean(r, 220)).filter(Boolean),
+      image: typeof c.image === 'string' && /^https:\/\/\S{4,300}$/.test(c.image) ? c.image : '',
       rewards: list(c.rewards, 8).map((r) => ({ at: Math.min(366, Math.max(1, Number(r.at) || 1)), prize: clean(r.prize, 80) })).sort((x, y) => x.at - y.at),
     })),
     posts: list(doc.posts, 200).filter((p) => idOk(p.id)).map((p) => ({
