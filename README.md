@@ -1,8 +1,9 @@
 # CTeen GN
 
 iPhone app for CTeen Great Neck. Two people build it together, each with their own Claude.
-**Every push to `main` is built and sent to Solomon's TestFlight automatically** (about 25 to 40
-minutes later).
+**Every push to `main` ships automatically:** phones that have the app get it as an
+over-the-air update within minutes, and a full build lands in Solomon's TestFlight about 25 to
+40 minutes later.
 
 ## New here? Set up once (about 10 minutes)
 
@@ -34,12 +35,15 @@ Just tell Claude what you want changed, in plain words. For example:
 
 Claude already knows the routine from `CLAUDE.md`, and does all of this for you:
 
-1. Pulls the newest code and tells you what the other person changed.
+1. Pulls the newest code into your folder by itself and tells you what the other person changed.
+   If you both changed something at the same time, it merges the two and tells you (or, if you
+   both edited the same lines, shows you where so you can pick).
 2. Makes your change and checks that it still builds.
 3. Writes a line in `NOTES.md` (the update log) saying what it did.
 4. Pushes to GitHub ("putting it back").
 
-The push starts the build. Watch it at
+The push sends an over-the-air update and starts a build. Claude also tells you when a build
+finishes, fails, or gets replaced because you both pushed close together. Watch it at
 https://github.com/theprojectmaker/cteen-gn-builds/actions. When it turns green, the new
 version is in TestFlight a few minutes later.
 
@@ -49,6 +53,8 @@ To see the app while you work: `npm run web` opens it in a browser.
 
 Ask Solomon to add your Apple ID email as a TestFlight tester. Install the TestFlight app from
 the App Store, accept the email invite, and CTeen GN shows up there with every new build.
+Smaller changes also arrive on their own: open the app, wait a few seconds, close it, and open
+it again to get the newest version.
 
 ## Rules (short version)
 

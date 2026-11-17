@@ -9,7 +9,14 @@ you change anything.**
 
 ## The one rule that matters
 
-**Every push to `main` builds the app and sends it to Solomon's TestFlight automatically.**
+**Every push to `main` ships, two ways at once:**
+1. **OTA update** (`ota-update.yml` in the builds repo): a few minutes after the push, every phone
+   that already has the app downloads the new code and switches to it the next time the app is
+   opened. This only works for JavaScript changes; it is skipped automatically for builds whose
+   native code differs (runtimeVersion policy `fingerprint`), so it can never break an older build.
+2. **TestFlight build** (`ios-testflight.yml`): a full new build, in TestFlight 25 to 40 minutes
+   later. Needed for native changes (new native packages, app.json changes, icons).
+
 There is no staging step. This repo is private; the build itself runs in a separate public repo,
 [theprojectmaker/cteen-gn-builds](https://github.com/theprojectmaker/cteen-gn-builds), which holds
 only the build recipe. A push here hands that repo the commit to build. So:
@@ -17,15 +24,25 @@ only the build recipe. A push here hands that repo the commit to build. So:
 - Only push code that runs. Check it first (see "Before you push").
 - A push that only touches `NOTES.md`, `CLAUDE.md`, `README.md` or `server/` does not start a build.
 - A build takes about 25 minutes. Pushes made while one is running wait in line; only the newest
-  waiting one is kept.
+  waiting one is kept. That is safe: `main` is one straight line, so the newest commit contains
+  both people's changes.
 
-## Noticing the other person's changes
+## Noticing the other person's changes (automatic)
 
 `.claude/settings.json` runs `scripts/whats-new.cjs` when a session starts and before every
-message. When GitHub has commits this copy does not have, it prints who changed what. **When you
-see that notice, stop, pull, read the new `NOTES.md` entries, and tell your human what changed
-before doing anything else.** It only reads; it never changes files. If you opened Claude in a
-parent folder and the notice never appears, run `node scripts/whats-new.cjs` yourself first.
+message. It keeps this folder on the newest code:
+
+- **Other person pushed, this folder has no unsaved edits:** it pulls their commits in by itself.
+- **You both committed:** it puts this folder's commits after theirs (a rebase). If the same lines
+  clash it undoes the attempt and names the files; then merge by hand (`git pull --rebase origin
+  main`, keep both people's intent, `git add`, `git rebase --continue`, run the checks, push).
+- **Unsaved edits:** it changes nothing and says so. Commit, then `git pull --rebase origin main`.
+- **Builds:** it reads the public builds repo and reports builds and OTA updates that started,
+  finished, failed, or were replaced because two pushes landed close together.
+
+**Whenever it prints anything, stop and tell your human what it says (what the other person
+changed, a clash, two builds at once, a failed build) before doing anything else.** If you opened
+Claude in a parent folder and the notice never appears, run `node scripts/whats-new.cjs` yourself.
 
 ## How to work (every session)
 
@@ -36,7 +53,8 @@ parent folder and the notice never appears, run `node scripts/whats-new.cjs` you
 5. Add one line to the top of the log in `NOTES.md` (date, who, what changed, anything unfinished).
 6. Commit and push to `main`:
    `git add -A && git commit -m "Short description of the change" && git push origin main`
-7. Tell your human the build has started. It shows up in TestFlight about 25 to 40 minutes later.
+7. Tell your human it has shipped: phones get the OTA update in a few minutes (open the app, then
+   open it again), and the TestFlight build shows up about 25 to 40 minutes later.
 
 For anything big or risky (new screens, changing how data is stored, new native packages), use a
 branch (`git checkout -b short-name`), push the branch, and merge to `main` only when it works.
@@ -82,6 +100,8 @@ preview misses. `dist/` is ignored by git.
 - Adding a package that has native code (anything that is not plain JavaScript) can break the
   build or signing. Ask Solomon first, and install with `npx expo install <name>` so the version
   matches the Expo SDK.
+- Do not remove `expo-updates`, or the `runtimeVersion` / `updates` settings in `app.json`, or the
+  `channel` in `eas.json`. OTA updates depend on them.
 - Keep the Expo SDK at 57. Do not upgrade it as part of another change.
 - The app is used by teenagers. Sign-up lists hold first names and grades; do not add anything
   that collects more personal information.
@@ -100,7 +120,8 @@ preview misses. `dist/` is ignored by git.
 | `src/config.ts` | Address of the chapter server |
 | `shared/seed.json` | Starter content, used until a leader saves something |
 | `server/` | The chapter server (Cloudflare). Only Solomon can deploy it |
-| `.github/workflows/trigger-build.yml` | Hands each push on `main` to the public build repo |
+| `.github/workflows/trigger-build.yml` | Hands each push on `main` to the public build repo (OTA + TestFlight) |
+| `scripts/whats-new.cjs` | Auto-pulls/merges the other person's work and reports builds |
 
 Design: light theme, CTeen blue `#159FDC`, heavy rounded headings, white cards on a pale
 background, floating glass header and tab bar. International events carry an "International"

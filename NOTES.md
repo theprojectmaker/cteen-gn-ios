@@ -13,6 +13,7 @@ Remove your line when it ships.
 
 ## Log
 
+- 2026-11-16 · Solomon · Over-the-air updates: added expo-updates (fingerprint runtime, channel production) and a check when the app opens; the builds repo now publishes an OTA on every push next to the TestFlight build. scripts/whats-new.cjs now pulls the other person's commits by itself, merges when you both committed, and reports builds that finish, fail or get replaced. OTAs only reach builds made after this commit.
 - 2026-11-16 · Solomon · New app icon: CTeen logo over a Great Neck harbor sunset (Stepping Stones Lighthouse, sailboat). Drawn by scripts/gen-icon.cjs; edit that script and re-run it rather than editing icon.png by hand.
 - 2026-11-16 · Solomon · Added README.md (setup guide for a new teammate), scripts/whats-new.cjs + .claude/settings.json so each Claude is told about the other person's new commits automatically. Builds now run in the public repo theprojectmaker/cteen-gn-builds.
 - 2026-11-16 · Solomon · First version: Home, Events, Feed and Chapter tabs; Great Neck events

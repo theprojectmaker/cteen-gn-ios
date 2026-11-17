@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AppState, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import * as Updates from 'expo-updates';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C } from './src/theme';
@@ -17,7 +18,31 @@ const TABS: { key: Tab; icon: string }[] = [
   { key: 'Chapter', icon: 'users' },
 ];
 
+// Over-the-air updates: every push to main publishes one. The app checks when it opens or comes
+// back to the front, downloads quietly, and switches to it the next time it is opened.
+function useOtaUpdates() {
+  useEffect(() => {
+    if (__DEV__ || !Updates.isEnabled) return;
+    let ready = false;
+    let busy = false;
+    const check = async () => {
+      if (ready) { Updates.reloadAsync().catch(() => {}); return; }
+      if (busy) return;
+      busy = true;
+      try {
+        const r = await Updates.checkForUpdateAsync();
+        if (r.isAvailable) ready = (await Updates.fetchUpdateAsync()).isNew;
+      } catch { /* offline: try again next time */ }
+      busy = false;
+    };
+    check();
+    const sub = AppState.addEventListener('change', (s) => { if (s === 'active') check(); });
+    return () => sub.remove();
+  }, []);
+}
+
 function Shell() {
+  useOtaUpdates();
   const insets = useSafeAreaInsets();
   const { tab, go, refresh, liveAlert, dismissAlert, openTarget } = useStore();
   const scroll = useRef<ScrollView>(null);
