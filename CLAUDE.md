@@ -10,7 +10,9 @@ you change anything.**
 ## The one rule that matters
 
 **Every push to `main` builds the app and sends it to Solomon's TestFlight automatically.**
-There is no staging step. So:
+There is no staging step. This repo is private; the build itself runs in a separate public repo,
+[theprojectmaker/cteen-gn-builds](https://github.com/theprojectmaker/cteen-gn-builds), which holds
+only the build recipe. A push here hands that repo the commit to build. So:
 
 - Only push code that runs. Check it first (see "Before you push").
 - A push that only touches `NOTES.md`, `CLAUDE.md`, `README.md` or `server/` does not start a build.
@@ -68,7 +70,7 @@ preview misses. `dist/` is ignored by git.
 - **Do not make up chapter facts** (dates, prices, prizes, names). Content comes from the rabbi
   through the leader panel.
 - Do not change `app.json` identifiers (`bundleIdentifier`, `owner`, `extra.eas.projectId`),
-  `eas.json`, or `.github/workflows/` without asking Solomon. Those control signing and shipping.
+  `eas.json`, `.github/workflows/`, or anything in the build repo without asking Solomon. Those control signing and shipping.
 - Adding a package that has native code (anything that is not plain JavaScript) can break the
   build or signing. Ask Solomon first, and install with `npx expo install <name>` so the version
   matches the Expo SDK.
@@ -90,7 +92,7 @@ preview misses. `dist/` is ignored by git.
 | `src/config.ts` | Address of the chapter server |
 | `shared/seed.json` | Starter content, used until a leader saves something |
 | `server/` | The chapter server (Cloudflare). Only Solomon can deploy it |
-| `.github/workflows/ios-testflight.yml` | The build that runs on every push to `main` |
+| `.github/workflows/trigger-build.yml` | Hands each push on `main` to the public build repo |
 
 Design: light theme, CTeen blue `#159FDC`, heavy rounded headings, white cards on a pale
 background, floating glass header and tab bar. International events carry an "International"
@@ -105,6 +107,7 @@ can deploy the server. If your app change needs a server change, put both in the
 
 ## If the build fails
 
-Open the repo on GitHub, go to Actions, open the failed run and read the red step. Fix it and
-push again. If it failed in "Build the app" or "Send to TestFlight" with a signing or Apple
+Builds show up at https://github.com/theprojectmaker/cteen-gn-builds/actions (anyone can view it).
+Open the failed run and read the red step. Fix it and push again. The build log is public, so
+never print secrets or personal information during a build. If it failed in "Build the app" or "Send to TestFlight" with a signing or Apple
 error, that is Solomon's to fix; write it in `NOTES.md` and tell him.

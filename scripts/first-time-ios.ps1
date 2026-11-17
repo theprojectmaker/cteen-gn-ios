@@ -1,8 +1,8 @@
 # One-time setup before GitHub can build CTeen GN:
-#  1. saves your Expo access token as the EXPO_TOKEN secret in theprojectmaker/cteen-gn-ios
+#  1. saves your Expo access token as the EXPO_TOKEN secret in theprojectmaker/cteen-gn-builds (the public build repo)
 #  2. opens EAS credentials so you can log in to Apple and create the signing certificate/profile
 $gh = 'C:\Program Files\GitHub CLI\gh.exe'
-$repo = 'theprojectmaker/cteen-gn-ios'
+$repo = 'theprojectmaker/cteen-gn-builds'
 Set-Location (Join-Path $PSScriptRoot '..')
 
 Write-Host ''
