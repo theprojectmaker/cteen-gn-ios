@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { MinyanEditor, PopupEditor } from './leaderTools';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, T, F } from './theme';
 import { EVENT_ICONS, Icon } from './icons';
@@ -389,7 +390,10 @@ export function AdminPanel() {
                     <View style={{ transform: [{ scaleX: -1 }] }}><Icon name="right" size={18} color={C.blueDeep} stroke={2.4} /></View>
                     <Text style={st.backText}>All tasks</Text>
                   </Pressable>
-                  {task === 'post' || task === 'event' || task === 'alert' ? <SimpleForm kind={task} onDone={(msg) => { setNote(msg); setTask(null); }} /> : body}
+                  {task === 'post' || task === 'event' || task === 'alert' ? <SimpleForm kind={task} onDone={(msg) => { setNote(msg); setTask(null); }} />
+                    : task === 'popup' ? <PopupEditor onDone={(msg) => { setNote(msg); setTask(null); }} />
+                    : task === 'minyan' ? <MinyanEditor onDone={(msg) => { setNote(msg); setTask(null); }} />
+                    : body}
                 </View>
               )
             ) : body}
@@ -406,12 +410,14 @@ export function AdminPanel() {
 }
 
 // ───────── Simple mode ─────────
-type Task = 'post' | 'event' | 'alert' | 'signups' | 'photos' | 'people' | 'inbox';
+type Task = 'post' | 'event' | 'alert' | 'popup' | 'minyan' | 'signups' | 'photos' | 'people' | 'inbox';
 const TASK_SECTION: Partial<Record<Task, Section>> = { signups: 'Sign-ups', photos: 'Photos', people: 'People', inbox: 'Inbox' };
 const TASKS: { k: Task; icon: string; color: 'blue' | 'orange' | 'purple' | 'green' | 'pink' | 'yellow'; title: string; sub: string }[] = [
   { k: 'post', icon: 'chat', color: 'blue', title: 'Post an update', sub: 'Write something for the Feed' },
   { k: 'event', icon: 'calendar', color: 'orange', title: 'Add an event', sub: 'Name, day, time and place' },
   { k: 'alert', icon: 'megaphone', color: 'pink', title: 'Send a quick alert', sub: 'A banner on every phone, plus a notification' },
+  { k: 'popup', icon: 'bell', color: 'purple', title: 'Pop-up message', sub: 'Shows every time someone opens the app' },
+  { k: 'minyan', icon: 'clock', color: 'green', title: 'Minyan times', sub: 'Weekday and Shabbat times in the Chapter tab' },
   { k: 'signups', icon: 'users', color: 'green', title: "See who's coming", sub: 'Sign-ups for each event' },
   { k: 'photos', icon: 'camera', color: 'purple', title: 'Check Tefillin photos', sub: "Look over today's photos" },
   { k: 'people', icon: 'user', color: 'blue', title: 'People & leaders', sub: 'Everyone who signed up. Make someone a leader.' },

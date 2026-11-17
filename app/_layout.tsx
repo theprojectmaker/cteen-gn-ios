@@ -8,6 +8,7 @@ import { StoreProvider } from '../src/store';
 import { AdminPanel } from '../src/admin';
 import { Setup } from '../src/setup';
 import { Intro } from '../src/intro';
+import { StartupPopup } from '../src/popup';
 import { useOtaUpdates } from '../src/shell';
 
 // If anything throws while drawing, show this instead of closing the app.
@@ -52,6 +53,7 @@ function Root() {
       <AdminPanel />
       {introDone ? <Setup /> : null}
       <Intro onDone={() => setIntroDone(true)} />
+      <StartupPopup ready={introDone} />
     </>
   );
 }

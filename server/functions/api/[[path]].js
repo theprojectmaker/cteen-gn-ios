@@ -10,6 +10,11 @@
 //   POST /api/auth/apple                   { identityToken, name?, id?, token? } -> Sign in with Apple
 //   POST /api/events/:id/signup|cancel     { id, token } (or legacy { device, name, grade })
 //   GET  /api/events/counts                how many are going to each in-app event (no names)
+//   GET  /api/posts/meta                   likes + comment counts per post (cached 10s at the edge)
+//   POST /api/posts/:id/like               { id, token, on } like / unlike a Feed post
+//   GET  /api/posts/:id/comments           comments on a post
+//   POST /api/posts/:id/comment            { id, token, text }
+//   POST /api/admin/post-comment-delete    { post, at }
 //   POST /api/challenges/:id/checkin       { id, token, photo? } one per day or week; photo is a small JPEG (base64)
 //   GET  /api/challenges/:id/board         top names + counts
 //   POST /api/challenges/:id/join          { id, token } join (needed to see the photo wall)
@@ -217,7 +222,9 @@ function memberStats(ch, row, joinedAt) {
 }
 
 async function getContent(env) {
-  const c = (await env.CTEEN.get('content', 'json')) || SEED;
+  const c = { ...((await env.CTEEN.get('content', 'json')) || SEED) };
+  if (!c.minyan) c.minyan = MINYAN_DEFAULT;
+  if (!c.popup) c.popup = { on: false, id: '', title: '', body: '', button: '', target: null };
   if (c.alert && c.alert.on && c.alert.until && c.alert.until < new Date().toISOString()) c.alert = { ...c.alert, on: false };
   return c;
 }
@@ -230,6 +237,21 @@ const targetOk = (t) => (t && ['event', 'challenge'].includes(t.type) && idOk(t.
 const ageOk = (v) => { const n = Number(v); return v !== '' && v != null && Number.isFinite(n) && n >= 10 && n <= 25 ? Math.round(n) : null; };
 
 // Rebuild the document field by field so nothing unexpected is ever stored.
+const MINYAN_DEFAULT = {
+  weekday: [
+    { label: 'Shacharit, Sunday', time: '7:30 AM & 9:00 AM' },
+    { label: 'Shacharit, Monday to Friday', time: '7:00 AM & 9:00 AM' },
+    { label: 'Mincha & Maariv', time: '' },
+  ],
+  shabbat: [
+    { label: 'Friday night', time: 'Candle lighting' },
+    { label: 'Shabbat morning', time: '9:25 AM' },
+    { label: 'Mincha', time: '' },
+    { label: 'Maariv', time: '10 min after Shabbat ends' },
+  ],
+  note: 'A short 5 to 7 minute class follows the morning minyan. Shabbat morning has a junior congregation and Kiddush after services.',
+};
+
 function sanitize(doc, alert) {
   const list = (v, max) => (Array.isArray(v) ? v.slice(0, max) : []);
   const color = (c) => (COLORS.includes(c) ? c : 'blue');
@@ -254,6 +276,16 @@ function sanitize(doc, alert) {
       photos: list(p.photos, 10).filter(urlOk), linkLabel: clean(p.linkLabel, 60), linkUrl: urlOk(p.linkUrl) ? p.linkUrl : '', at: dateOk(p.at) ? p.at : nyDate(),
     })),
     info: list(doc.info, 30).filter((i) => idOk(i.id)).map((i) => ({ id: i.id, icon: clean(i.icon, 20), title: clean(i.title, 60), body: clean(i.body, 600) })),
+    popup: doc.popup && typeof doc.popup === 'object' ? {
+      on: !!doc.popup.on, id: clean(doc.popup.id, 40) || 'p' + Date.now().toString(36),
+      title: clean(doc.popup.title, 80), body: clean(doc.popup.body, 600), button: clean(doc.popup.button, 30),
+      target: doc.popup.target && ['event', 'challenge', 'post'].includes(doc.popup.target.type) && idOk(doc.popup.target.id) ? { type: doc.popup.target.type, id: doc.popup.target.id } : null,
+    } : { on: false, id: '', title: '', body: '', button: '', target: null },
+    minyan: doc.minyan && typeof doc.minyan === 'object' ? {
+      weekday: list(doc.minyan.weekday, 12).map((r) => ({ label: clean(r.label, 50), time: clean(r.time, 40) })).filter((r) => r.label),
+      shabbat: list(doc.minyan.shabbat, 12).map((r) => ({ label: clean(r.label, 50), time: clean(r.time, 40) })).filter((r) => r.label),
+      note: clean(doc.minyan.note, 300),
+    } : MINYAN_DEFAULT,
   };
 }
 
@@ -295,6 +327,20 @@ async function verifyApple(env, jwt) {
 // Only app links of this app may receive a sign-in ticket.
 const APP_RETURN = /^(cteengn:\/\/|exp:\/\/|exps:\/\/|https?:\/\/localhost(:\d+)?\/)/;
 
+// Short edge cache for GETs every phone makes on every open, so lots of users barely touch storage.
+async function edgeCached(request, seconds, make) {
+  let cache = null;
+  try { cache = caches.default; } catch {}
+  const key = new Request(new URL(request.url).toString(), { method: 'GET' });
+  if (cache) { const hit = await cache.match(key); if (hit) return hit; }
+  const res = await make();
+  if (!cache || res.status !== 200) return res;
+  const out = new Response(res.body, res);
+  out.headers.set('Cache-Control', `public, max-age=0, s-maxage=${seconds}`);
+  await cache.put(key, out.clone());
+  return out;
+}
+
 export async function onRequest({ request, env, params }) {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
   if (!env.CTEEN) return bad('Storage is not connected.', 503);
@@ -305,7 +351,46 @@ export async function onRequest({ request, env, params }) {
   if ((method === 'POST' || method === 'PUT') && !body) return bad('Bad request.');
 
   try {
-    if (path === 'content' && method === 'GET') return json(await getContent(env));
+    if (path === 'content' && method === 'GET') return edgeCached(request, 10, async () => json(await getContent(env)));
+
+    // ── feed posts: likes and comments ──
+    if (path === 'posts/meta' && method === 'GET') {
+      return edgeCached(request, 10, async () => {
+        const content = await getContent(env);
+        const ids = content.posts.slice(0, 60).map((p) => p.id);
+        const rows = await Promise.all(ids.map((id) => env.CTEEN.get('pm:' + id, 'json')));
+        const meta = {};
+        ids.forEach((id, i) => { const r = rows[i] || {}; meta[id] = { likes: (r.likes || []).length, comments: (r.comments || []).length }; });
+        return json({ meta });
+      });
+    }
+    let pm = /^posts\/([a-z0-9-]+)\/(like|comments|comment)$/.exec(path);
+    if (pm) {
+      const [, pid, action] = pm;
+      const key = 'pm:' + pid;
+      const row = (await env.CTEEN.get(key, 'json')) || { likes: [], comments: [] };
+      if (action === 'comments' && method === 'GET') return json({ comments: (row.comments || []).map((c) => ({ name: c.name, text: c.text, at: c.at })) });
+      if (method !== 'POST') return bad('Not found.', 404);
+      const content = await getContent(env);
+      if (!content.posts.some((p) => p.id === pid)) return bad('That post was removed.', 404);
+      const who = await actor(env, body);
+      if (who.error) return bad(who.error, 401);
+      if (action === 'like') {
+        const likes = (row.likes || []).filter((k) => k !== who.key);
+        if (body.on !== false) likes.push(who.key);
+        row.likes = likes.slice(-5000);
+        await env.CTEEN.put(key, JSON.stringify(row));
+        return json({ ok: true, likes: row.likes.length, liked: body.on !== false });
+      }
+      if (action === 'comment') {
+        if (who.name.length < 2) return bad('Add your name first.');
+        const text = clean(body.text, 300);
+        if (!text) return bad('Write something first.');
+        row.comments = [...(row.comments || []), { name: who.name, who: who.key, text, at: new Date().toISOString() }].slice(-300);
+        await env.CTEEN.put(key, JSON.stringify(row));
+        return json({ ok: true, comments: row.comments.map((c) => ({ name: c.name, text: c.text, at: c.at })) });
+      }
+    }
 
     // ── accounts ──
     if (path === 'account' && method === 'POST') {
@@ -406,12 +491,14 @@ export async function onRequest({ request, env, params }) {
 
     // ── events ──
     // How many are going to each in-app event (numbers only; names stay leader-only).
-    if (path === 'events/counts' && method === 'GET') {
+    if (path === 'events/counts' && method === 'GET') return edgeCached(request, 10, async () => {
       const content = await getContent(env);
       const counts = {};
-      for (const e of content.events.filter((x) => x.signup === 'app')) counts[e.id] = ((await env.CTEEN.get('signups:' + e.id, 'json')) || []).length;
+      const evs = content.events.filter((x) => x.signup === 'app');
+      const rows = await Promise.all(evs.map((e) => env.CTEEN.get('signups:' + e.id, 'json')));
+      evs.forEach((e, i) => { counts[e.id] = (rows[i] || []).length; });
       return json({ counts });
-    }
+    });
     let m = /^events\/([a-z0-9-]+)\/(signup|cancel)$/.exec(path);
     if (m && method === 'POST') {
       const [, id, action] = m;
@@ -679,6 +766,14 @@ export async function onRequest({ request, env, params }) {
         const status = ['checked', 'hidden'].includes(body.status) ? body.status : '';
         const ok = await editPhotoEntry(env, String(body.key || ''), (p) => { p.status = status; });
         return ok ? json({ ok: true }) : bad('That photo is gone.', 404);
+      }
+      if (path === 'admin/post-comment-delete' && method === 'POST') {
+        if (!idOk(body.post)) return bad('Bad request.');
+        const key = 'pm:' + body.post;
+        const row = (await env.CTEEN.get(key, 'json')) || { likes: [], comments: [] };
+        row.comments = (row.comments || []).filter((c) => c.at !== body.at);
+        await env.CTEEN.put(key, JSON.stringify(row));
+        return json({ ok: true });
       }
       if (path === 'admin/comment-delete' && method === 'POST') {
         const ok = await editPhotoEntry(env, String(body.key || ''), (p) => { p.comments = (p.comments || []).filter((c) => c.at !== body.at); });

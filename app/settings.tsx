@@ -13,7 +13,8 @@ import { Card, IconTile, Toggle } from '../src/ui';
 // Profile picture -> Settings: your profile, appearance, how the app feels, notifications, about.
 export default function SettingsRoute() {
   const insets = useSafeAreaInsets();
-  const { name, grade, age, account, push, turnOnPush, setAdminOpen, leader, signOut } = useStore();
+  const { name, grade, age, account, push, turnOnPush, setAdminOpen, leader, signOut, appleReady, signInWithApple } = useStore();
+  const [appleErr, setAppleErr] = React.useState<string | null>(null);
   const [prefs, setPrefs] = useState({ ...PREFS });
   const [restartNote, setRestartNote] = useState(false);
 
@@ -88,6 +89,8 @@ export default function SettingsRoute() {
         <Text style={st.section}>More</Text>
         <Card style={{ padding: 0 }}>
           <Row icon="user" color="green" title="Edit profile" sub="Name, grade, age, sign-in" onPress={() => router.push('/account')} chevron />
+          {appleReady && !account?.apple ? <Row icon="lock" color="blue" title="Link Apple account" sub="Keep your streak and RSVPs on a new phone" onPress={async () => { const e = await signInWithApple(); if (e) setAppleErr(e); }} chevron rule /> : null}
+          {appleErr ? <Text style={{ color: '#C0303F', fontSize: 13, paddingHorizontal: 16, paddingBottom: 12 }}>{appleErr}</Text> : null}
           <Row icon="lock" color="orange" title={leader ? 'Leader panel' : 'Leader sign-in'} sub="For Rabbi Zevy and chapter leaders" onPress={() => setAdminOpen(true)} chevron rule />
         </Card>
 

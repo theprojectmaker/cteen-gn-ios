@@ -3,9 +3,11 @@ import { router, useFocusEffect } from 'expo-router';
 import { Animated, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { C, R, T, F } from './theme';
 import { Icon } from './icons';
-import { CHAPTER, calendarUrl, countdown, dateLabel, open, tap, upcoming, useShabbat, useStore, type ColorKey, type EventItem, type Post } from './store';
+import { CHAPTER, calendarUrl, countdown, dateLabel, open, sortPosts, tap, upcoming, useShabbat, useStore, type ColorKey, type EventItem, type Post } from './store';
 import { audienceLabel, Button, Card, Chips, Cover, Empty, EventCard, EventMeta, Field, IconTile, ScopeBadge, SectionHead, Sheet, s as u } from './ui';
 import { ChallengeBanner, NameGate } from './rewards';
+import { PostCard } from './feed';
+import { MinyanCard } from './minyan';
 import { greetingNow } from './shell';
 
 // ───────────────────────── Home ─────────────────────────
@@ -21,10 +23,11 @@ export function Home() {
   return (
     <>
       <Text style={st.helloLine} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} accessibilityRole="header">{greetingNow()}{first ? `, ${first}` : ''}</Text>
+      <LinkAppleCard />
       {next ? (
         <Pressable onPress={() => openEvent(next.id)} style={({ pressed }) => [st.hero, pressed && u.pressed]} accessibilityRole="button" accessibilityLabel={next.title}>
-          <Cover e={next} style={u.fill} iconSize={150} />
-          <View style={[u.fill, { backgroundColor: next.image ? 'rgba(13,60,110,0.5)' : 'rgba(19,32,44,0.18)' }]} />
+          <Cover e={next} style={StyleSheet.absoluteFill} iconSize={150} />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: next.image ? 'rgba(13,60,110,0.5)' : 'rgba(19,32,44,0.18)' }]} />
           <ScopeBadge scope={next.scope} style={{ position: 'absolute', left: 18, top: 18 }} />
           <Text style={st.heroKicker}>Up next · {countdown(next)}</Text>
           <Text style={st.heroTitle}>{next.title}</Text>
@@ -48,7 +51,7 @@ export function Home() {
       {latest ? (
         <>
           <SectionHead title="New from Rabbi Zevy" action="Feed" onAction={() => go('Feed')} />
-          <PostCard post={latest} />
+          <PostCard post={latest} compact />
         </>
       ) : null}
 
@@ -107,7 +110,7 @@ function ShabbatCard() {
 }
 
 // ───────────────────────── Events ─────────────────────────
-const EVENT_FILTERS = ['All', 'Great Neck', 'International', 'Saved'] as const;
+const EVENT_FILTERS = ['All', 'Great Neck', 'Saved'] as const;
 
 export function Events() {
   const { saved, content, fits, markEventsSeen } = useStore();
@@ -259,111 +262,36 @@ function Para({ title, body }: { title: string; body: string }) {
 }
 
 // ───────────────────────── Feed ─────────────────────────
-const FEED_FILTERS = ['All', 'News', 'Events', 'Photos', 'Rewards'] as const;
-const sortPosts = (posts: Post[]) => [...posts].sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || b.at.localeCompare(a.at));
-
-export function Feed() {
-  const { content, leader, setAdminOpen, markFeedSeen } = useStore();
-  const [f, setF] = useState<(typeof FEED_FILTERS)[number]>('All');
-  useFocusEffect(useCallback(() => { markFeedSeen(); }, [markFeedSeen]));
-  const list = sortPosts(content.posts).filter((p) => f === 'All' || p.kind === f);
+// Shown on Home until your account is linked with Apple, so a new phone keeps your streak and RSVPs.
+function LinkAppleCard() {
+  const { account, appleReady, signInWithApple } = useStore();
+  const [hidden, setHidden] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  if (!appleReady || account?.apple || hidden) return null;
   return (
-    <>
-      <Text style={T.eyebrow}>Chapter feed</Text>
-      <Text style={[T.h1, { marginTop: 6 }]}>The latest</Text>
-      <Text style={[T.small, { marginTop: 6, marginBottom: 14 }]}>From Rabbi Zevy and the {CHAPTER.name} leaders.</Text>
-      {leader ? (
-        <View style={{ marginBottom: 14 }}>
-          <Button label="New post" icon="plus" onPress={() => setAdminOpen(true)} />
-        </View>
-      ) : null}
-      <Chips options={FEED_FILTERS} value={f} onChange={setF} />
-      <View style={{ gap: 14, marginTop: 18 }}>
-        {list.map((p) => <PostCard key={p.id} post={p} />)}
+    <View style={st.appleCard}>
+      <View style={st.appleBadge}><Text style={st.appleGlyph}>{'\uF8FF'}</Text></View>
+      <View style={{ flex: 1 }}>
+        <Text style={T.h3}>Link your Apple account</Text>
+        <Text style={T.small}>{err ?? 'Keep your streak and RSVPs if you ever get a new phone.'}</Text>
       </View>
-      {list.length === 0 ? <Empty icon="chat" title="Nothing here yet" body="Posts from the chapter show up here." /> : null}
-    </>
-  );
-}
-
-export function PostCard({ post, full }: { post: Post; full?: boolean }) {
-  const { liked, toggleLiked, openEvent, openChallenge, content } = useStore();
-  const on = liked.includes(post.id);
-  const pop = React.useRef(new Animated.Value(1)).current;
-  const like = () => {
-    if (!on) {
-      tap();
-      pop.setValue(0.6);
-      Animated.spring(pop, { toValue: 1, friction: 3, tension: 220, useNativeDriver: Platform.OS !== 'web' }).start();
-    }
-    toggleLiked(post.id);
-  };
-  const ev = post.eventId ? content.events.find((e) => e.id === post.eventId) : undefined;
-  const ch = post.challengeId ? content.challenges.find((c) => c.id === post.challengeId) : undefined;
-  return (
-    <Card style={{ padding: 0, overflow: 'hidden' }}>
-      <View style={st.postHead}>
-        <Image source={require('../assets/logo.png')} style={st.avatar} resizeMode="contain" />
-        <View style={{ flex: 1 }}>
-          <Text style={T.h3}>{CHAPTER.name}</Text>
-          <Text style={T.small}>{post.kind}</Text>
-        </View>
-        {post.pinned ? (
-          <View style={st.pinned}>
-            <Icon name="pinned" size={12} color={C.blueDeep} stroke={2.2} />
-            <Text style={st.pinnedText}>Pinned</Text>
-          </View>
-        ) : null}
-      </View>
-      <Pressable onPress={full ? undefined : () => router.push(`/post/${post.id}`)} disabled={full} style={({ pressed }) => [{ paddingHorizontal: 16 }, pressed && { opacity: 0.7 }]} accessibilityRole={full ? undefined : 'button'} accessibilityLabel={full ? undefined : `Open: ${post.title}`}>
-        <Text style={[T.h2, full ? { fontSize: 24, lineHeight: 29 } : { fontSize: 18, lineHeight: 23 }]}>{post.title}</Text>
-        {post.body ? <Text style={[T.body, { marginTop: 6, color: C.ink }, full && { fontSize: 17, lineHeight: 25 }]} numberOfLines={full ? undefined : 4}>{post.body}</Text> : null}
-        {!full && (post.body?.length ?? 0) > 180 ? <Text style={[u.link, { marginTop: 4 }]}>Read more</Text> : null}
+      <Pressable onPress={async () => { setBusy(true); setErr(await signInWithApple()); setBusy(false); }} disabled={busy} style={({ pressed }) => [st.appleBtn, pressed && { opacity: 0.85 }]} accessibilityRole="button" accessibilityLabel="Link with Apple">
+        <Text style={st.appleBtnText}>{busy ? '…' : 'Link'}</Text>
       </Pressable>
-      {ev ? (
-        <Pressable onPress={() => openEvent(ev.id)} style={({ pressed }) => [st.attach, pressed && u.pressed]} accessibilityRole="button" accessibilityLabel={`Open ${ev.title}`}>
-          <Cover e={ev} style={st.attachImg} iconSize={26} />
-          <View style={{ flex: 1 }}>
-            <Text style={T.h3} numberOfLines={1}>{ev.title}</Text>
-            <EventMeta e={ev} />
-          </View>
-          <Icon name="right" size={18} color={C.faint} stroke={2.4} />
-        </Pressable>
-      ) : null}
-      {ch ? (
-        <Pressable onPress={() => openChallenge(ch.id)} style={({ pressed }) => [st.attach, pressed && u.pressed]} accessibilityRole="button" accessibilityLabel={`Open ${ch.title}`}>
-          <Cover e={ch} style={st.attachImg} iconSize={26} />
-          <View style={{ flex: 1 }}>
-            <Text style={T.h3} numberOfLines={1}>{ch.title}</Text>
-            <Text style={[u.meta, { color: C.sub }]}>{ch.active ? 'Live now' : 'Ended'}</Text>
-          </View>
-          <Icon name="right" size={18} color={C.faint} stroke={2.4} />
-        </Pressable>
-      ) : null}
-      {post.photos?.length ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 14 }} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
-          {post.photos.map((uri) => <Image key={uri} source={{ uri }} style={full ? st.photoBig : st.photo} resizeMode="cover" />)}
-        </ScrollView>
-      ) : null}
-      <View style={st.postFoot}>
-        <Pressable onPress={like} style={st.like} hitSlop={8} accessibilityRole="button" accessibilityLabel={on ? 'Unlike' : 'Like'}>
-          <Animated.View style={{ transform: [{ scale: pop }] }}><Icon name="heart" size={19} color={on ? '#E0445C' : C.sub} fill={on ? '#E0445C' : 'none'} /></Animated.View>
-          <Text style={[st.likeText, on && { color: '#E0445C' }]}>{on ? 'Liked' : 'Like'}</Text>
-        </Pressable>
-        {post.linkUrl ? (
-          <Pressable onPress={() => open(post.linkUrl!)} style={u.sectionAction} hitSlop={8} accessibilityRole="link">
-            <Text style={u.link}>{post.linkLabel || 'Open link'}</Text>
-            <Icon name="right" size={15} color={C.blue} stroke={2.4} />
-          </Pressable>
-        ) : null}
-      </View>
-    </Card>
+      <Pressable onPress={() => setHidden(true)} hitSlop={10} style={st.appleX} accessibilityRole="button" accessibilityLabel="Not now">
+        <Icon name="x" size={13} color={C.faint} stroke={2.4} />
+      </Pressable>
+    </View>
   );
 }
+
+// Feed and post cards live in feed.tsx.
+export { Feed, PostCard } from './feed';
 
 // ───────────────────────── Chapter ─────────────────────────
 export function Chapter() {
-  const { content, name, grade, age, account, leader, setAdminOpen, online, push, turnOnPush } = useStore();
+  const { content, leader, setAdminOpen, online } = useStore();
   return (
     <>
       <Text style={T.eyebrow}>Your chapter</Text>
@@ -376,33 +304,8 @@ export function Chapter() {
           <Text style={[T.small, { marginTop: 4 }]}>Led by {CHAPTER.leaders}. Make friends, do good, and be proud of who you are.</Text>
         </View>
       </Card>
-      <View style={{ marginTop: 12 }}>
-        <Button kind="ghost" icon="external" label="Chapter sign-up on chabadgn.com" onPress={() => open(CHAPTER.join)} />
-      </View>
-
-      <SectionHead title="You" />
-      {(
-        <Card style={{ padding: 0 }}>
-          <Pressable onPress={() => router.push('/account')} style={st.linkRow} accessibilityRole="button" accessibilityLabel="Your account">
-            <View style={st.meAvatar}>
-              {name ? <Text style={st.meInitial}>{name[0].toUpperCase()}</Text> : <Icon name="user" size={20} color={C.white} />}
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={T.h3}>{name || 'Add your name'}</Text>
-              <Text style={T.small}>{[grade ? `Grade ${grade}` : '', age ? `Age ${age}` : '', account?.google ? 'Linked with Google' : ''].filter(Boolean).join(' · ') || 'Set up your account'}</Text>
-            </View>
-            <Icon name="right" size={17} color={C.faint} stroke={2.4} />
-          </Pressable>
-          <Pressable onPress={push === 'off' ? turnOnPush : undefined} disabled={push !== 'off'} style={[st.linkRow, st.rule]} accessibilityRole="button" accessibilityLabel="Notifications">
-            <IconTile icon="bell" size={40} />
-            <View style={{ flex: 1 }}>
-              <Text style={T.h3}>Notifications</Text>
-              <Text style={T.small}>{push === 'on' ? 'On. You hear it when the chapter posts.' : push === 'off' ? 'Tap to turn on' : push === 'blocked' ? "Off in your phone's Settings" : 'Available in the app on your phone'}</Text>
-            </View>
-            {push === 'on' ? <Icon name="check" size={20} color={C.green} /> : null}
-          </Pressable>
-        </Card>
-      )}
+      <SectionHead title="Minyan times" />
+      <MinyanCard />
 
       <AskRabbi />
 
@@ -426,6 +329,7 @@ export function Chapter() {
         <LinkRow icon="camera" title="Instagram" sub={CHAPTER.instagramHandle} url={CHAPTER.instagram} />
         <LinkRow icon="users" title="Facebook" sub="Chabad GN Teens" url={CHAPTER.facebook} />
         <LinkRow icon="globe" title="CTeen portal" sub="International events, orders and service hours" url={CHAPTER.portal} />
+        <LinkRow icon="external" title="Chapter sign-up" sub="On chabadgn.com" url={CHAPTER.join} />
         <LinkRow icon="gift" title="Donate" sub={`Support ${CHAPTER.name}`} url={CHAPTER.donate} />
       </Card>
 
@@ -493,6 +397,12 @@ function LinkRow({ icon, title, sub, url, first }: { icon: string; title: string
 }
 
 const st = StyleSheet.create({
+  appleCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, paddingRight: 30, borderRadius: 22, backgroundColor: C.card, borderWidth: 1, borderColor: C.line, marginBottom: 16 },
+  appleBadge: { width: 42, height: 42, borderRadius: 21, backgroundColor: C.inverse, alignItems: 'center', justifyContent: 'center' },
+  appleGlyph: { color: C.onInverse, fontSize: 20, marginTop: -2 },
+  appleBtn: { paddingHorizontal: 16, height: 36, borderRadius: 18, backgroundColor: C.inverse, justifyContent: 'center' },
+  appleBtnText: { color: C.onInverse, fontSize: 14, fontWeight: '800' },
+  appleX: { position: 'absolute', top: 8, right: 8, padding: 4 },
   rsvp: { padding: 16, borderRadius: 22, backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
   rsvpHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   goingPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, height: 28, borderRadius: 14, backgroundColor: C.bluePale },

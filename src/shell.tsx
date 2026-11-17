@@ -55,7 +55,7 @@ export function Screen({ children }: { children: React.ReactNode }) {
   useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
   const onRefresh = async () => {
     setRefreshing(true);
-    await refresh();
+    await refresh(true);
     setRefreshing(false);
   };
   return (

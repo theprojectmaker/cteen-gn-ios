@@ -21,7 +21,12 @@ export type Challenge = { id: string; title: string; icon: string; color: ColorK
 export type Post = { id: string; kind: 'News' | 'Events' | 'Photos' | 'Rewards'; pinned?: boolean; title: string; body: string; eventId?: string; challengeId?: string; photos?: string[]; linkLabel?: string; linkUrl?: string; at: string };
 export type Info = { id: string; icon: string; title: string; body: string };
 export type Alert = { id: string; on: boolean; title: string; text: string; target: Target; until: string };
-export type Content = { alert: Alert; events: EventItem[]; challenges: Challenge[]; posts: Post[]; info: Info[] };
+export type Popup = { on: boolean; id: string; title: string; body: string; button: string; target: { type: 'event' | 'challenge' | 'post'; id: string } | null };
+export type MinyanRow = { label: string; time: string };
+export type Minyan = { weekday: MinyanRow[]; shabbat: MinyanRow[]; note: string };
+export type PostComment = { name: string; text: string; at: string };
+export type Content = { alert: Alert; events: EventItem[]; challenges: Challenge[]; posts: Post[]; info: Info[]; popup?: Popup; minyan?: Minyan };
+export const sortPosts = (posts: Post[]) => [...posts].sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || b.at.localeCompare(a.at));
 export type Tab = 'Home' | 'Events' | 'Feed' | 'Chapter';
 const TAB_PATH = { Home: '/', Events: '/events', Feed: '/feed', Chapter: '/chapter' } as const;
 export type BoardRow = { name: string; count: number };
@@ -77,7 +82,7 @@ const CACHE = 'cteengn.content.v3';
 type Ctx = Local & {
   content: Content; online: boolean | null;
   go: (t: Tab) => void;
-  refresh: () => Promise<void>;
+  refresh: (force?: boolean) => Promise<void>;
   toggleSaved: (id: string) => void; toggleLiked: (id: string) => void;
   setProfile: (name: string, grade: string) => void;
   saveProfile: (p: Partial<Profile>) => Promise<string | null>;
@@ -93,6 +98,11 @@ type Ctx = Local & {
   liveAlert: Alert | null; dismissAlert: () => void;
   signup: (id: string, on: boolean) => Promise<string | null>;
   goingCount: Record<string, number>;
+  postMeta: Record<string, { likes: number; comments: number }>;
+  likePost: (id: string) => void;
+  loadComments: (id: string) => Promise<PostComment[] | null>;
+  addComment: (id: string, text: string) => Promise<PostComment[] | { error: string }>;
+  deletePostComment: (id: string, at: string) => Promise<boolean>;
   join: (id: string, reminderHour: number | null) => void; leave: (id: string) => void;
   joinChallenge: (id: string, name: string, reminderHour: number | null) => Promise<string | null>;
   fetchWall: (id: string, day?: string) => Promise<Wall | { error: string }>;
@@ -161,6 +171,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [adminOpen, setAdminOpen] = useState(false);
   const [push, setPush] = useState<PushState>('unsupported');
   const [goingCount, setGoingCount] = useState<Record<string, number>>({});
+  const [postMeta, setPostMeta] = useState<Record<string, { likes: number; comments: number }>>({});
+  const lastRefresh = useRef(0);
   const ref = useRef(local);
   ref.current = local;
 
@@ -176,11 +188,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.setItem(CACHE, JSON.stringify(c)).catch(() => {});
   }, []);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (force?: boolean) => {
+    if (!force && Date.now() - lastRefresh.current < 20000) return;
+    lastRefresh.current = Date.now();
     try {
       keep(await api<Content>('/content'));
       setOnline(true);
       api<{ counts: Record<string, number> }>('/events/counts').then((r) => setGoingCount(r.counts || {})).catch(() => {});
+      api<{ meta: Record<string, { likes: number; comments: number }> }>('/posts/meta').then((r) => setPostMeta(r.meta || {})).catch(() => {});
     } catch {
       setOnline(false);
     }
@@ -345,6 +360,33 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     go: (t) => { tap(); router.navigate(TAB_PATH[t]); },
     toggleSaved: (id) => flip('saved', id),
     toggleLiked: (id) => flip('liked', id),
+    postMeta,
+    likePost: (id) => {
+      const me = ref.current;
+      const on = !me.liked.includes(id);
+      flip('liked', id);
+      setPostMeta((m) => ({ ...m, [id]: { likes: Math.max(0, (m[id]?.likes ?? 0) + (on ? 1 : -1)), comments: m[id]?.comments ?? 0 } }));
+      api<{ likes: number }>(`/posts/${id}/like`, { method: 'POST', body: { ...who(me), on } })
+        .then((r) => setPostMeta((m) => ({ ...m, [id]: { likes: r.likes, comments: m[id]?.comments ?? 0 } })))
+        .catch(() => {});
+    },
+    loadComments: async (id) => {
+      try { return (await api<{ comments: PostComment[] }>(`/posts/${id}/comments`)).comments; } catch { return null; }
+    },
+    addComment: async (id, text) => {
+      try {
+        const r = await api<{ comments: PostComment[] }>(`/posts/${id}/comment`, { method: 'POST', body: { ...who(ref.current), text } });
+        setPostMeta((m) => ({ ...m, [id]: { likes: m[id]?.likes ?? 0, comments: r.comments.length } }));
+        return r.comments;
+      } catch (e) { return { error: msg(e) }; }
+    },
+    deletePostComment: async (id, at) => {
+      try {
+        await api(`/admin/post-comment-delete`, { method: 'POST', body: { post: id, at }, leader });
+        setPostMeta((m) => ({ ...m, [id]: { likes: m[id]?.likes ?? 0, comments: Math.max(0, (m[id]?.comments ?? 1) - 1) } }));
+        return true;
+      } catch { return false; }
+    },
     setProfile: (name, grade) => {
       const me = ref.current;
       saveProfile({ name, grade }); // ref is updated first, so an action fired right after sees it
@@ -496,7 +538,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     removeQuestion: (id) => api('/admin/inbox/remove', { method: 'POST', body: { id }, leader }).then(() => {}).catch(() => {}),
     loadPhotos: (cid) => api<{ photos: PhotoRow[] }>(`/admin/photos?challenge=${cid}`, { leader }).then((r) => r.photos).catch(() => null),
     loadPhoto: (key) => api<{ photo: string }>(`/admin/photo?key=${encodeURIComponent(key)}`, { leader }).then((r) => r.photo).catch(() => null),
-  }), [local, content, online, leader, isOwner, adminOpen, push, liveAlert, googleReady, appleReady, unreadFeed, newEvents, goingCount, flip, patch, refresh, keep, openTarget, registerToken]);
+  }), [local, content, online, leader, isOwner, adminOpen, push, liveAlert, googleReady, appleReady, unreadFeed, newEvents, goingCount, postMeta, flip, patch, refresh, keep, openTarget, registerToken]);
 
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>;
 }

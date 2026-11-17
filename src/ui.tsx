@@ -199,6 +199,8 @@ export function Sheet({ onClose, children }: { onClose: () => void; children: Re
 export const s = StyleSheet.create({
   goingRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 5 },
   goingText: { fontSize: 13, fontWeight: '700', color: C.sub },
+  // Note: the 100% size is measured inside the parent's padding. In a padded box use
+  // StyleSheet.absoluteFill instead (the Home hero did, which left a blue strip).
   fill: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, width: '100%', height: '100%' },
   card: { backgroundColor: C.card, borderRadius: R.card, padding: 16, ...shadow },
   pressed: { opacity: 0.82, transform: [{ scale: 0.985 }] },

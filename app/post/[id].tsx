@@ -1,30 +1,35 @@
 import React from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, T } from '../../src/theme';
 import { Icon } from '../../src/icons';
 import { useStore } from '../../src/store';
-import { PostCard } from '../../src/screens';
+import { PostCard, PostComments } from '../../src/feed';
 
-// A Feed post opened full, in Apple's card pop-up (drag down to close).
+// A Feed post opened full, in Apple's card pop-up (drag down to close), with its comments.
 export default function PostRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { content } = useStore();
   const insets = useSafeAreaInsets();
   const post = content.posts.find((p) => p.id === id);
   return (
-    <View style={{ flex: 1, backgroundColor: C.bg }}>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: C.bg }}>
       <View style={st.grab} />
-      <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 22, paddingBottom: insets.bottom + 30 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 22, paddingBottom: insets.bottom + 30 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <View style={st.col}>
-          {post ? <PostCard post={post} full /> : <Text style={[T.body, { textAlign: 'center', marginTop: 60 }]}>This post was removed.</Text>}
+          {post ? (
+            <>
+              <PostCard post={post} full />
+              <PostComments postId={post.id} />
+            </>
+          ) : <Text style={[T.body, { textAlign: 'center', marginTop: 60 }]}>This post was removed.</Text>}
         </View>
       </ScrollView>
       <Pressable onPress={() => router.back()} style={st.close} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close">
         <Icon name="x" size={18} color={C.ink} stroke={2.4} />
       </Pressable>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
