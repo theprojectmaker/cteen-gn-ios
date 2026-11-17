@@ -1,7 +1,7 @@
 import React from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ViewStyle } from 'react-native';
 import { C, HUES, R, T, shadow } from './theme';
-import { Icon } from './icons';
+import { Icon, challengeIcon } from './icons';
 import { Glass } from './glass';
 import { IMAGES, countdown, dateLabel, useStore, type ColorKey, type EventItem } from './store';
 
@@ -80,7 +80,7 @@ export function ScopeBadge({ scope, style }: { scope: 'gn' | 'intl'; style?: Vie
 }
 
 // Event artwork: a bundled photo when there is one, otherwise a color block with a large icon.
-export function Cover({ e, style, iconSize = 56 }: { e: { image?: string; icon: string; color: ColorKey }; style?: ViewStyle; iconSize?: number }) {
+export function Cover({ e, style, iconSize = 56 }: { e: { id?: string; image?: string; icon: string; color: ColorKey }; style?: ViewStyle; iconSize?: number }) {
   const img = e.image ? IMAGES[e.image] : undefined;
   const hue = HUES[e.color] ?? HUES.blue;
   return (
@@ -88,7 +88,7 @@ export function Cover({ e, style, iconSize = 56 }: { e: { image?: string; icon: 
       {img ? <Image source={img} style={s.fill} resizeMode="cover" /> : (
         <>
           <View style={[s.blob, { backgroundColor: hue.deep, opacity: 0.22, right: -40, top: -50 }]} />
-          <Icon name={e.icon || 'star'} size={iconSize} color="rgba(255,255,255,0.92)" stroke={1.6} />
+          <Icon name={e.id ? challengeIcon({ id: e.id, icon: e.icon || 'star' }) : e.icon || 'star'} size={iconSize} color="rgba(255,255,255,0.92)" stroke={1.6} />
         </>
       )}
     </View>

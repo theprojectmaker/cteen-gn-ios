@@ -99,7 +99,7 @@ type Ctx = Local & {
   setPhotoStatus: (key: string, status: 'checked' | 'hidden' | '') => Promise<boolean>;
   deleteComment: (key: string, at: string) => Promise<boolean>;
   react: (id: string, key: string, emoji: string) => Promise<Reaction[] | null>;
-  checkin: (id: string, photo?: string, caption?: string) => Promise<{ error?: string; already?: boolean; board?: BoardRow[] }>;
+  checkin: (id: string, photo?: string, caption?: string) => Promise<{ error?: string; already?: boolean; count?: number; board?: BoardRow[] }>;
   ask: (text: string) => Promise<string | null>;
   push: PushState; turnOnPush: () => Promise<void>;
   leader: string | null; isOwner: boolean; adminOpen: boolean; setAdminOpen: (v: boolean) => void;
@@ -421,7 +421,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         const r = await api<{ already: boolean; count: number; period: string; board: BoardRow[] }>(`/challenges/${id}/checkin`, { method: 'POST', body: { ...who(me), photo, caption } });
         patch((s) => ({ ...s, counts: { ...s.counts, [id]: r.count }, checks: { ...s.checks, [id]: [...new Set([...(s.checks[id] ?? []), r.period])] } }));
         if (!r.already) tap(true);
-        return { already: r.already, board: r.board };
+        return { already: r.already, count: r.count, board: r.board };
       } catch (e) {
         return { error: msg(e) };
       }

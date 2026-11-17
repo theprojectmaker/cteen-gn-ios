@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
-import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, Easing, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { C, HUES, R, T, F } from './theme';
 import { Icon, challengeIcon } from './icons';
 import { nyTime, untilText, wrapWindow } from './zmanim';
-import { doneThisPeriod, hourLabel, periodKey, streak, useStore, type Challenge, type ChallengeStats, type Wall as WallT, type WallPost } from './store';
+import { doneThisPeriod, hourLabel, periodKey, streak, tap, useStore, type Challenge, type ChallengeStats, type Wall as WallT, type WallPost } from './store';
 import { Button, Card, Chips, Field, IconTile, s as u } from './ui';
 import { snapPhoto } from './photo';
 
@@ -147,6 +147,7 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
   const [open, setOpen] = useState<WallPost | null>(null);
   const [pending, setPending] = useState<{ uri: string; base64: string } | null>(null);
   const [caption, setCaption] = useState('');
+  const [party, setParty] = useState<{ count: number; streak: number } | null>(null);
   const hue = HUES[ch.color] ?? HUES.blue;
   const mine = joined.includes(ch.id);
   const timed = ch.id === 'tefillin';
@@ -194,8 +195,12 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
     setBusy(true);
     const r = await checkin(ch.id, base64, cap);
     setBusy(false);
+    if (r.error) { setPending(null); return setNote(r.error); }
+    if (pending && !r.already) {
+      tap(true);
+      setParty({ count: r.count ?? me.count + 1, streak: me.streak + 1 }); // the sheet turns into the celebration
+    }
     setPending(null);
-    if (r.error) return setNote(r.error);
     setNote(r.already ? 'You already checked in today.' : 'Posted. Nice.');
     setDay(0);
     setReload((k) => k + 1);
@@ -305,7 +310,7 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
                   </Pressable>
                 ))}
               </ScrollView>
-              {wallErr ? <Text style={[T.small, { marginTop: 12 }]}>{wallErr}</Text> : !wall ? <Text style={[T.small, { marginTop: 12 }]}>Loading…</Text> : (
+              {wallErr ? <Text style={[T.small, { marginTop: 12 }]}>{wallErr}</Text> : !wall ? <BoardSkeleton /> : (
                 <>
                 <Board wall={wall} onOpen={setOpen} />
                 <Text style={[st.section, { marginTop: 26 }]}>Who wrapped</Text>
@@ -344,8 +349,9 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
             <Text style={[T.small, { textDecorationLine: 'underline' }]}>Leave this challenge</Text>
           </Pressable>
           <PhotoSheet ch={ch} post={open} onClose={() => setOpen(null)} />
-          <Modal visible={!!pending} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setPending(null)}>
+          <Modal visible={!!pending || !!party} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => { setPending(null); setParty(null); }}>
             <View style={{ flex: 1, backgroundColor: C.bg }}>
+              {party ? <Celebrate ch={ch} count={party.count} streak={party.streak} onClose={() => setParty(null)} /> : (
               <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40, maxWidth: 600, width: '100%', alignSelf: 'center' }} keyboardShouldPersistTaps="handled">
                 <View style={st.sheetHead}>
                   <Text style={[T.h2, { flex: 1 }]}>Today's photo</Text>
@@ -358,6 +364,7 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
                 </View>
                 <Pressable onPress={doCheck} hitSlop={8} style={{ alignSelf: 'center', marginTop: 14 }} accessibilityRole="button"><Text style={u.link}>Retake</Text></Pressable>
               </ScrollView>
+              )}
             </View>
           </Modal>
         </>
@@ -413,6 +420,89 @@ function WindowStrip({ win, now }: { win: ReturnType<typeof wrapWindow>; now: nu
         {open ? <View style={[st.windowNow, { left: `${pct * 100}%` }]} /> : null}
       </View>
       <Text style={st.windowNote}>Sunrise to sunset in Great Neck. Times change every day.</Text>
+    </View>
+  );
+}
+
+// Grey squares that breathe while the day's photos load.
+function BoardSkeleton() {
+  const a = useRef(new Animated.Value(0.45)).current;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(a, { toValue: 1, duration: 700, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(a, { toValue: 0.45, duration: 700, useNativeDriver: Platform.OS !== 'web' }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, []);
+  return (
+    <Animated.View style={[st.board, { opacity: a }]} accessibilityLabel="Loading photos">
+      {[...Array(COLS * 4)].map((_, i) => <View key={i} style={[st.cell, st.cellWaiting]} />)}
+    </Animated.View>
+  );
+}
+
+// After posting: confetti, a check that springs in, the new streak and the next reward.
+const CONFETTI = ['#159FDC', '#F5B81F', '#F0569A', '#1FA971', '#7C5CFC', '#F2913D'];
+function Celebrate({ ch, count, streak: days, onClose }: { ch: Challenge; count: number; streak: number; onClose: () => void }) {
+  const hue = HUES[ch.color] ?? HUES.blue;
+  const nd = Platform.OS !== 'web';
+  const burst = useRef(new Animated.Value(0)).current;
+  const check = useRef(new Animated.Value(0)).current;
+  const text = useRef(new Animated.Value(0)).current;
+  const bits = useRef([...Array(28)].map((_, i) => ({
+    angle: (i / 28) * Math.PI * 2 + Math.random() * 0.4,
+    dist: 110 + Math.random() * 90,
+    spin: (Math.random() > 0.5 ? 1 : -1) * (180 + Math.random() * 360),
+    color: CONFETTI[i % CONFETTI.length],
+    w: 6 + Math.random() * 5,
+    round: i % 3 === 0,
+  }))).current;
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(burst, { toValue: 1, duration: 1300, easing: Easing.out(Easing.cubic), useNativeDriver: nd }),
+      Animated.spring(check, { toValue: 1, friction: 5, tension: 120, useNativeDriver: nd }),
+      Animated.timing(text, { toValue: 1, duration: 500, delay: 250, useNativeDriver: nd }),
+    ]).start();
+  }, []);
+  const next = ch.rewards.find((r) => r.at > count);
+  const goalLeft = Math.max(0, ch.goal - count);
+  return (
+    <View style={st.party}>
+      <View style={st.partyStage}>
+        {bits.map((b, i) => (
+          <Animated.View key={i} pointerEvents="none" style={{
+            position: 'absolute', width: b.w, height: b.round ? b.w : b.w * 1.8, borderRadius: b.round ? b.w : 2, backgroundColor: b.color,
+            opacity: burst.interpolate({ inputRange: [0, 0.1, 0.75, 1], outputRange: [0, 1, 1, 0] }),
+            transform: [
+              { translateX: burst.interpolate({ inputRange: [0, 1], outputRange: [0, Math.cos(b.angle) * b.dist] }) },
+              { translateY: burst.interpolate({ inputRange: [0, 0.6, 1], outputRange: [0, Math.sin(b.angle) * b.dist * 0.8, Math.sin(b.angle) * b.dist + 70] }) },
+              { rotate: burst.interpolate({ inputRange: [0, 1], outputRange: ['0deg', b.spin + 'deg'] }) },
+            ],
+          }} />
+        ))}
+        <Animated.View style={[st.partyCheck, { backgroundColor: hue.solid, transform: [{ scale: check }] }]}>
+          <Icon name="tick" size={54} color={C.white} stroke={3} />
+        </Animated.View>
+      </View>
+      <Animated.View style={{ alignItems: 'center', opacity: text, transform: [{ translateY: text.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }] }}>
+        <Text style={st.partyTitle}>{days > 1 ? `${days} days in a row` : 'You wrapped today'}</Text>
+        <Text style={st.partySub}>Your photo is on today's board.</Text>
+        <View style={st.partyStats}>
+          <View style={st.partyStat}><Text style={st.partyNum}>{count}</Text><Text style={st.partyLabel}>check-ins</Text></View>
+          <View style={st.partyDivider} />
+          <View style={st.partyStat}><Text style={st.partyNum}>{goalLeft}</Text><Text style={st.partyLabel}>to the goal</Text></View>
+        </View>
+        {next ? (
+          <View style={st.partyNext}>
+            <Icon name="gift" size={18} color={hue.deep} stroke={2.2} />
+            <Text style={[st.partyNextText, { color: hue.deep }]}>{next.at - count} more for: {next.prize}</Text>
+          </View>
+        ) : null}
+      </Animated.View>
+      <View style={{ width: '100%', marginTop: 28 }}>
+        <Button label="See today's board" color={hue.solid} onPress={onClose} />
+      </View>
     </View>
   );
 }
@@ -554,6 +644,18 @@ function PhotoSheet({ ch, post, onClose }: { ch: Challenge; post: WallPost | nul
 }
 
 const st = StyleSheet.create({
+  party: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28, maxWidth: 520, width: '100%', alignSelf: 'center' },
+  partyStage: { width: 220, height: 200, alignItems: 'center', justifyContent: 'center' },
+  partyCheck: { width: 108, height: 108, borderRadius: 54, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 20, shadowOffset: { width: 0, height: 10 } },
+  partyTitle: { fontSize: 30, fontFamily: F.display, color: C.ink, letterSpacing: -0.6, textAlign: 'center', marginTop: 6 },
+  partySub: { fontSize: 15, color: C.sub, marginTop: 6, textAlign: 'center' },
+  partyStats: { flexDirection: 'row', alignItems: 'center', marginTop: 22, paddingVertical: 14, paddingHorizontal: 26, borderRadius: 20, backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
+  partyStat: { alignItems: 'center', minWidth: 90 },
+  partyNum: { fontSize: 28, fontFamily: F.display, color: C.ink, fontVariant: ['tabular-nums'] },
+  partyLabel: { fontSize: 12, fontWeight: '700', color: C.sub, marginTop: 2 },
+  partyDivider: { width: 1, height: 34, backgroundColor: C.line, marginHorizontal: 10 },
+  partyNext: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 14, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 14, backgroundColor: C.bluePale },
+  partyNextText: { fontSize: 14, fontWeight: '800', flexShrink: 1 },
   closedCard: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 16, padding: 16, borderRadius: 22, backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
   window: { marginTop: 14, padding: 16, borderRadius: 20, backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
   windowEnds: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

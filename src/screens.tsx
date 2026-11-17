@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { router, useFocusEffect } from 'expo-router';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { C, R, T, F } from './theme';
 import { Icon } from './icons';
-import { CHAPTER, calendarUrl, countdown, dateLabel, open, upcoming, useShabbat, useStore, type ColorKey, type EventItem, type Post } from './store';
+import { CHAPTER, calendarUrl, countdown, dateLabel, open, tap, upcoming, useShabbat, useStore, type ColorKey, type EventItem, type Post } from './store';
 import { audienceLabel, Button, Card, Chips, Cover, Empty, EventCard, EventMeta, Field, IconTile, ScopeBadge, SectionHead, Sheet, s as u } from './ui';
 import { ChallengeBanner, NameGate } from './rewards';
 
@@ -269,6 +269,15 @@ export function Feed() {
 export function PostCard({ post, full }: { post: Post; full?: boolean }) {
   const { liked, toggleLiked, openEvent, openChallenge, content } = useStore();
   const on = liked.includes(post.id);
+  const pop = React.useRef(new Animated.Value(1)).current;
+  const like = () => {
+    if (!on) {
+      tap();
+      pop.setValue(0.6);
+      Animated.spring(pop, { toValue: 1, friction: 3, tension: 220, useNativeDriver: Platform.OS !== 'web' }).start();
+    }
+    toggleLiked(post.id);
+  };
   const ev = post.eventId ? content.events.find((e) => e.id === post.eventId) : undefined;
   const ch = post.challengeId ? content.challenges.find((c) => c.id === post.challengeId) : undefined;
   return (
@@ -317,8 +326,8 @@ export function PostCard({ post, full }: { post: Post; full?: boolean }) {
         </ScrollView>
       ) : null}
       <View style={st.postFoot}>
-        <Pressable onPress={() => toggleLiked(post.id)} style={st.like} hitSlop={8} accessibilityRole="button" accessibilityLabel={on ? 'Unlike' : 'Like'}>
-          <Icon name="heart" size={19} color={on ? '#E0445C' : C.sub} fill={on ? '#E0445C' : 'none'} />
+        <Pressable onPress={like} style={st.like} hitSlop={8} accessibilityRole="button" accessibilityLabel={on ? 'Unlike' : 'Like'}>
+          <Animated.View style={{ transform: [{ scale: pop }] }}><Icon name="heart" size={19} color={on ? '#E0445C' : C.sub} fill={on ? '#E0445C' : 'none'} /></Animated.View>
           <Text style={[st.likeText, on && { color: '#E0445C' }]}>{on ? 'Liked' : 'Like'}</Text>
         </Pressable>
         {post.linkUrl ? (
@@ -348,7 +357,7 @@ export function Chapter() {
         </View>
       </Card>
       <View style={{ marginTop: 12 }}>
-        <Button label="Join CTeen Great Neck" onPress={() => open(CHAPTER.join)} />
+        <Button kind="ghost" icon="external" label="Chapter sign-up on chabadgn.com" onPress={() => open(CHAPTER.join)} />
       </View>
 
       <SectionHead title="You" />
