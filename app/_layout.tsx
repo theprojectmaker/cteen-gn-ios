@@ -5,7 +5,7 @@ import { C } from '../src/theme';
 import { StoreProvider } from '../src/store';
 import { EventSheet } from '../src/screens';
 import { AdminPanel } from '../src/admin';
-import { Onboarding } from '../src/account';
+import { Setup } from '../src/setup';
 import { useOtaUpdates } from '../src/shell';
 
 // Tabs at the bottom; the challenge and account pages slide in on top with a native back button.
@@ -21,7 +21,7 @@ function Root() {
       </Stack>
       <EventSheet />
       <AdminPanel />
-      <Onboarding />
+      <Setup />
     </>
   );
 }

@@ -78,7 +78,7 @@ async function getAccount(env, id, token) {
   if (!acc || !(await sameSecret(await sha(token), acc.tokenHash))) return null;
   return acc;
 }
-const publicAccount = (a) => ({ id: a.id, name: a.name, grade: a.grade, age: a.age, gender: a.gender, google: a.google ? { email: a.google.email } : null });
+const publicAccount = (a) => ({ id: a.id, name: a.name, grade: a.grade, age: a.age, gender: a.gender, school: a.school || '', google: a.google ? { email: a.google.email } : null });
 function profileFields(b) {
   const age = Number(b.age);
   return {
@@ -86,6 +86,7 @@ function profileFields(b) {
     grade: clean(b.grade, 4),
     age: Number.isFinite(age) && age >= 10 && age <= 25 ? Math.round(age) : null,
     gender: GENDERS.includes(b.gender) ? b.gender : '',
+    school: clean(b.school, 40),
   };
 }
 
@@ -94,11 +95,11 @@ async function actor(env, b) {
   if (b.id && b.token) {
     const acc = await getAccount(env, b.id, b.token);
     if (!acc) return { error: 'Please sign in again.' };
-    return { key: acc.id, name: acc.name, grade: acc.grade, age: acc.age, gender: acc.gender };
+    return { key: acc.id, name: acc.name, grade: acc.grade, age: acc.age, gender: acc.gender, school: acc.school || '' };
   }
   const device = clean(b.device, 40);
   if (device.length < 8) return { error: 'Bad request.' };
-  return { key: device, name: clean(b.name, 40), grade: clean(b.grade, 12), age: null, gender: '' };
+  return { key: device, name: clean(b.name, 40), grade: clean(b.grade, 12), age: null, gender: '', school: '' };
 }
 
 async function getContent(env) {
@@ -259,7 +260,7 @@ export async function onRequest({ request, env, params }) {
       if (action === 'signup') {
         if (who.name.length < 2) return bad('Add your name.');
         if (rows.length >= 500) return bad('This event is full.', 409);
-        rows.push({ name: who.name, grade: who.grade, age: who.age, gender: who.gender, device: who.key, at: new Date().toISOString() });
+        rows.push({ name: who.name, grade: who.grade, age: who.age, gender: who.gender, school: who.school, device: who.key, at: new Date().toISOString() });
       }
       await env.CTEEN.put(key, JSON.stringify(rows));
       return json({ ok: true, going: action === 'signup', count: rows.length });
@@ -365,7 +366,7 @@ export async function onRequest({ request, env, params }) {
         const content = await getContent(env);
         const out = {};
         for (const e of content.events.filter((x) => x.signup === 'app')) {
-          out[e.id] = ((await env.CTEEN.get('signups:' + e.id, 'json')) || []).map((r) => ({ name: r.name, grade: r.grade, age: r.age ?? null, gender: r.gender || '', at: r.at }));
+          out[e.id] = ((await env.CTEEN.get('signups:' + e.id, 'json')) || []).map((r) => ({ name: r.name, grade: r.grade, age: r.age ?? null, gender: r.gender || '', school: r.school || '', at: r.at }));
         }
         return json({ signups: out, phones: Object.keys((await env.CTEEN.get('push', 'json')) || {}).length });
       }

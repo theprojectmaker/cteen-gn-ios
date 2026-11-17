@@ -25,8 +25,9 @@ export type Tab = 'Home' | 'Events' | 'Feed' | 'Chapter';
 const TAB_PATH = { Home: '/', Events: '/events', Feed: '/feed', Chapter: '/chapter' } as const;
 export type BoardRow = { name: string; count: number };
 export type Question = { id: string; name: string; text: string; at: string };
-export type SignupRow = { name: string; grade: string; age?: number | null; gender?: string; at: string };
+export type SignupRow = { name: string; grade: string; age?: number | null; gender?: string; school?: string; at: string };
 export type Gender = '' | 'boy' | 'girl';
+export type Profile = { name: string; grade: string; age: number | null; gender: Gender; school: string };
 export type Account = { id: string; token: string; google: { email: string } | null };
 export type PhotoRow = { key: string; name: string; at: string; day: string };
 
@@ -53,7 +54,7 @@ export const IMAGES: Record<string, ImageSourcePropType> = {
 
 // ───────── device-local state ─────────
 type Local = {
-  device: string; name: string; grade: string; age: number | null; gender: Gender;
+  device: string; name: string; grade: string; age: number | null; gender: Gender; school: string;
   account: Account | null; onboarded: boolean;
   seenPosts: string[]; seenInit: boolean;
   saved: string[]; liked: string[]; going: string[]; joined: string[]; dismissed: string[];
@@ -61,7 +62,7 @@ type Local = {
   counts: Record<string, number>;
   reminders: Record<string, number>; // challenge id -> hour of day
 };
-const blank: Local = { device: '', name: '', grade: '', age: null, gender: '', account: null, onboarded: false, seenPosts: [], seenInit: false, saved: [], liked: [], going: [], joined: [], dismissed: [], checks: {}, counts: {}, reminders: {} };
+const blank: Local = { device: '', name: '', grade: '', age: null, gender: '', school: '', account: null, onboarded: false, seenPosts: [], seenInit: false, saved: [], liked: [], going: [], joined: [], dismissed: [], checks: {}, counts: {}, reminders: {} };
 const KEY = 'cteengn.v3';
 const CACHE = 'cteengn.content.v3';
 
@@ -71,7 +72,7 @@ type Ctx = Local & {
   refresh: () => Promise<void>;
   toggleSaved: (id: string) => void; toggleLiked: (id: string) => void;
   setProfile: (name: string, grade: string) => void;
-  saveProfile: (p: { name: string; grade: string; age: number | null; gender: Gender }) => Promise<string | null>;
+  saveProfile: (p: Partial<Profile>) => Promise<string | null>;
   finishOnboarding: () => void;
   googleReady: boolean; linkGoogle: () => Promise<string | null>; signOut: () => void;
   unreadFeed: number; markFeedSeen: () => void;
@@ -211,10 +212,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const liveAlert = a && a.on && a.title && !local.dismissed.includes(a.id) && (!a.until || a.until > new Date().toISOString()) ? a : null;
 
   const unreadFeed = local.seenInit ? content.posts.filter((p) => !local.seenPosts.includes(p.id)).length : 0;
-  const saveProfile = async (p: { name: string; grade: string; age: number | null; gender: Gender }) => {
+  const saveProfile = async (part: Partial<Profile>) => {
     const me = ref.current;
-    ref.current = { ...me, name: p.name.trim(), grade: p.grade, age: p.age, gender: p.gender };
-    patch((s) => ({ ...s, name: p.name.trim(), grade: p.grade, age: p.age, gender: p.gender }));
+    const p: Profile = { name: (part.name ?? me.name).trim(), grade: part.grade ?? me.grade, age: part.age !== undefined ? part.age : me.age, gender: part.gender ?? me.gender, school: part.school ?? me.school };
+    ref.current = { ...me, ...p };
+    patch((s) => ({ ...s, ...p }));
+    if (p.name.length < 2) return null; // nothing to save on the server until there is a name
     try {
       const r = await api<{ account: { id: string; google: { email: string } | null }; token: string | null }>('/account', { method: 'POST', body: { ...p, id: me.account?.id, token: me.account?.token } });
       const account = { id: r.account.id, token: r.token ?? me.account!.token, google: r.account.google };
@@ -252,9 +255,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         const q = Linking2.parse(res.url).queryParams ?? {};
         if (q.error || !q.ticket) return q.error === 'cancelled' ? null : 'Google sign-in did not finish. Try again.';
         const me = ref.current;
-        const r = await api<{ account: { id: string; name: string; grade: string; age: number | null; gender: Gender; google: { email: string } | null }; token: string }>('/auth/redeem', { method: 'POST', body: { ticket: q.ticket, id: me.account?.id, token: me.account?.token } });
+        const r = await api<{ account: { id: string; name: string; grade: string; age: number | null; gender: Gender; school?: string; google: { email: string } | null }; token: string }>('/auth/redeem', { method: 'POST', body: { ticket: q.ticket, id: me.account?.id, token: me.account?.token } });
         const account = { id: r.account.id, token: r.token, google: r.account.google };
-        const next = { account, name: r.account.name || me.name, grade: r.account.grade || me.grade, age: r.account.age ?? me.age, gender: r.account.gender || me.gender, onboarded: true };
+        const next = { account, name: r.account.name || me.name, grade: r.account.grade || me.grade, age: r.account.age ?? me.age, gender: r.account.gender || me.gender, school: r.account.school || me.school, onboarded: true };
         ref.current = { ...ref.current, ...next };
         patch((s) => ({ ...s, ...next }));
         tap(true);
@@ -272,7 +275,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     toggleLiked: (id) => flip('liked', id),
     setProfile: (name, grade) => {
       const me = ref.current;
-      saveProfile({ name, grade, age: me.age, gender: me.gender }); // ref is updated first, so an action fired right after sees it
+      saveProfile({ name, grade }); // ref is updated first, so an action fired right after sees it
     },
     activeEvent: content.events.find((e) => e.id === eventId) ?? null,
     openEvent: (id) => { tap(); setEventId(id); },

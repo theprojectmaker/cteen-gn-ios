@@ -113,6 +113,7 @@ preview misses. `dist/` is ignored by git.
 | `app/_layout.tsx` | Root stack: the tabs, plus the challenge and account pages that slide in on top; event sheet, leader panel, first-launch welcome |
 | `app/(tabs)/_layout.tsx` | Tab bar: Apple's own on iPhone (real Liquid Glass on iOS 26, Feed badge, live banner in its bottom accessory); `src/webTabs.tsx` imitates it on web |
 | `app/(tabs)/index.tsx`, `events.tsx`, `feed.tsx`, `chapter.tsx` | One file per tab (expo-router); each wraps a screen from `src/screens.tsx` |
+| `src/setup.tsx` | First-launch setup: welcome, name, school and grade, age and gender, notifications |
 | `app/challenge/[id].tsx`, `app/account.tsx` | Challenge page (`src/rewards.tsx`, photo check-ins via `src/photo.ts`) and account page (`src/account.tsx`) |
 | `src/shell.tsx` | Glass header with the Events and account buttons, top live banner (older iOS and web), over-the-air update check |
 | `src/screens.tsx` | Home, Events, Feed and Chapter tabs, event sheet |

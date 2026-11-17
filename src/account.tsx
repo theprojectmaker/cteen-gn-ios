@@ -7,6 +7,7 @@ import { useStore, type Gender } from './store';
 import { Button, Card, Field, s as u } from './ui';
 
 const GRADES = ['8', '9', '10', '11', '12'];
+const SCHOOL_OPTS = ['GN North High', 'GN South High', 'NSHA', 'Village School', 'GN North Middle', 'GN South Middle', 'Another school'].map((l, i) => ({ v: ['Great Neck North High', 'Great Neck South High', 'North Shore Hebrew Academy', 'Village School', 'Great Neck North Middle', 'Great Neck South Middle', 'Another school'][i], l }));
 const AGES = [12, 13, 14, 15, 16, 17, 18];
 const GENDERS: { v: Gender; l: string }[] = [{ v: 'boy', l: 'Boy' }, { v: 'girl', l: 'Girl' }];
 
@@ -31,17 +32,18 @@ function ChipRow<V extends string | number>({ label, options, value, onChange, h
 
 // Name, grade, age and gender. Age and gender decide which special events (like a girls' night) you see.
 export function ProfileForm({ cta, onSaved }: { cta: string; onSaved?: () => void }) {
-  const { name, grade, age, gender, saveProfile } = useStore();
+  const { name, grade, age, gender, school, saveProfile } = useStore();
   const [n, setN] = useState(name);
   const [g, setG] = useState(grade);
   const [a, setA] = useState<number | null>(age);
   const [s, setS] = useState<Gender>(gender);
+  const [sc, setSc] = useState(school);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  useEffect(() => { setN(name); setG(grade); setA(age); setS(gender); }, [name, grade, age, gender]);
+  useEffect(() => { setN(name); setG(grade); setA(age); setS(gender); setSc(school); }, [name, grade, age, gender, school]);
   const save = async () => {
     setBusy(true); setErr(null);
-    const e = await saveProfile({ name: n, grade: g, age: a, gender: s });
+    const e = await saveProfile({ name: n, grade: g, age: a, gender: s, school: sc });
     setBusy(false);
     if (e) return setErr(e);
     onSaved?.();
@@ -49,6 +51,7 @@ export function ProfileForm({ cta, onSaved }: { cta: string; onSaved?: () => voi
   return (
     <View>
       <Field label="Your name" value={n} onChange={setN} placeholder="Like: Noah S." hint="First name and last initial is perfect." />
+      <ChipRow label="School" options={SCHOOL_OPTS} value={sc || null} onChange={setSc} />
       <ChipRow label="Grade" options={GRADES.map((x) => ({ v: x, l: `${x}th` }))} value={g || null} onChange={setG} />
       <ChipRow label="Age" options={AGES.map((x) => ({ v: x, l: x === 18 ? '18+' : String(x) }))} value={a} onChange={setA} />
       <ChipRow label="I'm a" options={GENDERS} value={s || null} onChange={setS} hint="Used only to show you events made for you, like a girls' or boys' night." />
@@ -121,31 +124,6 @@ export function AccountPage() {
         </Pressable>
       ) : null}
     </View>
-  );
-}
-
-// First launch: a short welcome that asks for name, grade, age and gender. Can be skipped.
-export function Onboarding() {
-  const insets = useSafeAreaInsets();
-  const { device, onboarded, name, finishOnboarding } = useStore();
-  const show = !!device && !onboarded && !name;
-  if (!show) return null;
-  return (
-    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={finishOnboarding}>
-      <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ padding: 24, paddingTop: 36, paddingBottom: insets.bottom + 40 }} keyboardShouldPersistTaps="handled">
-        <View style={{ width: '100%', maxWidth: 520, alignSelf: 'center' }}>
-          <Image source={require('../assets/icon.png')} style={st.logo} />
-          <Text style={st.welcome}>Welcome to CTeen Great Neck</Text>
-          <Text style={[T.body, { color: C.sub, marginTop: 8 }]}>Events, challenges and news from Rabbi Zevy, all in one place. Tell us a little about you.</Text>
-          <View style={{ marginTop: 10 }}>
-            <ProfileForm cta="Let's go" onSaved={finishOnboarding} />
-          </View>
-          <Pressable onPress={finishOnboarding} hitSlop={8} style={{ alignSelf: 'center', marginTop: 18 }} accessibilityRole="button">
-            <Text style={[T.small, { textDecorationLine: 'underline' }]}>Skip for now</Text>
-          </Pressable>
-        </View>
-      </ScrollView>
-    </Modal>
   );
 }
 
