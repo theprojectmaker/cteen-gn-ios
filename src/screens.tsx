@@ -6,6 +6,7 @@ import { Icon } from './icons';
 import { CHAPTER, calendarUrl, countdown, dateLabel, open, tap, upcoming, useShabbat, useStore, type ColorKey, type EventItem, type Post } from './store';
 import { audienceLabel, Button, Card, Chips, Cover, Empty, EventCard, EventMeta, Field, IconTile, ScopeBadge, SectionHead, Sheet, s as u } from './ui';
 import { ChallengeBanner, NameGate } from './rewards';
+import { greetingNow } from './shell';
 
 // ───────────────────────── Home ─────────────────────────
 // One thing per section, lots of room: who you are, what's next, your challenge,
@@ -16,11 +17,10 @@ export function Home() {
   const next = up.find((e) => e.scope === 'gn') ?? up[0];
   const live = content.challenges.filter((c) => c.active);
   const latest = sortPosts(content.posts)[0];
-  const first = name.split(' ')[0];
-  const h = new Date().getHours();
-  const hello = h < 12 ? 'Good morning' : h < 18 ? 'Hey' : 'Good evening';
+  const first = name.trim().split(' ')[0];
   return (
     <>
+      <Text style={st.helloLine} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} accessibilityRole="header">{greetingNow()}{first ? `, ${first}` : ''}</Text>
       {next ? (
         <Pressable onPress={() => openEvent(next.id)} style={({ pressed }) => [st.hero, pressed && u.pressed]} accessibilityRole="button" accessibilityLabel={next.title}>
           <Cover e={next} style={u.fill} iconSize={150} />
@@ -473,6 +473,7 @@ function LinkRow({ icon, title, sub, url, first }: { icon: string; title: string
 }
 
 const st = StyleSheet.create({
+  helloLine: { fontSize: 27, lineHeight: 32, fontFamily: F.display, color: C.ink, letterSpacing: -0.6, marginBottom: 14, marginTop: -2 },
   hello: { fontSize: 32, lineHeight: 37, fontFamily: F.display, color: C.ink, letterSpacing: -0.6 },
   helloSub: { fontSize: 16, lineHeight: 22, color: C.sub, marginTop: 6 },
   section: { fontSize: 20, fontFamily: F.display, color: C.ink, letterSpacing: -0.2, marginTop: 38, marginBottom: 14 },

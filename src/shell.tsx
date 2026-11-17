@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import * as Updates from 'expo-updates';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
-import { C, HUES, PREFS, R, F } from './theme';
+import { C, HUES, IS_DARK as IS_DARK_UI, PREFS, R, F } from './theme';
 import { Icon, challengeIcon } from './icons';
 import { wrapWindow } from './zmanim';
 import { Glass, LIQUID } from './glass';
@@ -80,16 +80,14 @@ export function Screen({ children }: { children: React.ReactNode }) {
   );
 }
 
-// One continuous glass bar: logo, greeting, the Tefillin trophy and your profile picture.
+// One continuous glass bar (the build 4 look): logo, chapter name, the tefillin button and your profile.
 function Header() {
-  const { name } = useStore();
-  const first = name.trim().split(' ')[0];
   return (
     <Glass style={st.header}>
       <Image source={require('../assets/logo.png')} style={st.logo} resizeMode="contain" />
       <View style={{ flex: 1 }}>
-        <Text style={st.topEyebrow}>CTEEN GREAT NECK</Text>
-        <Text style={st.topName} numberOfLines={1}>{greetingNow()}{first ? `, ${first}` : ''}</Text>
+        <Text style={st.topEyebrow}>YOUR CHAPTER</Text>
+        <Text style={st.topName} numberOfLines={1}>{CHAPTER.name}, NY</Text>
       </View>
       <HeaderButtons />
     </Glass>
@@ -129,7 +127,7 @@ function HeaderButtons() {
         <Pressable onPress={openIt} style={({ pressed }) => [st.hBtn, pressed && { opacity: 0.55 }]} hitSlop={4} accessibilityRole="button" accessibilityLabel={main.title}>
           {due ? <Animated.View pointerEvents="none" style={[st.ring, { opacity: ringOpacity, transform: [{ scale: ringScale }] }]} /> : null}
           <Animated.View style={{ transform: [{ scale: iconScale }] }}>
-            <Icon name={challengeIcon(main)} size={23} color={due ? '#D08A1E' : C.ink} stroke={2} />
+            <Icon name={challengeIcon(main)} size={21} color={due ? '#C27A12' : C.ink} stroke={2} />
           </Animated.View>
           {due ? <View style={st.hDot} /> : null}
         </Pressable>
@@ -264,18 +262,18 @@ function Footer() {
 const st = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
   col: { width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 20 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 11, borderRadius: 28, paddingLeft: 12, paddingRight: 8, height: 62, marginBottom: 18, zIndex: 5 },
-  logo: { width: 21, height: 37 },
-  topEyebrow: { fontSize: 10, fontWeight: '800', letterSpacing: 1, color: C.sub },
-  topName: { fontSize: 18, fontFamily: F.display, color: C.ink, letterSpacing: -0.3 },
-  hBtns: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  hBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  ring: { position: 'absolute', width: 40, height: 40, borderRadius: 20, backgroundColor: '#F5B81F' },
-  hDot: { position: 'absolute', top: 8, right: 8, width: 9, height: 9, borderRadius: 5, backgroundColor: '#E0445C', borderWidth: 1.5, borderColor: C.card },
-  hAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: C.blue, alignItems: 'center', justifyContent: 'center' },
-  hAvatarText: { color: C.white, fontSize: 17, fontWeight: '900' },
-  tip: { position: 'absolute', top: 54, right: 0, backgroundColor: C.inverse, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, minWidth: 140, zIndex: 10 },
-  tipArrow: { position: 'absolute', top: -5, right: 62, width: 12, height: 12, backgroundColor: C.inverse, transform: [{ rotate: '45deg' }] },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 22, paddingHorizontal: 14, paddingVertical: 9, marginBottom: 18, zIndex: 5 },
+  logo: { width: 20, height: 35 },
+  topEyebrow: { fontSize: 10, fontWeight: '800', letterSpacing: 0.8, color: C.sub },
+  topName: { fontSize: 16, fontWeight: '900', color: C.ink, letterSpacing: -0.2 },
+  hBtns: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  hBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: IS_DARK_UI ? 'rgba(255,255,255,0.09)' : 'rgba(19,32,44,0.06)', alignItems: 'center', justifyContent: 'center' },
+  ring: { position: 'absolute', width: 38, height: 38, borderRadius: 19, backgroundColor: '#F5B81F' },
+  hDot: { position: 'absolute', top: -1, right: -1, width: 11, height: 11, borderRadius: 6, backgroundColor: '#E0445C', borderWidth: 2, borderColor: C.card },
+  hAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: C.blue, alignItems: 'center', justifyContent: 'center' },
+  hAvatarText: { color: C.white, fontSize: 16, fontWeight: '900' },
+  tip: { position: 'absolute', top: 48, right: 0, backgroundColor: C.inverse, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, minWidth: 140, zIndex: 10 },
+  tipArrow: { position: 'absolute', top: -5, right: 59, width: 12, height: 12, backgroundColor: C.inverse, transform: [{ rotate: '45deg' }] },
   tipText: { color: C.onInverse, fontSize: 13, fontWeight: '800' },
   shabbat: { flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: 22, padding: 16, marginBottom: 18 },
   shabbatIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: 'rgba(181,119,42,0.14)', alignItems: 'center', justifyContent: 'center' },
