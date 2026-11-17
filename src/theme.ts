@@ -7,12 +7,12 @@ import { DEFAULT_PREFS } from './prefsDefaults';
 
 // CTeen's two colors: cyan (the logo) and orange. Warm off-white base, deep navy ink.
 const LIGHT = {
-  bg: '#F7F4EF',
+  bg: '#F2F6F9',
   card: '#FFFFFF',
   ink: '#0F1D2B',
   sub: '#5A6470',
   faint: '#98A0A8',
-  line: '#ECE6DE',
+  line: '#E2E9EF',
   blue: '#0BAFE6', // CTeen cyan: primary buttons, links, tab bar
   blueDeep: '#07729F',
   bluePale: '#E2F6FD',

@@ -128,8 +128,8 @@ export function Events() {
   const list = upcoming(content.events).filter(fits).filter((e) => (f === 'All' ? true : f === 'Saved' ? saved.includes(e.id) : f === 'Great Neck' ? e.scope === 'gn' : e.scope === 'intl'));
   return (
     <>
-      <Text style={T.eyebrow}>Events</Text>
-      <Text style={[T.h1, { marginTop: 6, marginBottom: 14 }]}>What's on</Text>
+      <Text style={T.h1}>Events</Text>
+      <Text style={[T.small, { marginTop: 4, marginBottom: 14 }]}>What's coming up in Great Neck and around CTeen</Text>
       <Chips options={EVENT_FILTERS} value={f} onChange={setF} />
       <View style={{ gap: 26, marginTop: 18 }}>
         {list.map((e) => <EventCard key={e.id} e={e} />)}
@@ -364,10 +364,9 @@ function LinkAppleCard() {
 export { Feed, PostCard } from './feed';
 
 // ───────────────────────── Chapter ─────────────────────────
-// Chapter tab: a plain, native-feeling page. Who we are, this week's times, how to reach us.
-// Apple-style grouped lists: grey section labels, white groups, hairline rows, values on the right.
+// Chapter tab: who runs it, this Shabbat, what's next, how to reach us. Real content, iOS-style lists.
 export function Chapter() {
-  const { content, leader, setAdminOpen, online } = useStore();
+  const { content, leader, setAdminOpen, online, openEvent, fits } = useStore();
   const sh = useShabbat();
   const shab = sh && sh !== 'error' ? sh : null;
   const [askOpen, setAskOpen] = useState(0);
@@ -376,23 +375,75 @@ export function Chapter() {
   const teen = m.shabbat.find((r) => /teen/i.test(r.label)) ?? m.weekday.find((r) => /teen/i.test(r.label));
   const shul = { weekday: m.weekday.filter((r) => r !== teen), shabbat: m.shabbat.filter((r) => r !== teen) };
   const clock = (ms?: number) => (ms ? new Date(ms).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }) : '');
+  const next = upcoming(content.events).filter(fits).find((e) => e.scope === 'gn');
+  // days until Shabbat morning (0 on Shabbat)
+  const dow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })).getDay();
+  const toShabbat = (6 - dow + 7) % 7;
   return (
     <>
-      <View style={st.idRow}>
-        <View style={st.idLogo}><Image source={require('../assets/logo.png')} style={st.idLogoImg} resizeMode="contain" /></View>
+      <View style={st.pageHead}>
+        <Image source={require('../assets/logo.png')} style={st.pageLogo} resizeMode="contain" />
         <View style={{ flex: 1 }}>
-          <Text style={st.idName}>{CHAPTER.name}</Text>
-          <Text style={st.idSub}>{CHAPTER.org}</Text>
+          <Text style={st.pageTitle}>{CHAPTER.name}</Text>
+          <Text style={st.pageSub}>{CHAPTER.org} · 400 East Shore Road</Text>
         </View>
       </View>
-      <Text style={st.idAbout}>Run by {CHAPTER.leaders}. The home for Jewish teens in Great Neck.</Text>
 
-      <GroupLabel text={shab?.parsha ? `This week · ${shab.parsha}` : 'This week'} />
+      {/* this Shabbat: the Teen Minyan front and center */}
+      <View style={st.shabCard}>
+        <View style={st.shabTop}>
+          <Text style={st.shabEyebrow}>This Shabbat{shab?.parsha ? ` · ${shab.parsha}` : ''}</Text>
+          <Text style={st.shabWhen}>{toShabbat === 0 ? 'Today' : toShabbat === 1 ? 'Tomorrow' : `In ${toShabbat} days`}</Text>
+        </View>
+        <View style={st.shabMain}>
+          <View style={{ flex: 1 }}>
+            <Text style={st.shabTitle}>{teen?.label ?? 'Teen Minyan'}</Text>
+            <Text style={st.shabSub}>Shabbat morning at the Chabad house</Text>
+          </View>
+          <Text style={st.shabTime}>{teen?.time ? minyanTime(teen.time, shab).time : '10:00 AM'}</Text>
+        </View>
+        <View style={st.shabRow}>
+          <View style={st.shabCell}><Text style={st.shabCellLabel}>Candle lighting</Text><Text style={st.shabCellValue}>{clock(shab?.candlesAt) || '—'}</Text></View>
+          <View style={st.shabDivider} />
+          <View style={st.shabCell}><Text style={st.shabCellLabel}>Shabbat ends</Text><Text style={st.shabCellValue}>{clock(shab?.havdalahAt) || '—'}</Text></View>
+        </View>
+      </View>
+
+      {/* the people who run it */}
+      <View style={st.rabbiCard}>
+        <View style={st.avatars}>
+          <View style={[st.avatar, { backgroundColor: C.blue }]}><Text style={st.avatarText}>Z</Text></View>
+          <View style={[st.avatar, st.avatar2, { backgroundColor: C.orange }]}><Text style={st.avatarText}>S</Text></View>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={st.rabbiName}>Rabbi Zevy & Shani</Text>
+          <Text style={st.rabbiSub}>Run CTeen Great Neck</Text>
+        </View>
+        <Pressable onPress={() => open('tel:' + CHAPTER.phone.replace(/\D/g, ''))} style={({ pressed }) => [st.pillBtn, pressed && { opacity: 0.8 }]} accessibilityRole="button" accessibilityLabel="Call"><Icon name="phone" size={16} color={C.blue} stroke={2.2} /></Pressable>
+        <Pressable onPress={() => setAskOpen((n) => n + 1)} style={({ pressed }) => [st.pillBtn, st.pillAsk, pressed && { opacity: 0.85 }]} accessibilityRole="button"><Text style={st.pillAskText}>Ask</Text></Pressable>
+      </View>
+      <AskRabbi openSignal={askOpen} />
+
+      {next ? (
+        <>
+          <GroupLabel text="Next at the Chabad house" />
+          <Pressable onPress={() => openEvent(next.id)} style={({ pressed }) => [st.nextCard, pressed && { opacity: 0.9 }]} accessibilityRole="button" accessibilityLabel={next.title}>
+            <Cover e={next} style={st.nextImg} iconSize={28} />
+            <View style={{ flex: 1 }}>
+              <Text style={st.nextTitle} numberOfLines={2}>{next.title}</Text>
+              <Text style={st.gSub}>{dateLabel(next)}{next.time ? ` · ${next.time}` : ''}</Text>
+            </View>
+            <Icon name="right" size={14} color={C.faint} stroke={2.4} />
+          </Pressable>
+        </>
+      ) : null}
+
+      <GroupLabel text="Visit and reach us" />
       <View style={st.group}>
-        {teen ? <GRow title={teen.label} sub="Shabbat morning" value={teen.time ? minyanTime(teen.time, shab).time : 'Ask'} strong first /> : null}
-        {shab?.candlesAt ? <GRow title="Candle lighting" sub="Friday" value={clock(shab.candlesAt)} first={!teen} /> : null}
-        {shab?.havdalahAt ? <GRow title="Shabbat ends" sub="Saturday night" value={clock(shab.havdalahAt)} /> : null}
-        <GRow title="Shul schedule" sub="Shacharit, Mincha and Maariv" onPress={() => setShulOpen((o) => !o)} chevron={shulOpen ? 'down' : 'right'} />
+        <GRow icon="pin" tile="#FF4D4F" title="Directions" sub={CHAPTER.address} onPress={() => open('https://maps.apple.com/?q=' + encodeURIComponent(CHAPTER.org + ', ' + CHAPTER.address))} chevron="right" first />
+        <GRow icon="phone" tile="#34C759" title="Call the Chabad house" value={CHAPTER.phone} onPress={() => open('tel:' + CHAPTER.phone.replace(/\D/g, ''))} />
+        <GRow icon="camera" tile="#E1306C" title="Instagram" value={CHAPTER.instagramHandle} onPress={() => open(CHAPTER.instagram)} />
+        <GRow icon="clock" tile="#5856D6" title="Shul schedule" sub="Shacharit, Mincha, Maariv" onPress={() => setShulOpen((o) => !o)} chevron={shulOpen ? 'down' : 'right'} />
         {shulOpen ? (
           <View style={st.shul}>
             {[...shul.weekday.map((r) => ({ ...r, day: 'Weekdays' })), ...shul.shabbat.map((r) => ({ ...r, day: 'Shabbat' }))].map((r, i) => {
@@ -409,18 +460,9 @@ export function Chapter() {
         ) : null}
       </View>
 
-      <GroupLabel text="Contact" />
-      <View style={st.group}>
-        <GRow icon="phone" title="Call" value={CHAPTER.phone} onPress={() => open('tel:' + CHAPTER.phone.replace(/\D/g, ''))} first />
-        <GRow icon="pin" title="400 East Shore Road" sub="Great Neck, NY 11024" valueLink="Directions" onPress={() => open('https://maps.apple.com/?q=' + encodeURIComponent(CHAPTER.org + ', ' + CHAPTER.address))} />
-        <GRow icon="camera" title="Instagram" value={CHAPTER.instagramHandle} onPress={() => open(CHAPTER.instagram)} />
-        <GRow icon="question" title="Ask Rabbi Zevy" sub="Anything about Judaism, life or CTeen" onPress={() => setAskOpen((n) => n + 1)} chevron="right" />
-      </View>
-      <AskRabbi openSignal={askOpen} />
-
       {content.info.length ? (
         <>
-          <GroupLabel text="Good to know" />
+          <GroupLabel text="About CTeen" />
           <View style={st.group}>
             {content.info.map((i, n) => <InfoRow key={i.id} icon={i.icon} title={i.title} body={i.body} first={n === 0} />)}
           </View>
@@ -429,10 +471,10 @@ export function Chapter() {
 
       <GroupLabel text="More" />
       <View style={st.group}>
-        <GRow title="Facebook" onPress={() => open(CHAPTER.facebook)} chevron="right" first />
-        <GRow title="CTeen portal" sub="International events and service hours" onPress={() => open(CHAPTER.portal)} chevron="right" />
-        <GRow title="Chapter sign-up" onPress={() => open(CHAPTER.join)} chevron="right" />
-        <GRow title="Donate" onPress={() => open(CHAPTER.donate)} chevron="right" />
+        <GRow icon="users" tile="#1877F2" title="Facebook" onPress={() => open(CHAPTER.facebook)} chevron="right" first />
+        <GRow icon="globe" tile={C.blue} title="CTeen portal" sub="International events, service hours" onPress={() => open(CHAPTER.portal)} chevron="right" />
+        <GRow icon="external" tile="#8E8E93" title="Chapter sign-up" onPress={() => open(CHAPTER.join)} chevron="right" />
+        <GRow icon="gift" tile={C.orange} title="Donate" onPress={() => open(CHAPTER.donate)} chevron="right" />
       </View>
 
       <Pressable onPress={() => setAdminOpen(true)} style={st.leaderLink} hitSlop={8} accessibilityRole="button">
@@ -447,36 +489,38 @@ function GroupLabel({ text }: { text: string }) {
   return <Text style={st.groupLabel}>{text}</Text>;
 }
 
-// One row in a grouped list: optional small grey icon, title + subtitle, value or link on the right.
-function GRow({ icon, title, sub, value, valueLink, strong, onPress, chevron, first }: { icon?: string; title: string; sub?: string; value?: string; valueLink?: string; strong?: boolean; onPress?: () => void; chevron?: 'right' | 'down'; first?: boolean }) {
+// One row in a grouped list: a small colored icon square (like iOS Settings), title + subtitle, value or chevron.
+function GRow({ icon, tile, title, sub, value, onPress, chevron, first }: { icon?: string; tile?: string; title: string; sub?: string; value?: string; onPress?: () => void; chevron?: 'right' | 'down'; first?: boolean }) {
   const body = (
     <>
-      {icon ? <Icon name={icon} size={18} color={C.sub} stroke={1.9} /> : null}
-      <View style={{ flex: 1 }}>
-        <Text style={st.gTitle}>{title}</Text>
-        {sub ? <Text style={st.gSub}>{sub}</Text> : null}
+      {icon ? <View style={[st.gTile, { backgroundColor: tile ?? C.sub }]}><Icon name={icon} size={16} color="#FFFFFF" stroke={2.1} /></View> : null}
+      <View style={[st.gBody, !first && st.gRule]}>
+        <View style={{ flex: 1 }}>
+          <Text style={st.gTitle}>{title}</Text>
+          {sub ? <Text style={st.gSub} numberOfLines={1}>{sub}</Text> : null}
+        </View>
+        {value ? <Text style={st.gValue}>{value}</Text> : null}
+        {chevron ? <View style={{ transform: [{ rotate: chevron === 'down' ? '90deg' : '0deg' }] }}><Icon name="right" size={14} color={C.faint} stroke={2.4} /></View> : null}
       </View>
-      {value ? <Text style={[st.gValue, strong && st.gValueStrong]}>{value}</Text> : null}
-      {valueLink ? <Text style={st.gLink}>{valueLink}</Text> : null}
-      {chevron ? <View style={{ transform: [{ rotate: chevron === 'down' ? '90deg' : '0deg' }] }}><Icon name="right" size={14} color={C.faint} stroke={2.4} /></View> : null}
     </>
   );
-  const style = [st.gRow, !first && st.gRule];
-  if (!onPress) return <View style={style}>{body}</View>;
-  return <Pressable onPress={onPress} style={({ pressed }) => [...style, pressed && { backgroundColor: C.bg }]} accessibilityRole="button">{body}</Pressable>;
+  if (!onPress) return <View style={st.gRow}>{body}</View>;
+  return <Pressable onPress={onPress} style={({ pressed }) => [st.gRow, pressed && { backgroundColor: C.bg }]} accessibilityRole="button">{body}</Pressable>;
 }
 
 // A "Good to know" item: just the title until you tap it.
 function InfoRow({ icon, title, body, first }: { icon: string; title: string; body: string; first?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
-    <Pressable onPress={() => setOpen((o) => !o)} style={({ pressed }) => [st.chInfoRow, !first && st.rule, pressed && { backgroundColor: C.bg }]} accessibilityRole="button" accessibilityState={{ expanded: open }}>
-      <Icon name={icon || 'star'} size={18} color={C.sub} stroke={1.9} />
-      <View style={{ flex: 1 }}>
-        <Text style={st.gTitle}>{title}</Text>
-        {open ? <Text style={st.chInfoBody}>{body}</Text> : null}
+    <Pressable onPress={() => setOpen((o) => !o)} style={({ pressed }) => [st.gRow, { alignItems: 'flex-start' }, pressed && { backgroundColor: C.bg }]} accessibilityRole="button" accessibilityState={{ expanded: open }}>
+      <View style={[st.gTile, { backgroundColor: C.blue, marginTop: 12 }]}><Icon name={icon || 'star'} size={16} color="#FFFFFF" stroke={2.1} /></View>
+      <View style={[st.gBody, !first && st.gRule, { alignItems: 'flex-start' }]}>
+        <View style={{ flex: 1 }}>
+          <Text style={st.gTitle}>{title}</Text>
+          {open ? <Text style={[st.gSub, { lineHeight: 19, marginTop: 4 }]}>{body}</Text> : null}
+        </View>
+        <View style={{ transform: [{ rotate: open ? '90deg' : '0deg' }], marginTop: 3 }}><Icon name="right" size={14} color={C.faint} stroke={2.4} /></View>
       </View>
-      <View style={{ transform: [{ rotate: open ? '90deg' : '0deg' }] }}><Icon name="right" size={15} color={C.faint} stroke={2.4} /></View>
     </Pressable>
   );
 }
@@ -548,6 +592,40 @@ function LinkRow({ icon, title, sub, url, first }: { icon: string; title: string
 }
 
 const st = StyleSheet.create({
+  pageHead: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 2, marginBottom: 18 },
+  pageLogo: { width: 30, height: 53 },
+  pageTitle: { fontSize: 27, fontFamily: F.display, color: C.ink, letterSpacing: -0.6 },
+  pageSub: { fontSize: 14, color: C.sub, marginTop: 1 },
+  shabCard: { borderRadius: 22, backgroundColor: C.card, padding: 18, shadowColor: '#0F1D2B', shadowOpacity: 0.06, shadowRadius: 16, shadowOffset: { width: 0, height: 6 } },
+  shabTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  shabEyebrow: { fontSize: 12, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase', color: C.orange },
+  shabWhen: { fontSize: 12, fontWeight: '800', color: C.orange, backgroundColor: C.orangePale, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 10, overflow: 'hidden' },
+  shabMain: { flexDirection: 'row', alignItems: 'center', marginTop: 12 },
+  shabTitle: { fontSize: 22, fontFamily: F.display, color: C.ink, letterSpacing: -0.3 },
+  shabSub: { fontSize: 13, color: C.sub, marginTop: 2 },
+  shabTime: { fontSize: 26, fontFamily: F.display, color: C.ink, fontVariant: ['tabular-nums'] },
+  shabRow: { flexDirection: 'row', alignItems: 'center', marginTop: 16, paddingTop: 14, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line },
+  shabCell: { flex: 1 },
+  shabCellLabel: { fontSize: 12, color: C.sub, fontWeight: '600' },
+  shabCellValue: { fontSize: 17, fontWeight: '800', color: C.ink, marginTop: 2, fontVariant: ['tabular-nums'] },
+  shabDivider: { width: StyleSheet.hairlineWidth, height: 32, backgroundColor: C.line, marginHorizontal: 14 },
+  rabbiCard: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12, padding: 14, borderRadius: 22, backgroundColor: C.card },
+  avatars: { flexDirection: 'row', width: 62 },
+  avatar: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: C.card },
+  avatar2: { marginLeft: -14 },
+  avatarText: { color: '#FFFFFF', fontSize: 15, fontWeight: '900' },
+  rabbiName: { fontSize: 16, fontWeight: '800', color: C.ink },
+  rabbiSub: { fontSize: 13, color: C.sub, marginTop: 1 },
+  pillBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: C.bluePale, alignItems: 'center', justifyContent: 'center' },
+  pillAsk: { width: undefined, paddingHorizontal: 16, backgroundColor: C.blue },
+  pillAskText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
+  nextCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, paddingRight: 14, borderRadius: 18, backgroundColor: C.card },
+  nextImg: { width: 64, height: 64, borderRadius: 12 },
+  nextTitle: { fontSize: 16, fontWeight: '800', color: C.ink },
+  gRow: { flexDirection: 'row', alignItems: 'center', paddingLeft: 14 },
+  gTile: { width: 30, height: 30, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  gBody: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingRight: 14, minHeight: 52 },
+  gRule: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line },
   idRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 4 },
   idLogo: { width: 56, height: 56, borderRadius: 14, backgroundColor: C.card, borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center' },
   idLogoImg: { width: 24, height: 42 },
@@ -555,9 +633,7 @@ const st = StyleSheet.create({
   idSub: { fontSize: 14, color: C.sub, marginTop: 1 },
   idAbout: { fontSize: 15, lineHeight: 21, color: C.sub, marginTop: 14 },
   groupLabel: { fontSize: 13, fontWeight: '600', color: C.sub, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 28, marginBottom: 8, marginLeft: 16 },
-  group: { borderRadius: 14, backgroundColor: C.card, overflow: 'hidden' },
-  gRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, minHeight: 50 },
-  gRule: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line, marginLeft: 16, paddingLeft: 0 },
+  group: { borderRadius: 18, backgroundColor: C.card, overflow: 'hidden' },
   gTitle: { fontSize: 16, color: C.ink },
   gSub: { fontSize: 13, color: C.sub, marginTop: 1 },
   gValue: { fontSize: 16, color: C.sub, fontVariant: ['tabular-nums'] },
@@ -655,7 +731,6 @@ const st = StyleSheet.create({
   intlNote: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.card, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: C.line },
   err: { color: '#C0303F', fontWeight: '700', fontSize: 13, marginTop: 8, textAlign: 'center' },
   postHead: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 16, paddingBottom: 12 },
-  avatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: C.bluePale },
   pinned: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: C.bluePale, borderRadius: R.pill, paddingHorizontal: 10, paddingVertical: 5 },
   pinnedText: { color: C.blueDeep, fontSize: 12, fontWeight: '800' },
   attach: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, marginTop: 14, padding: 10, borderRadius: R.tile, backgroundColor: C.bg },
