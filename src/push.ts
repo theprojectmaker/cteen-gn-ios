@@ -70,3 +70,21 @@ export function onNotificationTap(fn: (target: { type: string; id: string } | nu
   });
   return () => sub.remove();
 }
+
+// Tefillin: a reminder 30 minutes before each day's window closes (sunset, or candle lighting on
+// Fridays), for the next week. Today's is skipped once you've posted. Pass [] to clear them all.
+export async function scheduleWrapReminders(times: { id: string; at: number; title: string; body: string }[]) {
+  if (!NATIVE) return;
+  try {
+    const all = await Notifications.getAllScheduledNotificationsAsync();
+    await Promise.all(all.filter((n) => n.identifier.startsWith('wrap-')).map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier).catch(() => {})));
+    for (const t of times) {
+      if (t.at <= Date.now() + 60000) continue;
+      await Notifications.scheduleNotificationAsync({
+        identifier: t.id,
+        content: { title: t.title, body: t.body, data: { target: { type: 'challenge', id: 'tefillin' } } },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(t.at) },
+      });
+    }
+  } catch {}
+}

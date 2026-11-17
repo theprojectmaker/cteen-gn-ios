@@ -9,6 +9,8 @@ import { AdminPanel } from '../src/admin';
 import { Setup } from '../src/setup';
 import { Intro } from '../src/intro';
 import { StartupPopup } from '../src/popup';
+import { Composer } from '../src/composer';
+import { WrapReminderSync } from '../src/wrapReminders';
 import { useOtaUpdates } from '../src/shell';
 
 // If anything throws while drawing, show this instead of closing the app.
@@ -51,6 +53,8 @@ function Root() {
         <Stack.Screen name="settings" options={page} />
       </Stack>
       <AdminPanel />
+      <Composer />
+      <WrapReminderSync />
       {introDone ? <Setup /> : null}
       <Intro onDone={() => setIntroDone(true)} />
       <StartupPopup ready={introDone} />

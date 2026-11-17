@@ -8,7 +8,7 @@ import { C, HUES, R, T, F } from './theme';
 import { Icon, challengeIcon } from './icons';
 import { nyTime, untilText, wrapWindow } from './zmanim';
 import { leftText, useWrapStatus } from './wrap';
-import { doneThisPeriod, hourLabel, periodKey, streak, tap, useStore, type Challenge, type ChallengeStats, type Wall as WallT, type WallPost } from './store';
+import { challengeFits, doneThisPeriod, hourLabel, periodKey, streak, tap, useStore, type Challenge, type ChallengeStats, type Wall as WallT, type WallPost } from './store';
 import { Button, Card, Chips, Field, IconTile, s as u } from './ui';
 import { snapPhoto } from './photo';
 
@@ -117,7 +117,7 @@ function nthWrapDay(start: string, nth: number) {
 const niceDay = (ymd: string) => new Date(ymd + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
 
 export function ChallengePage({ ch }: { ch: Challenge }) {
-  const { counts, checks, name, joined, reminders, join, leave, checkin, joinChallenge, fetchWall } = useStore();
+  const { counts, checks, name, joined, reminders, join, leave, checkin, joinChallenge, fetchWall, gender } = useStore();
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [hour, setHour] = useState<number | null>(reminders[ch.id] ?? null);
@@ -203,6 +203,14 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
   const total = wall ? wall.posts.length + wall.waiting.length : 0;
   const dayLine = !starts ? '' : today < starts ? `Starts ${niceDay(starts)}` : isSat(today) ? `Shabbat · day ${dayNum} of ${ch.goal}` : `Day ${dayNum} of ${ch.goal}`;
 
+  if (!challengeFits(ch, gender)) {
+    return (
+      <View style={{ paddingTop: 40, alignItems: 'center' }}>
+        <Text style={[T.h2, { textAlign: 'center' }]}>{ch.title}</Text>
+        <Text style={[T.body, { textAlign: 'center', color: C.sub, marginTop: 8, maxWidth: 320 }]}>This challenge is for boys, so it's not part of your app. Check Events for what's coming up.</Text>
+      </View>
+    );
+  }
   return (
     <View style={{ paddingBottom: 24 }}>
       {/* title */}

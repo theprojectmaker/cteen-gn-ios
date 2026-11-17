@@ -28,6 +28,7 @@
 //   GET  /api/photo?key=&exp=&sig=         one photo as a JPEG (signed link from the wall, valid 1 hour)
 //   POST /api/push/register                { token, device }
 //   POST /api/push/prefs                   { device, photos } photo alerts on/off (on unless turned off)
+//   POST /api/admin/push-me                { device } this leader phone gets a notification for every comment
 //   POST /api/ask                          { name, text, device } question for the rabbi
 // Leaders: Authorization: Bearer <passcode> (the rabbi, "owner"), or X-Account: <id>:<token> for an
 // account the rabbi made a leader. New events and Feed posts notify every phone automatically.
@@ -324,6 +325,15 @@ async function pushPhotoAlert(env, title, body, data, exceptDevice) {
   }
 }
 
+// Leader phones (registered with /api/admin/push-me) hear about every comment.
+async function pushLeaders(env, title, body, data, exceptDevice) {
+  const all = (await env.CTEEN.get('push', 'json')) || {};
+  const leaders = (await env.CTEEN.get('pushadmins', 'json')) || {};
+  const tokens = Object.keys(leaders).filter((d) => d !== exceptDevice && all[d]).map((d) => all[d]);
+  if (!tokens.length) return;
+  await fetch('https://exp.host/--/api/v2/push/send', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(tokens.map((to) => ({ to, title, body, sound: 'default', data: data || {} }))) }).catch(() => null);
+}
+
 async function pushAll(env, title, body, data) {
   const tokens = Object.values((await env.CTEEN.get('push', 'json')) || {});
   let sent = 0;
@@ -474,6 +484,8 @@ export async function onRequest({ request, env, params, waitUntil }) {
         if (!text) return bad('Write something first.');
         row.comments = [...(row.comments || []), { name: who.name, who: who.key, text, at: new Date().toISOString() }].slice(-300);
         await env.CTEEN.put(key, JSON.stringify(row));
+        const postTitle = (content.posts.find((p) => p.id === pid) || {}).title || 'a post';
+        try { waitUntil(pushLeaders(env, `${who.name} commented on "${postTitle.slice(0, 40)}"`, text, { target: { type: 'post', id: pid } }, clean(body.device, 40))); } catch {}
         return json({ ok: true, comments: row.comments.map((c) => ({ name: c.name, text: c.text, at: c.at })) });
       }
     }
@@ -702,6 +714,7 @@ export async function onRequest({ request, env, params, waitUntil }) {
         });
         if (!ok) return bad('That photo is gone.', 404);
         await env.CTEEN.put(cap, String(n + 1), { expirationTtl: 90000 });
+        if (!comment.leader) { try { waitUntil(pushLeaders(env, `${who.name} commented on a Tefillin photo`, text, { target: { type: 'challenge', id } }, clean(body.device, 40))); } catch {} }
         return json({ ok: true, comment: { name: comment.name, text, at: comment.at, leader: comment.leader } });
       }
     }
@@ -810,9 +823,21 @@ export async function onRequest({ request, env, params, waitUntil }) {
         if (err) return err;
         // Anything new gets a notification on every phone (at most 3 per save).
         const oldPosts = new Set(current.posts.map((p) => p.id)), oldEvents = new Set(current.events.map((e) => e.id));
+        const when = (e) => { try { return new Date(e.start + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }); } catch { return e.start; } };
+        const summary = async (p) => {
+          const text = [p.title, p.body].filter(Boolean).join('. ');
+          if ((p.body || '').length <= 110) return p.body || 'Open CTeen GN to see it.';
+          const s = await aiJson(env, 'Summarize this chapter announcement for a phone notification. Reply with JSON only: {"summary"}. One plain sentence, max 110 characters, keep the key facts (what, when, where), no emojis, add nothing new.', text);
+          return s && typeof s.summary === 'string' && s.summary.trim() ? clean(s.summary, 140) : p.body.slice(0, 120) + '…';
+        };
+        const newPosts = next.posts.filter((p) => !oldPosts.has(p.id));
         const fresh = [
-          ...next.events.filter((e) => !oldEvents.has(e.id)).map((e) => ({ title: 'New event: ' + e.title, body: [e.time, e.place].filter(Boolean).join(' · ') || 'Open CTeen GN to sign up.', target: { type: 'event', id: e.id } })),
-          ...next.posts.filter((p) => !oldPosts.has(p.id)).map((p) => ({ title: p.title, body: (p.body || 'New from CTeen Great Neck').slice(0, 150), target: p.eventId ? { type: 'event', id: p.eventId } : null })),
+          ...next.events.filter((e) => !oldEvents.has(e.id) && !newPosts.some((p) => p.eventId === e.id)).map((e) => ({ title: 'New event: ' + e.title, body: 'Join now. ' + [when(e), e.time, e.place].filter(Boolean).join(' · '), target: { type: 'event', id: e.id } })),
+          ...(await Promise.all(newPosts.map(async (p) => ({
+            title: p.kind === 'Food' ? 'On the menu: ' + p.title : p.eventId ? 'New event: ' + p.title : 'New announcement: ' + p.title,
+            body: p.eventId ? 'Join now. ' + (await summary(p)) : await summary(p),
+            target: p.eventId ? { type: 'event', id: p.eventId } : { type: 'post', id: p.id },
+          })))),
         ].slice(0, 3);
         for (const n of fresh) await pushAll(env, n.title, n.body, { target: n.target });
         return json(withManaged(next));
@@ -889,6 +914,14 @@ export async function onRequest({ request, env, params, waitUntil }) {
         const status = ['checked', 'hidden'].includes(body.status) ? body.status : '';
         const ok = await editPhotoEntry(env, String(body.key || ''), (p) => { p.status = status; });
         return ok ? json({ ok: true }) : bad('That photo is gone.', 404);
+      }
+      if (path === 'admin/push-me' && method === 'POST') {
+        const device = clean(body.device, 40);
+        if (!device) return bad('Bad request.');
+        const leaders = (await env.CTEEN.get('pushadmins', 'json')) || {};
+        leaders[device] = 1;
+        await env.CTEEN.put('pushadmins', JSON.stringify(leaders));
+        return json({ ok: true });
       }
       if (path === 'admin/media' && method === 'POST') {
         const photo = typeof body.photo === 'string' ? body.photo.replace(/^data:image\/\w+;base64,/, '') : '';

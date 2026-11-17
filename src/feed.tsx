@@ -20,7 +20,7 @@ export function timeAgo(iso: string) {
 }
 
 export function Feed() {
-  const { content, leader, setAdminOpen, markFeedSeen } = useStore();
+  const { content, leader, setComposerOpen, markFeedSeen } = useStore();
   useEffect(() => { markFeedSeen(); }, []);
   const list = sortPosts(content.posts);
   return (
@@ -31,7 +31,7 @@ export function Feed() {
           <Text style={[T.small, { marginTop: 4 }]}>From Rabbi Zevy and the {CHAPTER.name} leaders</Text>
         </View>
         {leader ? (
-          <Pressable onPress={() => setAdminOpen(true)} style={({ pressed }) => [st.newBtn, pressed && { opacity: 0.8 }]} accessibilityRole="button" accessibilityLabel="New post">
+          <Pressable onPress={() => setComposerOpen(true)} style={({ pressed }) => [st.newBtn, pressed && { opacity: 0.8 }]} accessibilityRole="button" accessibilityLabel="New post">
             <Icon name="plus" size={20} color={C.white} stroke={2.6} />
           </Pressable>
         ) : null}

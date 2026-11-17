@@ -3,7 +3,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { Animated, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { C, R, T, F } from './theme';
 import { Icon } from './icons';
-import { CHAPTER, calendarUrl, countdown, dateLabel, open, sortPosts, tap, upcoming, useShabbat, useStore, type ColorKey, type EventItem, type Post } from './store';
+import { CHAPTER, calendarUrl, challengeFits, countdown, dateLabel, open, sortPosts, tap, upcoming, useShabbat, useStore, type ColorKey, type EventItem, type Post } from './store';
 import { audienceLabel, Button, Card, Chips, Cover, Empty, EventCard, EventMeta, Field, IconTile, ScopeBadge, SectionHead, Sheet, s as u } from './ui';
 import { ChallengeBanner, NameGate } from './rewards';
 import { PostCard, timeAgo } from './feed';
@@ -14,18 +14,21 @@ import { greetingNow } from './shell';
 // One thing per section, lots of room: who you are, what's next, your challenge,
 // the newest post, Shabbat, then the shortcuts at the bottom.
 export function Home() {
-  const { content, go, openEvent, name, push, turnOnPush, fits } = useStore();
+  const { content, go, openEvent, name, push, turnOnPush, fits, gender } = useStore();
   const up = upcoming(content.events).filter(fits);
   const next = up.find((e) => e.scope === 'gn') ?? up[0];
-  const live = content.challenges.filter((c) => c.active);
+  const coming = next ? [next, ...up.filter((e) => e.id !== next.id)].slice(0, 3) : [];
+  const live = content.challenges.filter((c) => c.active && challengeFits(c, gender));
   const posts = sortPosts(content.posts).filter((p) => p.kind !== 'Food');
   const food = [...content.posts].filter((p) => p.kind === 'Food' && Date.now() - new Date(p.at).getTime() < 4 * 864e5).sort((a, b) => b.at.localeCompare(a.at))[0];
   const first = name.trim().split(' ')[0];
-  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/New_York' });
+  const today = new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/New_York' });
   return (
     <>
-      <Text style={st.helloLine} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} accessibilityRole="header">{greetingNow()}{first ? `, ${first}` : ''}</Text>
-      <Text style={st.todayLine}>{today}</Text>
+      <View style={st.helloRow}>
+        <Text style={st.helloSmall} numberOfLines={1} accessibilityRole="header">{greetingNow()}{first ? `, ${first}` : ''}</Text>
+        <Text style={st.todaySmall}>{today}</Text>
+      </View>
       <LinkAppleCard />
 
       {food ? (
@@ -39,23 +42,7 @@ export function Home() {
         </Pressable>
       ) : null}
 
-      {next ? (
-        <>
-          <Text style={st.homeSection}>Up next</Text>
-          <Pressable onPress={() => openEvent(next.id)} style={({ pressed }) => [st.hero, pressed && u.pressed]} accessibilityRole="button" accessibilityLabel={next.title}>
-            <Cover e={next} style={StyleSheet.absoluteFill} iconSize={150} />
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: next.image ? 'rgba(13,60,110,0.45)' : 'rgba(19,32,44,0.18)' }]} />
-            <ScopeBadge scope={next.scope} style={{ position: 'absolute', left: 18, top: 18 }} />
-            <Text style={st.heroKicker}>{countdown(next)}</Text>
-            <Text style={st.heroTitle}>{next.title}</Text>
-            <Text style={st.heroDate}>{dateLabel(next)}{next.time ? ` · ${next.time}` : ''}</Text>
-            <View style={st.heroBtn}>
-              <Text style={st.heroBtnText}>{next.signup === 'app' ? 'RSVP' : 'View details'}</Text>
-              <Icon name="right" size={15} color={C.night} stroke={2.4} />
-            </View>
-          </Pressable>
-        </>
-      ) : null}
+      {coming.length ? <EventsCarousel events={coming} onOpen={openEvent} /> : null}
 
       {live.length ? (
         <>
@@ -144,7 +131,8 @@ function ShabbatCard() {
 const EVENT_FILTERS = ['All', 'Great Neck', 'Saved'] as const;
 
 export function Events() {
-  const { saved, content, fits, markEventsSeen } = useStore();
+  const { saved, content, fits, markEventsSeen, gender } = useStore();
+  const notForMe = content.challenges.filter((c) => c.active && !challengeFits(c, gender));
   useFocusEffect(useCallback(() => { markEventsSeen(); }, [markEventsSeen]));
   const [f, setF] = useState<(typeof EVENT_FILTERS)[number]>('All');
   const list = upcoming(content.events).filter(fits).filter((e) => (f === 'All' ? true : f === 'Saved' ? saved.includes(e.id) : f === 'Great Neck' ? e.scope === 'gn' : e.scope === 'intl'));
@@ -156,6 +144,20 @@ export function Events() {
       <View style={{ gap: 26, marginTop: 18 }}>
         {list.map((e) => <EventCard key={e.id} e={e} />)}
       </View>
+      {f === 'All' && notForMe.length ? (
+        <View style={{ marginTop: 30, gap: 12 }}>
+          {notForMe.map((c) => (
+            <View key={c.id} style={st.notApplicable} accessibilityLabel={`${c.title}. For boys, not applicable.`}>
+              <View style={st.naIcon}><Icon name="tefillin" size={22} color={C.faint} stroke={2} /></View>
+              <View style={{ flex: 1 }}>
+                <Text style={[T.h3, { color: C.sub }]}>{c.title}</Text>
+                <Text style={T.small}>For boys</Text>
+              </View>
+              <View style={st.naPill}><Text style={st.naText}>Not applicable</Text></View>
+            </View>
+          ))}
+        </View>
+      ) : null}
       {list.length === 0 ? (
         <Empty icon={f === 'Saved' ? 'heart' : 'calendar'} title={f === 'Saved' ? 'No saved events yet' : 'Nothing here right now'} body={f === 'Saved' ? 'Tap the heart on an event to keep it here.' : 'New events are on the way. Check the feed.'} />
       ) : null}
@@ -293,6 +295,55 @@ function Para({ title, body }: { title: string; body: string }) {
 }
 
 // ───────────────────────── Feed ─────────────────────────
+// Home: the next events, one big photo card at a time, sliding by itself every few seconds.
+function EventsCarousel({ events, onOpen }: { events: EventItem[]; onOpen: (id: string) => void }) {
+  const [w, setW] = useState(0);
+  const [page, setPage] = useState(0);
+  const ref = React.useRef<ScrollView>(null);
+  const touching = React.useRef(false);
+  useEffect(() => {
+    if (events.length < 2 || !w) return;
+    const t = setInterval(() => {
+      if (touching.current) return;
+      setPage((p) => {
+        const n = (p + 1) % events.length;
+        ref.current?.scrollTo({ x: n * w, animated: true });
+        return n;
+      });
+    }, 4500);
+    return () => clearInterval(t);
+  }, [events.length, w]);
+  return (
+    <View style={{ marginTop: 8 }} onLayout={(e) => setW(e.nativeEvent.layout.width)}>
+      <ScrollView ref={ref} horizontal pagingEnabled showsHorizontalScrollIndicator={false} decelerationRate="fast"
+        onScrollBeginDrag={() => { touching.current = true; }}
+        onMomentumScrollEnd={(e) => { touching.current = false; if (w) setPage(Math.round(e.nativeEvent.contentOffset.x / w)); }}
+        style={st.carousel}>
+        {events.map((ev, i) => (
+          <Pressable key={ev.id} onPress={() => onOpen(ev.id)} style={({ pressed }) => [st.hero, { width: w || 1 }, pressed && { opacity: 0.95 }]} accessibilityRole="button" accessibilityLabel={ev.title}>
+            <Cover e={ev} style={StyleSheet.absoluteFill} iconSize={150} />
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: ev.image ? 'rgba(13,60,110,0.42)' : 'rgba(19,32,44,0.18)' }]} />
+            <View style={st.heroTopRow}>
+              <View style={st.upNext}><Text style={st.upNextText}>{i === 0 ? 'Up next' : 'Coming up'}</Text></View>
+              <ScopeBadge scope={ev.scope} />
+            </View>
+            <Text style={st.heroKicker}>{countdown(ev)}</Text>
+            <Text style={st.heroTitle} numberOfLines={2}>{ev.title}</Text>
+            <Text style={st.heroDate}>{dateLabel(ev)}{ev.time ? ` · ${ev.time}` : ''}</Text>
+            <View style={st.heroBtn}>
+              <Text style={st.heroBtnText}>{ev.signup === 'app' ? 'RSVP' : 'View details'}</Text>
+              <Icon name="right" size={15} color={C.night} stroke={2.4} />
+            </View>
+          </Pressable>
+        ))}
+      </ScrollView>
+      {events.length > 1 ? (
+        <View style={st.carDots}>{events.map((_, i) => <View key={i} style={[st.carDot, i === page && st.carDotOn]} />)}</View>
+      ) : null}
+    </View>
+  );
+}
+
 // Shown on Home until your account is linked with Apple, so a new phone keeps your streak and RSVPs.
 function LinkAppleCard() {
   const { account, appleReady, signInWithApple } = useStore();
@@ -428,6 +479,20 @@ function LinkRow({ icon, title, sub, url, first }: { icon: string; title: string
 }
 
 const st = StyleSheet.create({
+  helloRow: { flexDirection: 'row', alignItems: 'baseline', gap: 10, marginBottom: 12 },
+  helloSmall: { flex: 1, fontSize: 19, fontFamily: F.display, color: C.ink, letterSpacing: -0.3 },
+  todaySmall: { fontSize: 13, fontWeight: '700', color: C.faint },
+  carousel: { borderRadius: 28, overflow: 'hidden' },
+  heroTopRow: { position: 'absolute', left: 18, right: 18, top: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  upNext: { paddingHorizontal: 11, height: 26, borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.92)', justifyContent: 'center' },
+  upNextText: { fontSize: 12, fontWeight: '900', letterSpacing: 0.6, textTransform: 'uppercase', color: C.night },
+  carDots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 10 },
+  carDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: C.line },
+  carDotOn: { width: 18, backgroundColor: C.blue },
+  notApplicable: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 20, backgroundColor: C.card, borderWidth: 1, borderColor: C.line, opacity: 0.6 },
+  naIcon: { width: 42, height: 42, borderRadius: 12, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' },
+  naPill: { paddingHorizontal: 10, height: 26, borderRadius: 13, backgroundColor: C.bg, justifyContent: 'center' },
+  naText: { fontSize: 12, fontWeight: '800', color: C.sub },
   todayLine: { fontSize: 14, fontWeight: '700', color: C.sub, marginTop: -10, marginBottom: 18 },
   homeSection: { fontSize: 20, fontFamily: F.display, color: C.ink, letterSpacing: -0.3, marginTop: 32, marginBottom: 12 },
   homeHeadRow: { flexDirection: 'row', alignItems: 'center', marginTop: 32, marginBottom: 12 },

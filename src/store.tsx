@@ -11,7 +11,7 @@ import { enablePush, onNotificationTap, pushState, setReminder, type PushState }
 
 // ───────── content model (mirrors server/functions/api/[[path]].js) ─────────
 export type ColorKey = 'blue' | 'orange' | 'purple' | 'green' | 'pink' | 'yellow';
-export type Target = { type: 'event' | 'challenge'; id: string } | null;
+export type Target = { type: 'event' | 'challenge' | 'post'; id: string } | null;
 export type EventItem = {
   id: string; title: string; icon: string; color: ColorKey; image?: string; scope: 'gn' | 'intl';
   start: string; end: string; time?: string; place?: string; price?: string; who?: string; about?: string;
@@ -36,6 +36,9 @@ export function withManaged(c: Content): Content {
   return { ...c, events: [...ev, ...c.events.filter((e) => !evIds.has(e.id))], challenges: [...ch, ...c.challenges.filter((x) => !chIds.has(x.id))] };
 }
 export type AiDraft = { title: string; body: string; kind: Post['kind']; event: { title: string; date: string; time: string; place: string } | null };
+
+// Tefillin is for boys: girls never see that challenge as something to do.
+export const challengeFits = (ch: { id: string }, gender: Gender) => !(ch.id === 'tefillin' && gender === 'girl');
 
 export const sortPosts = (posts: Post[]) => [...posts].sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || b.at.localeCompare(a.at));
 export type Tab = 'Home' | 'Events' | 'Feed' | 'Chapter';
@@ -125,6 +128,7 @@ type Ctx = Local & {
   ask: (text: string) => Promise<string | null>;
   push: PushState; turnOnPush: () => Promise<void>;
   leader: string | null; isOwner: boolean; adminOpen: boolean; setAdminOpen: (v: boolean) => void;
+  composerOpen: boolean; setComposerOpen: (v: boolean) => void;
   loadPeople: () => Promise<Person[] | null>; setLeaderFor: (id: string, on: boolean) => Promise<string | null>;
   leaderLogin: (code: string) => Promise<string | null>; leaderLogout: () => void;
   saveContent: (next: Content) => Promise<string | null>;
@@ -184,6 +188,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [leader, setLeader] = useState<string | null>(null);
   const [isOwner, setIsOwner] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(false);
   const [push, setPush] = useState<PushState>('unsupported');
   const [goingCount, setGoingCount] = useState<Record<string, number>>({});
   const [postMeta, setPostMeta] = useState<Record<string, { likes: number; comments: number }>>({});
@@ -265,9 +270,21 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (!t) return;
     tap();
     if (t.type === 'event') router.push(`/event/${t.id}`);
+    else if (t.type === 'post') router.push(`/post/${t.id}`);
     else router.push(`/challenge/${t.id}`);
   }, []);
   useEffect(() => onNotificationTap((t) => openTarget(t as Target)), [openTarget]);
+
+  useEffect(() => {
+    if (!leader || !local.device) return;
+    api('/admin/push-me', { method: 'POST', body: { device: local.device }, leader }).catch(() => {});
+  }, [leader, local.device]);
+  const girlSynced = useRef(false);
+  useEffect(() => {
+    if (local.gender !== 'girl' || !local.device || girlSynced.current) return;
+    girlSynced.current = true;
+    api('/push/prefs', { method: 'POST', body: { device: local.device, photos: false } }).catch(() => {});
+  }, [local.gender, local.device]);
 
   const flip = useCallback((field: 'saved' | 'liked', id: string) => {
     tap();
@@ -390,7 +407,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     },
     addComment: async (id, text) => {
       try {
-        const r = await api<{ comments: PostComment[] }>(`/posts/${id}/comment`, { method: 'POST', body: { ...who(ref.current), text } });
+        const r = await api<{ comments: PostComment[] }>(`/posts/${id}/comment`, { method: 'POST', body: { ...who(ref.current), text, device: ref.current.device } });
         setPostMeta((m) => ({ ...m, [id]: { likes: m[id]?.likes ?? 0, comments: r.comments.length } }));
         return r.comments;
       } catch (e) { return { error: msg(e) }; }
@@ -463,7 +480,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     },
     comment: async (id, key, text) => {
       try {
-        const r = await api<{ comment: WallComment }>(`/challenges/${id}/comment`, { method: 'POST', body: { ...who(ref.current), key, text } });
+        const r = await api<{ comment: WallComment }>(`/challenges/${id}/comment`, { method: 'POST', body: { ...who(ref.current), key, text, device: ref.current.device } });
         tap();
         return r.comment;
       } catch (e) {
@@ -521,6 +538,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       }
     },
     leaderLogout: () => { setLeader(null); setAdminOpen(false); },
+    composerOpen, setComposerOpen,
     setPhotoAlerts: async (on) => {
       try { await api('/push/prefs', { method: 'POST', body: { device: ref.current.device, photos: on } }); } catch {}
     },
@@ -565,7 +583,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     removeQuestion: (id) => api('/admin/inbox/remove', { method: 'POST', body: { id }, leader }).then(() => {}).catch(() => {}),
     loadPhotos: (cid) => api<{ photos: PhotoRow[] }>(`/admin/photos?challenge=${cid}`, { leader }).then((r) => r.photos).catch(() => null),
     loadPhoto: (key) => api<{ photo: string }>(`/admin/photo?key=${encodeURIComponent(key)}`, { leader }).then((r) => r.photo).catch(() => null),
-  }), [local, content, online, leader, isOwner, adminOpen, push, liveAlert, googleReady, appleReady, unreadFeed, newEvents, goingCount, postMeta, flip, patch, refresh, keep, openTarget, registerToken]);
+  }), [local, content, online, leader, isOwner, adminOpen, composerOpen, push, liveAlert, googleReady, appleReady, unreadFeed, newEvents, goingCount, postMeta, flip, patch, refresh, keep, openTarget, registerToken]);
 
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>;
 }

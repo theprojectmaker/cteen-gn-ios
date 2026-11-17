@@ -9,7 +9,7 @@ import { Icon, challengeIcon } from './icons';
 import { wrapWindow } from './zmanim';
 import { WrapBanner, useWrapStatus } from './wrap';
 import { Glass, LIQUID } from './glass';
-import { CHAPTER, doneThisPeriod, open, useShabbat, useStore, type Alert } from './store';
+import { CHAPTER, challengeFits, doneThisPeriod, open, useShabbat, useStore, type Alert } from './store';
 
 const NATIVE_DRIVER = Platform.OS !== 'web';
 
@@ -98,8 +98,8 @@ function Header() {
 
 // Pulsing trophy (opens the Tefillin Challenge, with a one-time tip) and the profile picture (settings).
 function HeaderButtons() {
-  const { content, name, checks, joined, tipSeen, hideTip } = useStore();
-  const live = content.challenges.filter((c) => c.active);
+  const { content, name, checks, joined, tipSeen, hideTip, gender, leader, setComposerOpen } = useStore();
+  const live = content.challenges.filter((c) => c.active && challengeFits(c, gender));
   const main = live.find((c) => c.id === 'tefillin') ?? live[0];
   // pulses only while you can actually do it (tefillin: sunrise to sunset, not Shabbat)
   const due = !!main && (!joined.includes(main.id) || !doneThisPeriod(main, checks)) && (main.id !== 'tefillin' || wrapWindow().state === 'open');
@@ -132,6 +132,11 @@ function HeaderButtons() {
             <Icon name={challengeIcon(main)} size={21} color={due ? '#C27A12' : C.ink} stroke={2} />
           </Animated.View>
           {due ? <View style={st.hDot} /> : null}
+        </Pressable>
+      ) : null}
+      {leader ? (
+        <Pressable onPress={() => setComposerOpen(true)} style={({ pressed }) => [st.hBtn, pressed && { opacity: 0.55 }]} hitSlop={4} accessibilityRole="button" accessibilityLabel="New post">
+          <Icon name="plus" size={21} color={C.ink} stroke={2.4} />
         </Pressable>
       ) : null}
       <Pressable onPress={() => router.push('/settings')} style={({ pressed }) => [st.hAvatar, pressed && { opacity: 0.6 }]} hitSlop={4} accessibilityRole="button" accessibilityLabel="Profile and settings">

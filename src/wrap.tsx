@@ -19,8 +19,8 @@ export type WrapStatus = {
 };
 
 export function useWrapStatus(): WrapStatus | null {
-  const { content, joined, checks } = useStore();
-  const ch = content.challenges.find((c) => c.id === 'tefillin' && c.active);
+  const { content, joined, checks, gender } = useStore();
+  const ch = gender === 'girl' ? undefined : content.challenges.find((c) => c.id === 'tefillin' && c.active);
   const [now, setNow] = useState(Date.now());
   const win = wrapWindow(now);
   const left = win.state === 'open' ? Math.max(0, win.set - now) : 0;
