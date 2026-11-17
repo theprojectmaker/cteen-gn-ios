@@ -52,6 +52,7 @@ export function greetingNow(d = new Date()) {
 export function Screen({ children }: { children: React.ReactNode }) {
   const insets = useSafeAreaInsets();
   const { refresh, liveAlert } = useStore();
+  const wrap = useWrapStatus();
   const [refreshing, setRefreshing] = useState(false);
   const enter = useRef(new Animated.Value(PREFS.reduceMotion ? 1 : 0)).current;
   // Ease in once when the page first opens; coming back to a tab is instant (no flicker).
@@ -75,12 +76,10 @@ export function Screen({ children }: { children: React.ReactNode }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.blue} colors={[C.blue]} progressViewOffset={insets.top} />}>
         <View style={st.col}>
           <Header />
-          {liveAlert ? <TopAlert alert={liveAlert} /> : null}
-          <WrapBanner />
-          <ShabbatBanner />
+          {/* at most one banner at a time, the most urgent one */}
+          {wrap?.lastHour ? <WrapBanner /> : liveAlert ? <TopAlert alert={liveAlert} /> : <ShabbatBanner />}
           <Animated.View style={{ opacity: enter, transform: [{ translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }] }}>
             {children}
-            <Footer />
           </Animated.View>
         </View>
       </ScrollView>
@@ -138,11 +137,6 @@ function HeaderButtons() {
             <Icon name={challengeIcon(main)} size={21} color={due ? '#C27A12' : C.ink} stroke={2} />
           </Animated.View>
           {due ? <View style={st.hDot} /> : null}
-        </Pressable>
-      ) : null}
-      {leader ? (
-        <Pressable onPress={() => setComposerOpen(true)} style={({ pressed }) => [st.hBtn, pressed && { opacity: 0.55 }]} hitSlop={4} accessibilityRole="button" accessibilityLabel="New post">
-          <Icon name="plus" size={21} color={C.ink} stroke={2.4} />
         </Pressable>
       ) : null}
       <Pressable onPress={() => router.push('/settings')} style={({ pressed }) => [st.hAvatar, pressed && { opacity: 0.6 }]} hitSlop={4} accessibilityRole="button" accessibilityLabel="Profile and settings">

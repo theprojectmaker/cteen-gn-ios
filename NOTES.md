@@ -13,6 +13,8 @@ Remove your line when it ships.
 
 ## Log
 
+- 2026-11-17 · Solomon · Declutter: at most ONE banner per page (wrap last hour > rabbi live banner > Shabbat), no footer on pages (it repeated the tab bar), no + in the header (leaders post from the Feed +). Home = greeting, carousel, Today, From Rabbi Zevy, This Shabbat (+ food card only when posted); Apple-link and notifications cards removed from Home (both in Settings). Chapter: Ask the rabbi only appears after tapping Ask; Good to know shows titles that open on tap; one heading style.
+
 - 2026-11-17 · Solomon · WHY BUILD 16 LOOKED OLD: build 16 was made from db93523; the next two pushes (f489adf, 27e8a70) had their builds replaced by the icon push (build 17 = e211e10, has everything). Build 15 looked newer only because it kept pulling OTAs (all builds 13-16 share runtime 2e12f331...), and a freshly installed build always opens with its own built-in code first. Fix: useOtaUpdates now reloads straight into a newer update if it downloads within 8 s of opening. Lesson: when telling the user which build to install, check which commit it was made from (gh run view, "HEAD is now at").
 
 - 2026-11-17 · Solomon · New app icon (assets/icon.png): deep navy, the CTeen logo centered, small spaced GREAT NECK. Native change, so it needs this TestFlight build (OTA cannot change icons).

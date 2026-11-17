@@ -29,7 +29,6 @@ export function Home() {
         <Text style={st.helloSmall} numberOfLines={1} accessibilityRole="header">{greetingNow()}{first ? `, ${first}` : ''}</Text>
         <Text style={st.todaySmall}>{today}</Text>
       </View>
-      <LinkAppleCard />
 
       {food ? (
         <Pressable onPress={() => router.push(`/post/${food.id}`)} style={({ pressed }) => [st.food, pressed && u.pressed]} accessibilityRole="button" accessibilityLabel={`On the menu: ${food.title}`}>
@@ -77,16 +76,6 @@ export function Home() {
       <Text style={st.homeSection}>This Shabbat</Text>
       <ShabbatCard />
 
-      {push === 'off' ? (
-        <Card style={[st.notify, { marginTop: 28 }]} onPress={turnOnPush} label="Turn on notifications">
-          <IconTile icon="bell" size={44} />
-          <View style={{ flex: 1 }}>
-            <Text style={T.h3}>Turn on notifications</Text>
-            <Text style={T.small}>Hear it first when Rabbi Zevy posts or an event opens.</Text>
-          </View>
-          <Icon name="right" size={17} color={C.faint} stroke={2.4} />
-        </Card>
-      ) : null}
     </>
   );
 }
@@ -415,15 +404,7 @@ export function Chapter() {
         <>
           <Text style={st.homeSection}>Good to know</Text>
           <View style={st.chInfo}>
-            {content.info.map((i, n) => (
-              <View key={i.id} style={[st.chInfoRow, n > 0 && st.rule]}>
-                <Icon name={i.icon || 'star'} size={19} color={C.blueDeep} stroke={2} />
-                <View style={{ flex: 1 }}>
-                  <Text style={st.chInfoTitle}>{i.title}</Text>
-                  <Text style={st.chInfoBody}>{i.body}</Text>
-                </View>
-              </View>
-            ))}
+            {content.info.map((i, n) => <InfoRow key={i.id} icon={i.icon} title={i.title} body={i.body} first={n === 0} />)}
           </View>
         </>
       ) : null}
@@ -443,6 +424,21 @@ export function Chapter() {
       </Pressable>
       {online === false ? <Text style={st.endNote}>Offline: showing the last saved info</Text> : null}
     </>
+  );
+}
+
+// A "Good to know" item: just the title until you tap it.
+function InfoRow({ icon, title, body, first }: { icon: string; title: string; body: string; first?: boolean }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Pressable onPress={() => setOpen((o) => !o)} style={({ pressed }) => [st.chInfoRow, !first && st.rule, pressed && { backgroundColor: C.bg }]} accessibilityRole="button" accessibilityState={{ expanded: open }}>
+      <Icon name={icon || 'star'} size={19} color={C.blueDeep} stroke={2} />
+      <View style={{ flex: 1 }}>
+        <Text style={st.chInfoTitle}>{title}</Text>
+        {open ? <Text style={st.chInfoBody}>{body}</Text> : null}
+      </View>
+      <View style={{ transform: [{ rotate: open ? '90deg' : '0deg' }] }}><Icon name="right" size={15} color={C.faint} stroke={2.4} /></View>
+    </Pressable>
   );
 }
 
@@ -472,9 +468,10 @@ function AskRabbi({ openSignal = 0 }: { openSignal?: number }) {
     if (err) return setNote(err);
     setText(''); setOpenForm(false); setNote('Sent. Rabbi Zevy will see it.');
   };
+  if (!openForm && !needName && !note) return null; // the Ask button on the Chapter page opens it
   return (
     <>
-      <SectionHead title="Ask the rabbi" />
+      <Text style={st.homeSection}>Ask the rabbi</Text>
       {needName ? <Card><NameGate title="Who's asking?" onDone={() => setNeedName(false)} /></Card> : !openForm ? (
         <Card style={st.askRow} onPress={() => { setOpenForm(true); setNote(null); }} label="Ask the rabbi a question">
           <IconTile icon="question" color="purple" size={40} />
