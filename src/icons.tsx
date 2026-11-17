@@ -39,10 +39,14 @@ const PATHS: Record<string, React.ReactNode> = {
   clock: <><Circle cx="12" cy="12" r="9" /><Path d="M12 7v5.500l3.500 2" /></>,
   edit: <Path d="M4 20h4L19.500 8.500a2.100 2.100 0 0 0-3-3L5 17zM14.500 7.500l3 3" />,
   question: <><Circle cx="12" cy="12" r="9" /><Path d="M9.500 9.500a2.500 2.500 0 1 1 3.500 2.300c-.700.300-1 .900-1 1.700M12 16.800v.100" /></>,
+  tefillin: <><Rect x="7" y="2.5" width="10" height="10" rx="1.8" /><Path d="M9.4 5.5v3c0 1 .6 1.6 1.6 1.6h2c1 0 1.6-.6 1.6-1.6V5.5M12 5.5v4.6" /><Rect x="4.5" y="12.5" width="15" height="2.6" rx="1" /><Path d="M19.5 13.8c2.3.2 2.6 3 .6 4.3-2.3 1.5-7.5 1.4-11.3 2.2-2 .4-3 1.3-3.3 2.2" /></>,
   send: <Path d="M20.500 3.500 3 11l6.500 2.500L12 20zM9.500 13.500l5-5" />,
 };
 
-export const EVENT_ICONS = ['star', 'flame', 'ticket', 'users', 'heart', 'trophy', 'food', 'ball', 'music', 'book', 'cap', 'sun', 'gift', 'globe', 'calendar', 'pin'] as const;
+export const EVENT_ICONS = ['tefillin', 'star', 'flame', 'ticket', 'users', 'heart', 'trophy', 'food', 'ball', 'music', 'book', 'cap', 'sun', 'gift', 'globe', 'calendar', 'pin'] as const;
+
+// The Tefillin Challenge always wears the tefillin icon, whatever was picked for it.
+export const challengeIcon = (ch: { id: string; icon?: string }) => (ch.id === 'tefillin' ? 'tefillin' : ch.icon || 'trophy');
 
 export function Icon({ name, size = 22, color = '#13202C', fill, stroke = 1.9 }: { name: string; size?: number; color?: string; fill?: string; stroke?: number }) {
   return (

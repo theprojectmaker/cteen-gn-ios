@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
-import { C, HUES, R, T } from './theme';
-import { Icon } from './icons';
+import { C, HUES, R, T, F } from './theme';
+import { Icon, challengeIcon } from './icons';
+import { nyTime, untilText, wrapWindow } from './zmanim';
 import { doneThisPeriod, hourLabel, periodKey, streak, useStore, type Challenge, type ChallengeStats, type Wall as WallT, type WallPost } from './store';
 import { Button, Card, Chips, Field, IconTile, s as u } from './ui';
 import { snapPhoto } from './photo';
@@ -30,7 +31,7 @@ export function ChallengeBanner({ ch }: { ch: Challenge }) {
   const action = !mine ? 'Join' : done ? 'Done' : ch.photo ? 'Snap' : 'Check in';
   return (
     <Card style={st.banner} onPress={() => openChallenge(ch.id)} label={`${ch.title}. ${line}`}>
-      <IconTile icon={ch.icon || 'trophy'} color={ch.color} size={52} solid />
+      <IconTile icon={challengeIcon(ch)} color={ch.color} size={52} solid />
       <View style={{ flex: 1 }}>
         <Text style={T.h3} numberOfLines={1}>{ch.title}</Text>
         <Text style={[T.small, { marginTop: 2 }]} numberOfLines={2}>{line}</Text>
@@ -67,15 +68,24 @@ export function NameGate({ onDone, title, cta = 'Save' }: { onDone: () => void; 
   );
 }
 
-const REMINDERS = [
+const REMINDERS_ALL = [
   { l: 'No reminder', h: null },
   { l: '7:00 AM', h: 7 },
   { l: '4:00 PM', h: 16 },
   { l: '8:00 PM', h: 20 },
 ] as const;
 
+const TEFILLIN_REMINDERS = [
+  { l: 'No reminder', h: null },
+  { l: '7:00 AM', h: 7 },
+  { l: '8:00 AM', h: 8 },
+  { l: '12:00 PM', h: 12 },
+  { l: '3:00 PM', h: 15 },
+] as const;
+
 function ReminderPicker({ value, onChange, ch }: { value: number | null; onChange: (h: number | null) => void; ch: Challenge }) {
   const { push } = useStore();
+  const REMINDERS = ch.id === 'tefillin' ? TEFILLIN_REMINDERS : REMINDERS_ALL;
   return (
     <View>
       <Text style={u.fieldLabel}>{ch.every === 'day' ? 'Remind me every day' : 'Remind me every Friday'}</Text>
@@ -139,6 +149,11 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
   const [caption, setCaption] = useState('');
   const hue = HUES[ch.color] ?? HUES.blue;
   const mine = joined.includes(ch.id);
+  const timed = ch.id === 'tefillin';
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { if (!timed) return; const t = setInterval(() => setNow(Date.now()), 30000); return () => clearInterval(t); }, [timed]);
+  const win = timed ? wrapWindow(now) : null;
+  const closed = !!win && win.state !== 'open';
 
   useEffect(() => {
     if (!mine || !ch.photo) return;
@@ -192,7 +207,7 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
   return (
     <View style={{ paddingBottom: 20 }}>
       <View style={st.head}>
-        <IconTile icon={ch.icon || 'trophy'} color={ch.color} size={64} solid />
+        <IconTile icon={challengeIcon(ch)} color={ch.color} size={64} solid />
         <Text style={st.title}>{ch.title}</Text>
         <Text style={[T.body, { textAlign: 'center', marginTop: 8, color: C.sub, maxWidth: 380 }]}>{ch.about}</Text>
       </View>
@@ -235,6 +250,7 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
             </View>
             <View style={st.weekOnBlue}><Week ch={ch} light /></View>
           </View>
+          {win ? <WindowStrip win={win} now={now} /> : null}
 
           {me.out ? (
             <View style={st.outCard}>
@@ -245,7 +261,15 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
               </View>
             </View>
           ) : ch.active ? (
-            done ? (
+            closed && !done ? (
+              <View style={st.closedCard}>
+                <View style={[st.snapIcon, { backgroundColor: C.line }]}><Icon name={win!.state === 'shabbat' ? 'flame' : win!.state === 'before' ? 'sun' : 'lock'} size={26} color={C.sub} stroke={2} /></View>
+                <View style={{ flex: 1 }}>
+                  <Text style={st.snapTitle}>{win!.state === 'shabbat' ? 'Shabbat. No tefillin today' : win!.state === 'before' ? `Opens at sunrise, ${nyTime(win!.rise)}` : 'Closed for today'}</Text>
+                  <Text style={T.small}>{win!.state === 'before' ? `In ${untilText(win!.rise - now)}. Doesn't count as a miss yet.` : win!.state === 'after' ? `The window ended at sunset, ${nyTime(win!.set)}.` : 'Shabbat never breaks your streak.'}</Text>
+                </View>
+              </View>
+            ) : done ? (
               <View style={st.doneCard}>
                 <View style={st.doneIcon}><Icon name="tick" size={22} color={C.white} stroke={3} /></View>
                 <View style={{ flex: 1 }}>
@@ -260,7 +284,7 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={st.snapTitle}>{busy ? 'Posting…' : ch.photo ? "Snap today's photo" : 'Check in for today'}</Text>
-                  <Text style={T.small}>{me.strikes > 0 ? `${me.strikes} of 3 strikes. Don't miss today.` : 'Wrap tefillin, then take a quick photo.'}</Text>
+                  <Text style={T.small}>{win ? `Open until sunset, ${nyTime(win.set)} · ${untilText(win.set - now)} left` : me.strikes > 0 ? `${me.strikes} of 3 strikes. Don't miss today.` : 'Take a quick photo.'}</Text>
                 </View>
                 <Icon name="right" size={20} color={C.faint} stroke={2.4} />
               </Pressable>
@@ -373,11 +397,31 @@ function Board({ wall, onOpen }: { wall: WallT; onOpen: (p: WallPost) => void })
   );
 }
 
+// Today's wrap window: sunrise to sunset in Great Neck, with a dot for where "now" is.
+function WindowStrip({ win, now }: { win: ReturnType<typeof wrapWindow>; now: number }) {
+  const pct = Math.max(0, Math.min(1, (now - win.rise) / (win.set - win.rise)));
+  const open = win.state === 'open';
+  return (
+    <View style={st.window} accessibilityLabel={`Tefillin today from ${nyTime(win.rise)} to ${nyTime(win.set)}`}>
+      <View style={st.windowEnds}>
+        <View style={st.windowEnd}><Icon name="sun" size={15} color={C.sub} stroke={2.2} /><Text style={st.windowTime}>{nyTime(win.rise)}</Text></View>
+        <Text style={[st.windowState, open && { color: C.green }]}>{win.state === 'shabbat' ? 'Shabbat' : open ? 'Open now' : win.state === 'before' ? 'Opens soon' : 'Closed'}</Text>
+        <View style={st.windowEnd}><Text style={st.windowTime}>{nyTime(win.set)}</Text><Icon name="clock" size={15} color={C.sub} stroke={2.2} /></View>
+      </View>
+      <View style={st.windowTrack}>
+        <View style={[st.windowFill, { width: `${pct * 100}%`, opacity: open ? 1 : 0.35 }]} />
+        {open ? <View style={[st.windowNow, { left: `${pct * 100}%` }]} /> : null}
+      </View>
+      <Text style={st.windowNote}>Sunrise to sunset in Great Neck. Times change every day.</Text>
+    </View>
+  );
+}
+
 function RuleCard() {
   return (
     <View style={st.rule}>
       <Text style={st.ruleTitle}>The rules</Text>
-      <Text style={st.ruleLine}>1. Snap a photo every day. Shabbat doesn't count.</Text>
+      <Text style={st.ruleLine}>1. Wrap and snap a photo every day between sunrise and sunset. Shabbat doesn't count.</Text>
       <Text style={st.ruleLine}>2. Miss a day: your streak resets (strike 1).</Text>
       <Text style={st.ruleLine}>3. Miss again: streak resets and you add one extra day (strike 2).</Text>
       <Text style={st.ruleLine}>4. A third miss and you're out.</Text>
@@ -510,6 +554,16 @@ function PhotoSheet({ ch, post, onClose }: { ch: Challenge; post: WallPost | nul
 }
 
 const st = StyleSheet.create({
+  closedCard: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 16, padding: 16, borderRadius: 22, backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
+  window: { marginTop: 14, padding: 16, borderRadius: 20, backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
+  windowEnds: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  windowEnd: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  windowTime: { fontSize: 15, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },
+  windowState: { fontSize: 12, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase', color: C.sub },
+  windowTrack: { height: 6, borderRadius: 3, backgroundColor: C.line, marginTop: 12, justifyContent: 'center' },
+  windowFill: { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 3, backgroundColor: '#F5B81F' },
+  windowNow: { position: 'absolute', width: 14, height: 14, borderRadius: 7, marginLeft: -7, backgroundColor: C.card, borderWidth: 3, borderColor: '#F5B81F' },
+  windowNote: { fontSize: 12, color: C.faint, marginTop: 10 },
   board: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 14 },
   cell: { width: '11.5%', aspectRatio: 1, borderRadius: 7, overflow: 'hidden', backgroundColor: C.line },
   cellWaiting: { backgroundColor: C.line, alignItems: 'center', justifyContent: 'center' },
@@ -556,13 +610,13 @@ const st = StyleSheet.create({
   checkedRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12 },
   hero: { borderRadius: 28, padding: 20, overflow: 'hidden' },
   heroRow: { flexDirection: 'row', alignItems: 'center', gap: 20 },
-  ringBig: { color: C.white, fontSize: 38, lineHeight: 42, fontWeight: '900', letterSpacing: -1 },
+  ringBig: { color: C.white, fontSize: 38, lineHeight: 42, fontFamily: F.display, letterSpacing: -1 },
   ringLabel: { color: 'rgba(255,255,255,0.9)', fontSize: 12, fontWeight: '800' },
   statLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
-  statValue: { color: C.white, fontSize: 18, fontWeight: '900' },
+  statValue: { color: C.white, fontSize: 18, fontFamily: F.display },
   snapCard: { marginTop: 16, flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: C.card, borderRadius: 24, padding: 16, borderWidth: 2, borderColor: C.line },
   snapIcon: { width: 58, height: 58, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  snapTitle: { fontSize: 18, fontWeight: '900', color: C.ink },
+  snapTitle: { fontSize: 18, fontFamily: F.display, color: C.ink },
   doneCard: { marginTop: 16, flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: C.greenPale, borderRadius: 24, padding: 16 },
   doneIcon: { width: 46, height: 46, borderRadius: 23, backgroundColor: C.green, alignItems: 'center', justifyContent: 'center' },
   doneRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14 },
@@ -576,7 +630,7 @@ const st = StyleSheet.create({
   streakTop: { flexDirection: 'row', alignItems: 'center', gap: 12, justifyContent: 'center' },
   weekOnBlue: { marginTop: 18, paddingHorizontal: 14 },
   wallHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 },
-  section0: { fontSize: 20, fontWeight: '900', color: C.ink },
+  section0: { fontSize: 20, fontFamily: F.display, color: C.ink },
   postHead: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14 },
   avatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: C.bluePale, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 16, fontWeight: '900', color: C.blueDeep },
@@ -594,9 +648,9 @@ const st = StyleSheet.create({
   pill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: R.pill, paddingHorizontal: 16, minHeight: 38, justifyContent: 'center' },
   pillText: { color: C.white, fontSize: 14, fontWeight: '800' },
   head: { alignItems: 'center', paddingHorizontal: 12, paddingTop: 8, paddingBottom: 26 },
-  title: { fontSize: 30, lineHeight: 34, fontWeight: '900', color: C.ink, letterSpacing: -0.5, textAlign: 'center', marginTop: 4 },
+  title: { fontSize: 30, lineHeight: 34, fontFamily: F.display, color: C.ink, letterSpacing: -0.5, textAlign: 'center', marginTop: 4 },
   streak: { borderRadius: 26, paddingVertical: 22, overflow: 'hidden' },
-  streakBig: { color: C.white, fontSize: 56, lineHeight: 62, fontWeight: '900', letterSpacing: -2 },
+  streakBig: { color: C.white, fontSize: 56, lineHeight: 62, fontFamily: F.display, letterSpacing: -2 },
   streakLabel: { color: C.white, fontSize: 15, lineHeight: 19, fontWeight: '800' },
   week: { flexDirection: 'row', justifyContent: 'space-between' },
   weekCol: { alignItems: 'center', gap: 6 },
@@ -605,7 +659,7 @@ const st = StyleSheet.create({
   photo: { width: 140, height: 140, borderRadius: 18, alignSelf: 'center', marginTop: 14, backgroundColor: C.line },
   note: { fontSize: 14, color: C.ink, fontWeight: '700', marginTop: 12, textAlign: 'center' },
   progressRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginTop: 28, marginBottom: 10 },
-  section: { fontSize: 19, fontWeight: '900', color: C.ink, marginTop: 34, marginBottom: 12 },
+  section: { fontSize: 19, fontFamily: F.display, color: C.ink, marginTop: 34, marginBottom: 12 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
   dot: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   rank: { fontSize: 14, fontWeight: '900', color: C.sub },

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { C, R } from './theme';
+import { C, R, F } from './theme';
 import { Icon } from './icons';
 import { tap, useStore, type Gender } from './store';
 
@@ -263,7 +263,7 @@ const st = StyleSheet.create({
   welcomeText: { marginTop: 26, width: '100%', maxWidth: 560, alignSelf: 'center' },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   brandLogo: { width: 26, height: 46 },
-  brandName: { fontSize: 32, fontWeight: '900', color: C.ink, letterSpacing: -0.8 },
+  brandName: { fontSize: 32, fontFamily: F.display, color: C.ink, letterSpacing: -0.8 },
   welcomeLine: { fontSize: 17, lineHeight: 24, color: C.sub, marginTop: 10 },
   welcomeButtons: { marginTop: 'auto', paddingTop: 24, width: '100%', maxWidth: 560, alignSelf: 'center', gap: 10 },
   nameBtn: { minHeight: 56, borderRadius: R.pill, backgroundColor: C.blue, alignItems: 'center', justifyContent: 'center' },
@@ -274,7 +274,7 @@ const st = StyleSheet.create({
   heroInner: { marginTop: 24, maxWidth: 480, width: '100%', alignSelf: 'center' },
   heroIcon: { width: 76, height: 76, borderRadius: 18, borderWidth: 2, borderColor: 'rgba(255,255,255,0.6)' },
   heroEyebrow: { color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: '800', letterSpacing: 2, marginTop: 28 },
-  heroTitle: { color: C.white, fontSize: 40, lineHeight: 44, fontWeight: '900', letterSpacing: -1, marginTop: 10 },
+  heroTitle: { color: C.white, fontSize: 40, lineHeight: 44, fontFamily: F.display, letterSpacing: -1, marginTop: 10 },
   feature: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   featureIcon: { width: 40, height: 40, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
   featureText: { flex: 1, color: C.white, fontSize: 16, fontWeight: '700' },
@@ -283,7 +283,7 @@ const st = StyleSheet.create({
   appleBtn: { width: '100%', minHeight: 56, borderRadius: R.pill, backgroundColor: '#000', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   appleLogo: { color: '#fff', fontSize: 22, marginTop: -3 },
   appleText: { color: '#fff', fontSize: 18, fontWeight: '800' },
-  heroBtnText: { color: C.blueDeep, fontSize: 18, fontWeight: '900' },
+  heroBtnText: { color: C.blueDeep, fontSize: 18, fontFamily: F.display },
   heroLink: { color: C.white, fontSize: 15, fontWeight: '700', textDecorationLine: 'underline' },
   top: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingBottom: 6, maxWidth: 600, width: '100%', alignSelf: 'center' },
   back: { width: 44, height: 36, justifyContent: 'center', transform: [{ scaleX: -1 }] },
@@ -291,7 +291,7 @@ const st = StyleSheet.create({
   seg: { flex: 1, height: 5, borderRadius: 3 },
   skip: { color: C.sub, fontSize: 15, fontWeight: '700' },
   scroll: { paddingHorizontal: 24, paddingTop: 22, paddingBottom: 30, maxWidth: 600, width: '100%', alignSelf: 'center' },
-  q: { fontSize: 32, lineHeight: 37, fontWeight: '900', color: C.ink, letterSpacing: -0.7 },
+  q: { fontSize: 32, lineHeight: 37, fontFamily: F.display, color: C.ink, letterSpacing: -0.7 },
   qSub: { fontSize: 16, lineHeight: 23, color: C.sub, marginTop: 10 },
   label: { fontSize: 13, fontWeight: '800', color: C.sub, letterSpacing: 0.6, textTransform: 'uppercase', marginTop: 30, marginBottom: 12 },
   bigInput: { marginTop: 30, fontSize: 30, fontWeight: '800', color: C.ink, borderBottomWidth: 2, borderBottomColor: C.blue, paddingVertical: 10, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null) },
@@ -314,6 +314,6 @@ const st = StyleSheet.create({
   tagText: { fontSize: 14, fontWeight: '800', color: C.ink },
   footer: { paddingHorizontal: 24, paddingTop: 10, maxWidth: 600, width: '100%', alignSelf: 'center' },
   cta: { minHeight: 56, borderRadius: R.pill, backgroundColor: C.blue, alignItems: 'center', justifyContent: 'center' },
-  ctaText: { color: C.white, fontSize: 18, fontWeight: '900' },
+  ctaText: { color: C.white, fontSize: 18, fontFamily: F.display },
   err: { color: '#C0303F', fontWeight: '700', fontSize: 14, marginTop: 14, textAlign: 'center' },
 });

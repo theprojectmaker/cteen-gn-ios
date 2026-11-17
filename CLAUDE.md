@@ -133,7 +133,8 @@ preview misses. `dist/` is ignored by git.
 | `.github/workflows/trigger-build.yml` | Hands each push on `main` to the public build repo (OTA + TestFlight) |
 | `scripts/whats-new.cjs` | Auto-pulls/merges the other person's work and reports builds |
 
-Design: light theme, CTeen blue `#159FDC`, heavy rounded headings, white cards on a pale
+Design: light theme, CTeen blue `#159FDC`, headlines in Bricolage Grotesque (`fontFamily: F.display`
+from `src/theme.ts`, no `fontWeight` with it), body in Apple's system font, white cards on a pale
 background, floating glass header and tab bar. International events carry an "International"
 badge and register on the CTeen website; Great Neck events sign up inside the app.
 

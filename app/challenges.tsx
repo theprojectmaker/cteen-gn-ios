@@ -1,7 +1,7 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { C, T } from '../src/theme';
+import { C, T, F } from '../src/theme';
 import { useStore } from '../src/store';
 import { ChallengeBanner } from '../src/rewards';
 
@@ -26,5 +26,5 @@ export default function ChallengesRoute() {
 
 const st = StyleSheet.create({
   col: { width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 20 },
-  title: { fontSize: 32, fontWeight: '900', color: C.ink, letterSpacing: -0.6 },
+  title: { fontSize: 32, fontFamily: F.display, color: C.ink, letterSpacing: -0.6 },
 });

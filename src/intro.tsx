@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Image, Platform, Pressable, StyleSheet, View } from 'react-native';
-import { C, PREFS } from './theme';
+import { C, PREFS, F } from './theme';
 
 // Opening animation (about 2 seconds, tap to skip): the CTeen tile drops in with a glow,
 // light rings ripple out, GREAT NECK spells itself in letter by letter, then the whole
@@ -85,5 +85,5 @@ const st = StyleSheet.create({
   glow: { position: 'absolute', left: -40, right: -40, top: -40, bottom: -40, borderRadius: 120, backgroundColor: 'rgba(255,255,255,0.18)' },
   logo: { width: 92, height: 162 },
   word: { flexDirection: 'row', marginTop: 28 },
-  letter: { color: C.white, fontSize: 22, fontWeight: '900', letterSpacing: 4 },
+  letter: { color: C.white, fontSize: 22, fontFamily: F.display, letterSpacing: 4 },
 });

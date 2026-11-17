@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { C, R, T } from './theme';
+import { C, R, T, F } from './theme';
 import { Icon } from './icons';
 import { CHAPTER, calendarUrl, countdown, dateLabel, open, upcoming, useShabbat, useStore, type ColorKey, type EventItem, type Post } from './store';
 import { audienceLabel, Button, Card, Chips, Cover, Empty, EventCard, EventMeta, Field, IconTile, ScopeBadge, SectionHead, Sheet, s as u } from './ui';
@@ -464,13 +464,13 @@ function LinkRow({ icon, title, sub, url, first }: { icon: string; title: string
 }
 
 const st = StyleSheet.create({
-  hello: { fontSize: 32, lineHeight: 37, fontWeight: '900', color: C.ink, letterSpacing: -0.6 },
+  hello: { fontSize: 32, lineHeight: 37, fontFamily: F.display, color: C.ink, letterSpacing: -0.6 },
   helloSub: { fontSize: 16, lineHeight: 22, color: C.sub, marginTop: 6 },
-  section: { fontSize: 20, fontWeight: '900', color: C.ink, letterSpacing: -0.2, marginTop: 38, marginBottom: 14 },
+  section: { fontSize: 20, fontFamily: F.display, color: C.ink, letterSpacing: -0.2, marginTop: 38, marginBottom: 14 },
   quickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   hero: { marginTop: 0, borderRadius: 28, overflow: 'hidden', minHeight: 280, justifyContent: 'flex-end', padding: 20, backgroundColor: C.blueDeep },
   heroKicker: { color: 'rgba(255,255,255,0.92)', fontSize: 13, fontWeight: '800' },
-  heroTitle: { color: C.white, fontSize: 28, lineHeight: 32, fontWeight: '900', letterSpacing: -0.4, marginTop: 4 },
+  heroTitle: { color: C.white, fontSize: 28, lineHeight: 32, fontFamily: F.display, letterSpacing: -0.4, marginTop: 4 },
   heroDate: { color: C.white, fontSize: 14, fontWeight: '700', marginTop: 6 },
   heroBtn: { marginTop: 16, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: C.white, borderRadius: R.pill, paddingHorizontal: 18, height: 42 },
   heroBtnText: { color: C.night, fontSize: 15, fontWeight: '800' },
@@ -480,11 +480,11 @@ const st = StyleSheet.create({
   quickLabel: { flex: 1, fontSize: 16, fontWeight: '800', color: C.ink },
   shabbat: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   shabbatTimes: { flexDirection: 'row', alignItems: 'center', gap: 18, marginTop: 8 },
-  timeBig: { fontSize: 20, fontWeight: '900', color: C.ink, letterSpacing: -0.3 },
+  timeBig: { fontSize: 20, fontFamily: F.display, color: C.ink, letterSpacing: -0.3 },
   timeRule: { width: 1, height: 30, backgroundColor: C.line },
   endNote: { textAlign: 'center', color: C.faint, fontSize: 13, marginTop: 14, lineHeight: 19 },
   sheetImgWrap: { aspectRatio: 16 / 9, backgroundColor: C.line, justifyContent: 'flex-end' },
-  sheetTitle: { position: 'absolute', left: 18, right: 18, bottom: 16, color: C.white, fontSize: 26, lineHeight: 30, fontWeight: '900', letterSpacing: -0.3 },
+  sheetTitle: { position: 'absolute', left: 18, right: 18, bottom: 16, color: C.white, fontSize: 26, lineHeight: 30, fontFamily: F.display, letterSpacing: -0.3 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 14, paddingHorizontal: 16 },
   rule: { borderTopWidth: 1, borderTopColor: C.line },
   inBox: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.greenPale, borderRadius: 18, padding: 16 },
@@ -504,7 +504,7 @@ const st = StyleSheet.create({
   about: { marginTop: 16, flexDirection: 'row', alignItems: 'center', gap: 14 },
   aboutLogo: { width: 44, height: 72 },
   meAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: C.blue, alignItems: 'center', justifyContent: 'center' },
-  meInitial: { color: C.white, fontSize: 18, fontWeight: '900' },
+  meInitial: { color: C.white, fontSize: 18, fontFamily: F.display },
   askRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
   infoRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
   linkRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12 },

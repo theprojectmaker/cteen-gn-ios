@@ -47,6 +47,32 @@ const PHOTO_TTL = 60 * 60 * 24 * 30; // check-in photos are deleted after 30 day
 function nyDate(now = new Date()) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(now); // YYYY-MM-DD
 }
+// Sunrise and sunset in Great Neck (NOAA sunrise equation, same as src/zmanim.ts in the app).
+function sunTimes(ymd) {
+  const rad = Math.PI / 180, LAT = 40.8007, LON = -73.7285;
+  const [y, m, d] = ymd.split('-').map(Number);
+  const n = Math.ceil(Date.UTC(y, m - 1, d) / 86400000 + 2440587.5 - 2451545 + 0.0008);
+  const js = n - LON / 360;
+  const M = (357.5291 + 0.98560028 * js) % 360;
+  const C = 1.9148 * Math.sin(M * rad) + 0.02 * Math.sin(2 * M * rad) + 0.0003 * Math.sin(3 * M * rad);
+  const L = (M + C + 180 + 102.9372) % 360;
+  const transit = 2451545 + js + 0.0053 * Math.sin(M * rad) - 0.0069 * Math.sin(2 * L * rad);
+  const dec = Math.asin(Math.sin(L * rad) * Math.sin(23.4397 * rad));
+  const w = Math.acos((Math.sin(-0.833 * rad) - Math.sin(LAT * rad) * Math.sin(dec)) / (Math.cos(LAT * rad) * Math.cos(dec))) / rad;
+  const ms = (j) => Math.round((j - 2440587.5) * 86400000);
+  return { rise: ms(transit - w / 360), set: ms(transit + w / 360) };
+}
+const nyClock = (ms) => new Date(ms).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' });
+// Returns an error message when tefillin can't be wrapped right now, or '' when it can.
+function wrapClosed(now = Date.now()) {
+  const day = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short' }).format(new Date(now));
+  if (day === 'Sat') return 'No tefillin on Shabbat. See you Sunday.';
+  const { rise, set } = sunTimes(nyDate(new Date(now)));
+  if (now < rise) return `Tefillin opens at sunrise, ${nyClock(rise)}.`;
+  if (now > set) return `Today's window closed at sunset (${nyClock(set)}). Come back tomorrow from ${nyClock(sunTimes(nyDate(new Date(now + 864e5))).rise)}.`;
+  return '';
+}
+
 function periodKey(every) {
   const d = nyDate();
   if (every !== 'week') return d;
@@ -502,6 +528,7 @@ export async function onRequest({ request, env, params }) {
         if (row.last === period) return json({ ok: true, already: true, count: row.count, period, board: top() });
         const membersNow = (await env.CTEEN.get('members:' + id, 'json')) || {};
         if (memberStats(ch, row, membersNow[who.key]?.at).out) return bad("You've missed 3 days, so you're out of this challenge. Talk to Rabbi Zevy.", 409);
+        if (id === 'tefillin') { const closed = wrapClosed(); if (closed) return bad(closed, 409); }
         let photoKey = '';
         if (ch.photo) {
           const photo = typeof body.photo === 'string' ? body.photo : '';

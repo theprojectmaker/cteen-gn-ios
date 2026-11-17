@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { C, R, T } from './theme';
+import { C, R, T, F } from './theme';
 import { Icon } from './icons';
 import { useStore, type Gender } from './store';
 import { Button, Card, Field, s as u } from './ui';
@@ -155,14 +155,14 @@ const st = StyleSheet.create({
   err: { color: '#C0303F', fontWeight: '700', fontSize: 13, marginTop: 12 },
   head: { alignItems: 'center', paddingTop: 8, paddingBottom: 24 },
   avatarBig: { width: 84, height: 84, borderRadius: 42, backgroundColor: C.blue, alignItems: 'center', justifyContent: 'center' },
-  avatarLetter: { color: C.white, fontSize: 36, fontWeight: '900' },
-  title: { fontSize: 28, fontWeight: '900', color: C.ink, marginTop: 14, letterSpacing: -0.4 },
-  section: { fontSize: 19, fontWeight: '900', color: C.ink, marginTop: 30, marginBottom: 12 },
+  avatarLetter: { color: C.white, fontSize: 36, fontFamily: F.display },
+  title: { fontSize: 28, fontFamily: F.display, color: C.ink, marginTop: 14, letterSpacing: -0.4 },
+  section: { fontSize: 19, fontFamily: F.display, color: C.ink, marginTop: 30, marginBottom: 12 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   gButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, minHeight: 50, borderRadius: R.pill, borderWidth: 1, borderColor: C.line, backgroundColor: C.card },
   gBadge: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#F1F3F4', alignItems: 'center', justifyContent: 'center' },
   gLetter: { fontSize: 15, fontWeight: '900', color: '#4285F4' },
   gText: { fontSize: 16, fontWeight: '800', color: C.ink },
   logo: { width: 72, height: 72, borderRadius: 18 },
-  welcome: { fontSize: 30, lineHeight: 34, fontWeight: '900', color: C.ink, marginTop: 18, letterSpacing: -0.5 },
+  welcome: { fontSize: 30, lineHeight: 34, fontFamily: F.display, color: C.ink, marginTop: 18, letterSpacing: -0.5 },
 });

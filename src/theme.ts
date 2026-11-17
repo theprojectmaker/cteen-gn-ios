@@ -50,20 +50,23 @@ export const PREFS = readPrefs();
 export const IS_DARK = PREFS.theme === 'dark' || (PREFS.theme === 'system' && Appearance.getColorScheme() === 'dark');
 export const C = IS_DARK ? DARK : LIGHT;
 
-export const R = { card: 18, tile: 14, pill: 999 };
+export const R = { card: 22, tile: 16, pill: 999 };
+
+// Bricolage Grotesque for headlines (loaded in app/_layout.tsx), Apple's system font for everything else.
+export const F = { display: 'BricolageGrotesque_800ExtraBold', bold: 'BricolageGrotesque_700Bold' } as const;
 
 export const shadow = {
   shadowColor: '#000',
-  shadowOpacity: IS_DARK ? 0.35 : 0.06,
-  shadowRadius: 10,
-  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: IS_DARK ? 0.35 : 0.07,
+  shadowRadius: 18,
+  shadowOffset: { width: 0, height: 6 },
   elevation: 2,
 } as const;
 
 export const T = {
   eyebrow: { fontSize: 11, fontWeight: '800', letterSpacing: 0.8, color: C.sub, textTransform: 'uppercase' },
-  h1: { fontSize: 30, lineHeight: 34, fontWeight: '900', color: C.ink, letterSpacing: -0.6 },
-  h2: { fontSize: 19, fontWeight: '900', color: C.ink, letterSpacing: -0.2 },
+  h1: { fontSize: 31, lineHeight: 35, fontFamily: F.display, color: C.ink, letterSpacing: -0.8 },
+  h2: { fontSize: 20, fontFamily: F.display, color: C.ink, letterSpacing: -0.3 },
   h3: { fontSize: 16, fontWeight: '800', color: C.ink },
   body: { fontSize: 15, lineHeight: 22, color: C.ink },
   small: { fontSize: 13, lineHeight: 18, color: C.sub },

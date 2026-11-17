@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
 import * as Updates from 'expo-updates';
-import { C, PREFS, R, T } from '../src/theme';
+import { C, PREFS, R, T, F } from '../src/theme';
 import { Icon } from '../src/icons';
 import { writePrefs, type ThemeMode } from '../src/prefs';
 import { useStore } from '../src/store';
@@ -118,10 +118,10 @@ function Row({ icon, color, title, sub, children, onPress, rule, chevron }: { ic
 
 const st = StyleSheet.create({
   col: { width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 20 },
-  title: { fontSize: 34, fontWeight: '900', color: C.ink, letterSpacing: -0.7, marginBottom: 18 },
+  title: { fontSize: 34, fontFamily: F.display, color: C.ink, letterSpacing: -0.7, marginBottom: 18 },
   profile: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16 },
   avatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: C.blue, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: C.white, fontSize: 24, fontWeight: '900' },
+  avatarText: { color: C.white, fontSize: 24, fontFamily: F.display },
   section: { fontSize: 13, fontWeight: '800', color: C.sub, letterSpacing: 0.6, textTransform: 'uppercase', marginTop: 28, marginBottom: 10, marginLeft: 4 },
   seg: { flexDirection: 'row', gap: 6 },
   segBtn: { flex: 1, alignItems: 'center', gap: 6, paddingVertical: 12, borderRadius: 14 },

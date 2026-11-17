@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { C, T } from './theme';
+import { C, T, F } from './theme';
 import { EVENT_ICONS, Icon } from './icons';
 import { dateLabel, todayIso, useStore, type Content, type Person, type PhotoRow, type Question, type SignupRow, type Target } from './store';
 import { Button, Card, Chips, Field, IconTile, Toggle, s as u } from './ui';
@@ -622,7 +622,7 @@ const st = StyleSheet.create({
   modeBtn: { flex: 1, height: 40, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   modeOn: { backgroundColor: C.inverse },
   modeText: { fontSize: 15, fontWeight: '800', color: C.ink },
-  simpleHello: { fontSize: 22, fontWeight: '900', color: C.ink },
+  simpleHello: { fontSize: 22, fontFamily: F.display, color: C.ink },
   task: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16 },
   taskTitle: { fontSize: 18, fontWeight: '800', color: C.ink },
   taskSub: { fontSize: 14, color: C.sub, marginTop: 2 },

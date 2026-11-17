@@ -12,6 +12,7 @@
     "check-sdk": "node scripts/check-sdk.cjs"
   },
   "dependencies": {
+    "@expo-google-fonts/bricolage-grotesque": "^0.4.1",
     "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "~57.0.31",
     "expo-apple-authentication": "~57.0.2",
@@ -39,7 +40,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
-    "typescript": "~6.0.3",
-    "babel-preset-expo": "~57.0.17"
+    "babel-preset-expo": "~57.0.17",
+    "typescript": "~6.0.3"
   }
 }

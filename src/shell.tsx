@@ -4,8 +4,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import * as Updates from 'expo-updates';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
-import { C, HUES, PREFS, R } from './theme';
-import { Icon } from './icons';
+import { C, HUES, PREFS, R, F } from './theme';
+import { Icon, challengeIcon } from './icons';
+import { wrapWindow } from './zmanim';
 import { Glass, LIQUID } from './glass';
 import { CHAPTER, doneThisPeriod, open, useShabbat, useStore, type Alert } from './store';
 
@@ -100,7 +101,8 @@ function HeaderButtons() {
   const { content, name, checks, joined, tipSeen, hideTip } = useStore();
   const live = content.challenges.filter((c) => c.active);
   const main = live.find((c) => c.id === 'tefillin') ?? live[0];
-  const due = !!main && (!joined.includes(main.id) || !doneThisPeriod(main, checks));
+  // pulses only while you can actually do it (tefillin: sunrise to sunset, not Shabbat)
+  const due = !!main && (!joined.includes(main.id) || !doneThisPeriod(main, checks)) && (main.id !== 'tefillin' || wrapWindow().state === 'open');
   const pulse = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (!due || PREFS.reduceMotion) { pulse.stopAnimation(); pulse.setValue(0); return; }
@@ -127,7 +129,7 @@ function HeaderButtons() {
         <Pressable onPress={openIt} style={({ pressed }) => [st.hBtn, pressed && { opacity: 0.55 }]} hitSlop={4} accessibilityRole="button" accessibilityLabel={main.title}>
           {due ? <Animated.View pointerEvents="none" style={[st.ring, { opacity: ringOpacity, transform: [{ scale: ringScale }] }]} /> : null}
           <Animated.View style={{ transform: [{ scale: iconScale }] }}>
-            <Icon name="trophy" size={22} color={due ? '#D08A1E' : C.ink} stroke={2.1} />
+            <Icon name={challengeIcon(main)} size={23} color={due ? '#D08A1E' : C.ink} stroke={2} />
           </Animated.View>
           {due ? <View style={st.hDot} /> : null}
         </Pressable>
@@ -265,7 +267,7 @@ const st = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: 11, borderRadius: 28, paddingLeft: 12, paddingRight: 8, height: 62, marginBottom: 18, zIndex: 5 },
   logo: { width: 21, height: 37 },
   topEyebrow: { fontSize: 10, fontWeight: '800', letterSpacing: 1, color: C.sub },
-  topName: { fontSize: 18, fontWeight: '900', color: C.ink, letterSpacing: -0.3 },
+  topName: { fontSize: 18, fontFamily: F.display, color: C.ink, letterSpacing: -0.3 },
   hBtns: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   hBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   ring: { position: 'absolute', width: 40, height: 40, borderRadius: 20, backgroundColor: '#F5B81F' },
@@ -278,10 +280,10 @@ const st = StyleSheet.create({
   shabbat: { flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: 22, padding: 16, marginBottom: 18 },
   shabbatIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: 'rgba(181,119,42,0.14)', alignItems: 'center', justifyContent: 'center' },
   shabbatKicker: { color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '900', letterSpacing: 1 },
-  countdown: { color: C.white, fontSize: 34, fontWeight: '900', letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
+  countdown: { color: C.white, fontSize: 34, fontFamily: F.display, letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
   shabbatTitle: { color: C.ink, fontSize: 16, fontWeight: '800' },
   shabbatSub: { color: C.sub, fontSize: 13, marginTop: 2 },
-  shabbatTitleLight: { color: C.white, fontSize: 18, fontWeight: '900' },
+  shabbatTitleLight: { color: C.white, fontSize: 18, fontFamily: F.display },
   shabbatSubLight: { color: 'rgba(255,255,255,0.9)', fontSize: 13, marginTop: 2, fontWeight: '600' },
   alert: { marginBottom: 16, flexDirection: 'row', alignItems: 'center', borderRadius: 20, paddingLeft: 14, paddingRight: 6, paddingVertical: 10, overflow: 'hidden' },
   alertMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
