@@ -3,7 +3,8 @@ node_modules/
 dist/
 web-build/
 *.log
-.claude/
+.claude/*
+!.claude/settings.json
 .secrets/
 /ios/
 /android/

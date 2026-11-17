@@ -19,6 +19,14 @@ only the build recipe. A push here hands that repo the commit to build. So:
 - A build takes about 25 minutes. Pushes made while one is running wait in line; only the newest
   waiting one is kept.
 
+## Noticing the other person's changes
+
+`.claude/settings.json` runs `scripts/whats-new.cjs` when a session starts and before every
+message. When GitHub has commits this copy does not have, it prints who changed what. **When you
+see that notice, stop, pull, read the new `NOTES.md` entries, and tell your human what changed
+before doing anything else.** It only reads; it never changes files. If you opened Claude in a
+parent folder and the notice never appears, run `node scripts/whats-new.cjs` yourself first.
+
 ## How to work (every session)
 
 1. **Get the latest code first:** `git pull --rebase origin main`
