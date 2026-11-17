@@ -196,7 +196,7 @@ export function PostCard({ post, full, compact }: { post: Post; full?: boolean; 
 }
 
 // Comments under a post (on the post's own page): soft bubbles, a colored initial, a pill to reply.
-const AVATAR_HUES = ['#159FDC', '#F2913D', '#7C5CFC', '#1FA971', '#F0569A', '#E0A400'];
+const AVATAR_HUES = ['#0BAFE6', '#F2913D', '#7C5CFC', '#1FA971', '#F0569A', '#E0A400'];
 const hueFor = (name: string) => AVATAR_HUES[[...name].reduce((a, c) => a + c.charCodeAt(0), 0) % AVATAR_HUES.length];
 
 export function PostComments({ postId }: { postId: string }) {
@@ -264,7 +264,7 @@ export function PostComments({ postId }: { postId: string }) {
 
 const st = StyleSheet.create({
   feedHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  newBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: C.blue, alignItems: 'center', justifyContent: 'center' },
+  newBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: C.orange, alignItems: 'center', justifyContent: 'center' },
   card: { backgroundColor: C.card, borderRadius: 24, overflow: 'hidden', borderWidth: 1, borderColor: C.line },
   head: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
   avatarRing: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: C.blue, alignItems: 'center', justifyContent: 'center', backgroundColor: C.card },

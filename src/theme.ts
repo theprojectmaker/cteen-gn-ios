@@ -1,50 +1,57 @@
-// Colors and type lifted from the CTeen portal (myportal.cteen.com) and the CTeen logo.
+// Colors from the CTeen logo (cyan + orange) on warm neutrals; type is Bricolage for headlines.
 // The palette is picked once at startup from Settings > Appearance (light, dark, or the phone's
 // setting); changing it restarts the app so every screen redraws with the new colors.
 import { Appearance } from 'react-native';
 import { readPrefs } from './prefs';
 import { DEFAULT_PREFS } from './prefsDefaults';
 
+// CTeen's two colors: cyan (the logo) and orange. Warm off-white base, deep navy ink.
 const LIGHT = {
-  bg: '#F3F6F9',
+  bg: '#F7F4EF',
   card: '#FFFFFF',
-  ink: '#13202C',
-  sub: '#5B6875',
-  faint: '#8A96A3',
-  line: '#E3E9EF',
-  blue: '#159FDC',
-  blueDeep: '#0C5E9E',
-  bluePale: '#E7F5FC',
+  ink: '#0F1D2B',
+  sub: '#5A6470',
+  faint: '#98A0A8',
+  line: '#ECE6DE',
+  blue: '#0BAFE6', // CTeen cyan: primary buttons, links, tab bar
+  blueDeep: '#07729F',
+  bluePale: '#E2F6FD',
   logoBlue: '#2BC6F6',
-  tan: '#E8B478',
-  tanPale: '#FBF1E4',
-  green: '#1A6B45',
-  greenPale: '#E8F1EC',
+  tan: '#FF7A2F',
+  tanPale: '#FFF0E4',
+  orange: '#FF7A2F', // CTeen orange: the things you act on (streak, Snap, Up next, you)
+  orangeDeep: '#B04A0C',
+  orangePale: '#FFF0E4',
+  green: '#157A4C',
+  greenPale: '#E5F4EC',
   white: '#FFFFFF',
-  inverse: '#13202C', // dark chip / badge background in light mode
+  inverse: '#0F1D2B', // dark chip / badge background in light mode
   onInverse: '#FFFFFF',
-  night: '#13202C', // always dark (text on white buttons over photos)
+  night: '#0F1D2B', // always dark (text on white buttons over photos)
 };
 
 const DARK: typeof LIGHT = {
-  bg: '#0B121B',
-  card: '#151F2B',
-  ink: '#EDF2F7',
-  sub: '#9AA8B6',
-  faint: '#6B7A89',
-  line: '#243243',
-  blue: '#2BB2EE',
-  blueDeep: '#7FD0F5',
-  bluePale: '#123049',
+  bg: '#0B1520',
+  card: '#142231',
+  ink: '#EEF2F6',
+  sub: '#9CA9B6',
+  faint: '#6A7887',
+  line: '#223345',
+  blue: '#35C3F2',
+  blueDeep: '#8ADDF8',
+  bluePale: '#0F3347',
   logoBlue: '#2BC6F6',
-  tan: '#E8B478',
-  tanPale: '#33261A',
+  tan: '#FF9550',
+  tanPale: '#3A2414',
+  orange: '#FF9550',
+  orangeDeep: '#FFC199',
+  orangePale: '#3A2414',
   green: '#5FD39B',
   greenPale: '#13301F',
   white: '#FFFFFF',
-  inverse: '#EDF2F7',
-  onInverse: '#0B121B',
-  night: '#13202C',
+  inverse: '#EEF2F6',
+  onInverse: '#0B1520',
+  night: '#0F1D2B',
 };
 
 export const PREFS = (() => { try { return { ...DEFAULT_PREFS, ...(readPrefs() || {}) }; } catch { return DEFAULT_PREFS; } })();
@@ -75,16 +82,16 @@ export const T = {
 
 // Cover / accent colors leaders can pick for events and challenges.
 const HUES_LIGHT = {
-  blue: { solid: '#159FDC', deep: '#0C5E9E', pale: '#E7F5FC' },
-  orange: { solid: '#F2913D', deep: '#9A5A16', pale: '#FDF0E3' },
+  blue: { solid: '#0BAFE6', deep: '#07729F', pale: '#E2F6FD' },
+  orange: { solid: '#FF7A2F', deep: '#B04A0C', pale: '#FFF0E4' },
   purple: { solid: '#7C5CFC', deep: '#4A32B8', pale: '#EFEBFF' },
   green: { solid: '#1FA971', deep: '#136B48', pale: '#E3F6EE' },
   pink: { solid: '#F0569A', deep: '#A52560', pale: '#FDE9F2' },
   yellow: { solid: '#F5B81F', deep: '#8A6405', pale: '#FEF6DC' },
 };
 const HUES_DARK: typeof HUES_LIGHT = {
-  blue: { solid: '#159FDC', deep: '#8AD4F6', pale: '#10324A' },
-  orange: { solid: '#F2913D', deep: '#F7BC86', pale: '#3A2612' },
+  blue: { solid: '#35C3F2', deep: '#8ADDF8', pale: '#0F3347' },
+  orange: { solid: '#FF9550', deep: '#FFC199', pale: '#3A2414' },
   purple: { solid: '#7C5CFC', deep: '#BFB0FF', pale: '#26204A' },
   green: { solid: '#1FA971', deep: '#86DDB3', pale: '#103225' },
   pink: { solid: '#F0569A', deep: '#F7A8CA', pale: '#3B1528' },

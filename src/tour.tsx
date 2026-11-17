@@ -7,7 +7,7 @@ import { useStore } from './store';
 // A one-time quick tour of the four tabs, shown once after sign-up.
 const ND = Platform.OS !== 'web';
 const STEPS = [
-  { icon: 'home', color: '#159FDC', title: 'Home', text: 'Your day at a glance: the next events, your Tefillin streak and this Shabbat.' },
+  { icon: 'home', color: '#0BAFE6', title: 'Home', text: 'Your day at a glance: the next events, your Tefillin streak and this Shabbat.' },
   { icon: 'ticket', color: '#F2913D', title: 'Events', text: 'Everything coming up. Tap Going to RSVP, add it to your calendar in one tap.' },
   { icon: 'chat', color: '#1FA971', title: 'Feed', text: 'News and photos from Rabbi Zevy. Like, comment and never miss an announcement.' },
   { icon: 'users', color: '#7C5CFC', title: 'Chapter', text: 'Minyan times, how to reach the Chabad house, and Ask the rabbi anything.' },

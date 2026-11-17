@@ -324,7 +324,7 @@ const st = StyleSheet.create({
   hBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: IS_DARK_UI ? 'rgba(255,255,255,0.09)' : 'rgba(19,32,44,0.06)', alignItems: 'center', justifyContent: 'center' },
   ring: { position: 'absolute', width: 38, height: 38, borderRadius: 19, backgroundColor: '#F5B81F' },
   hDot: { position: 'absolute', top: -1, right: -1, width: 11, height: 11, borderRadius: 6, backgroundColor: '#E0445C', borderWidth: 2, borderColor: C.card },
-  hAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: C.blue, alignItems: 'center', justifyContent: 'center' },
+  hAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: C.orange, alignItems: 'center', justifyContent: 'center' },
   hAvatarText: { color: C.white, fontSize: 16, fontWeight: '900' },
   tip: { position: 'absolute', top: 48, right: 0, backgroundColor: C.inverse, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, minWidth: 140, zIndex: 10 },
   tipArrow: { position: 'absolute', top: -5, right: 59, width: 12, height: 12, backgroundColor: C.inverse, transform: [{ rotate: '45deg' }] },

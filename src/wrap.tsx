@@ -44,7 +44,7 @@ export function leftText(ms: number) {
 }
 
 // A soft glow that breathes behind its child (off with Reduce motion).
-export function Pulse({ on, color = '#159FDC', radius = 22, children, style }: { on: boolean; color?: string; radius?: number; children: React.ReactNode; style?: ViewStyle }) {
+export function Pulse({ on, color = '#0BAFE6', radius = 22, children, style }: { on: boolean; color?: string; radius?: number; children: React.ReactNode; style?: ViewStyle }) {
   const a = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (!on || PREFS.reduceMotion) { a.stopAnimation(); a.setValue(0); return; }
@@ -90,7 +90,7 @@ export function WrapBanner() {
 }
 
 const st = StyleSheet.create({
-  banner: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 22, backgroundColor: '#E8742A' },
+  banner: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 22, backgroundColor: '#FF7A2F' },
   bannerFri: { backgroundColor: '#5A3FA8' },
   icon: { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: 16, fontWeight: '900', color: '#FFFFFF' },

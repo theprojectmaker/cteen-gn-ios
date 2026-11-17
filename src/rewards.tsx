@@ -35,7 +35,7 @@ export function ChallengeBanner({ ch }: { ch: Challenge }) {
         <Text style={T.h3} numberOfLines={1}>{ch.title}</Text>
         <Text style={[T.small, { marginTop: 2 }]} numberOfLines={2}>{line}</Text>
       </View>
-      <View style={[st.pill, { backgroundColor: done ? hue.pale : hue.solid }]}>
+      <View style={[st.pill, { backgroundColor: done ? hue.pale : C.orange }]}>
         {done ? <Icon name="tick" size={14} color={hue.deep} stroke={2.8} /> : ch.photo && mine ? <Icon name="camera" size={14} color={C.white} stroke={2.4} /> : null}
         <Text style={[st.pillText, done && { color: hue.deep }]}>{action}</Text>
       </View>
@@ -296,8 +296,8 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
               </View>
             </View>
           ) : (
-            <Pressable onPress={doCheck} disabled={busy || !ch.active} style={({ pressed }) => [st.snap, { backgroundColor: ws?.lastHour ? '#E8742A' : hue.solid }, pressed && { transform: [{ scale: 0.98 }], opacity: 0.95 }]} accessibilityRole="button" accessibilityLabel="Snap today's selfie">
-              <View style={st.snapIconWrap}><Icon name={ch.photo ? 'camera' : 'tick'} size={24} color={hue.solid} stroke={2.2} /></View>
+            <Pressable onPress={doCheck} disabled={busy || !ch.active} style={({ pressed }) => [st.snap, { backgroundColor: ws?.lastHour ? '#E5561A' : C.orange }, pressed && { transform: [{ scale: 0.98 }], opacity: 0.95 }]} accessibilityRole="button" accessibilityLabel="Snap today's selfie">
+              <View style={st.snapIconWrap}><Icon name={ch.photo ? 'camera' : 'tick'} size={24} color={C.orange} stroke={2.2} /></View>
               <View style={{ flex: 1 }}>
                 <Text style={st.snapText}>{busy ? 'Posting…' : ch.photo ? "Snap today's selfie" : 'Check in for today'}</Text>
                 {win ? <Text style={st.snapSub}>{win.friday ? 'Before candle lighting' : 'Before sunset'}, {nyTime(win.set)}</Text> : null}
@@ -584,7 +584,7 @@ const st = StyleSheet.create({
   viewerComment: { color: 'rgba(255,255,255,0.92)', fontSize: 14, lineHeight: 20, marginBottom: 6 },
   viewerInputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 2 },
   viewerInput: { flex: 1, height: 42, borderRadius: 21, paddingHorizontal: 16, backgroundColor: 'rgba(255,255,255,0.12)', color: '#FFFFFF', fontSize: 15 },
-  viewerSend: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#159FDC', alignItems: 'center', justifyContent: 'center' },
+  viewerSend: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#0BAFE6', alignItems: 'center', justifyContent: 'center' },
   snapTimer: { alignItems: 'flex-end' },
   snapTimerText: { fontSize: 20, fontFamily: F.display, color: '#FFFFFF', fontVariant: ['tabular-nums'] },
   snapTimerLabel: { fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.85)', marginTop: -2 },
