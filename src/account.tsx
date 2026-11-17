@@ -159,7 +159,7 @@ const st = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '900', color: C.ink, marginTop: 14, letterSpacing: -0.4 },
   section: { fontSize: 19, fontWeight: '900', color: C.ink, marginTop: 30, marginBottom: 12 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  gButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, minHeight: 50, borderRadius: R.pill, borderWidth: 1, borderColor: C.line, backgroundColor: C.white },
+  gButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, minHeight: 50, borderRadius: R.pill, borderWidth: 1, borderColor: C.line, backgroundColor: C.card },
   gBadge: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#F1F3F4', alignItems: 'center', justifyContent: 'center' },
   gLetter: { fontSize: 15, fontWeight: '900', color: '#4285F4' },
   gText: { fontSize: 16, fontWeight: '800', color: C.ink },

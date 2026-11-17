@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import Svg, { Circle } from 'react-native-svg';
 import { C, HUES, R, T } from './theme';
 import { Icon } from './icons';
 import { doneThisPeriod, hourLabel, periodKey, streak, useStore, type Challenge, type WallPost } from './store';
@@ -121,6 +122,7 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [setupName, setSetupName] = useState(name);
+  useEffect(() => { if (!setupName && name) setSetupName(name); }, [name]); // saved name loads a moment after the page
   const [hour, setHour] = useState<number | null>(reminders[ch.id] ?? null);
   const [day, setDay] = useState(0); // 0 = today, 1 = yesterday...
   const [wallKey, setWallKey] = useState(0); // bump to reload the wall
@@ -177,36 +179,50 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
         ) : <Text style={[T.body, { textAlign: 'center' }]}>This challenge has ended.</Text>
       ) : (
         <>
-          <View style={[st.streak, { backgroundColor: hue.solid }]}>
-            <View style={[u.blob, { backgroundColor: hue.deep, opacity: 0.25, right: -60, top: -80 }]} />
-            <View style={st.streakTop}>
-              <Icon name="flame" size={28} color={C.white} stroke={2} />
-              <Text style={st.streakBig}>{fire}</Text>
-              <Text style={st.streakLabel}>{unit(ch, fire)}{'\n'}in a row</Text>
+          <View style={[st.hero, { backgroundColor: hue.solid }]}>
+            <View style={[u.blob, { backgroundColor: hue.deep, opacity: 0.22, right: -70, top: -90 }]} />
+            <View style={[u.blob, { backgroundColor: '#ffffff', opacity: 0.08, left: -90, bottom: -110 }]} />
+            <View style={st.heroRow}>
+              <Ring size={132} progress={Math.min(1, count / Math.max(1, ch.goal))}>
+                <Icon name="flame" size={20} color={C.white} stroke={2.2} />
+                <Text style={st.ringBig}>{fire}</Text>
+                <Text style={st.ringLabel}>{ch.every === 'day' ? 'day streak' : 'week streak'}</Text>
+              </Ring>
+              <View style={{ flex: 1, gap: 12 }}>
+                <HeroStat label="Today" value={done ? 'Done' : 'Not yet'} good={done} />
+                <HeroStat label="Check-ins" value={`${count} of ${ch.goal}`} />
+                <HeroStat label="Next reward" value={(() => { const nx = ch.rewards.find((r) => r.at > count); return nx ? `in ${nx.at - count}` : 'All yours'; })()} />
+              </View>
             </View>
             <View style={st.weekOnBlue}><Week ch={ch} light /></View>
           </View>
 
           {ch.active ? (
-            <View style={{ marginTop: 16 }}>
-              <Button
-                label={busy ? 'Posting…' : done ? doneLabel(ch) : ch.photo ? 'Snap my photo' : 'Check in'}
-                icon={done ? 'tick' : ch.photo ? 'camera' : undefined}
-                color={hue.solid}
-                disabled={busy || done}
-                onPress={doCheck}
-              />
-            </View>
+            done ? (
+              <View style={st.doneCard}>
+                <View style={st.doneIcon}><Icon name="tick" size={22} color={C.white} stroke={3} /></View>
+                <View style={{ flex: 1 }}>
+                  <Text style={T.h3}>{doneLabel(ch)}</Text>
+                  <Text style={T.small}>Come back {ch.every === 'day' ? 'tomorrow' : 'next week'} to keep your streak.</Text>
+                </View>
+              </View>
+            ) : (
+              <Pressable onPress={doCheck} disabled={busy} style={({ pressed }) => [st.snapCard, pressed && { transform: [{ scale: 0.98 }] }]} accessibilityRole="button" accessibilityLabel={ch.photo ? 'Snap today\'s photo' : 'Check in'}>
+                <View style={[st.snapIcon, { backgroundColor: hue.solid }]}>
+                  <Icon name={ch.photo ? 'camera' : 'tick'} size={28} color={C.white} stroke={2} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={st.snapTitle}>{busy ? 'Posting…' : ch.photo ? "Snap today's photo" : 'Check in for today'}</Text>
+                  <Text style={T.small}>{ch.photo ? 'Wrap tefillin, then take a quick photo.' : 'One tap keeps your streak alive.'}</Text>
+                </View>
+                <Icon name="right" size={20} color={C.faint} stroke={2.4} />
+              </Pressable>
+            )
           ) : null}
           {note ? <Text style={st.note} accessibilityLiveRegion="polite">{note}</Text> : null}
 
           {ch.photo ? <Wall ch={ch} day={day} setDay={setDay} reloadKey={wallKey} /> : null}
 
-          <View style={st.progressRow}>
-            <Text style={T.h3}>{count} of {ch.goal} check-ins</Text>
-            <Text style={T.small}>{(ch.rewards.find((r) => r.at > count)?.at ?? count) - count > 0 ? `${(ch.rewards.find((r) => r.at > count)?.at ?? 0) - count} to the next reward` : 'All rewards unlocked'}</Text>
-          </View>
-          <Bar ch={ch} count={count} height={10} />
           <Rewards ch={ch} count={count} mine={mine} />
 
           <View style={{ marginTop: 30 }}>
@@ -217,6 +233,29 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
           </Pressable>
         </>
       )}
+    </View>
+  );
+}
+
+// Circular progress toward the goal, with the streak in the middle.
+function Ring({ size, progress, children }: { size: number; progress: number; children: React.ReactNode }) {
+  const stroke = 10, r = (size - stroke) / 2, c = 2 * Math.PI * r;
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={size} height={size} style={{ position: 'absolute', transform: [{ rotate: '-90deg' }] }}>
+        <Circle cx={size / 2} cy={size / 2} r={r} stroke="rgba(255,255,255,0.25)" strokeWidth={stroke} fill="none" />
+        <Circle cx={size / 2} cy={size / 2} r={r} stroke="#ffffff" strokeWidth={stroke} fill="none" strokeLinecap="round" strokeDasharray={`${c} ${c}`} strokeDashoffset={c * (1 - progress)} />
+      </Svg>
+      {children}
+    </View>
+  );
+}
+
+function HeroStat({ label, value, good }: { label: string; value: string; good?: boolean }) {
+  return (
+    <View>
+      <Text style={st.statLabel}>{label}</Text>
+      <Text style={[st.statValue, good && { color: '#D9FFE9' }]}>{value}</Text>
     </View>
   );
 }
@@ -281,6 +320,16 @@ function Wall({ ch, day, setDay, reloadKey }: { ch: Challenge; day: number; setD
           </Pressable>
         ))}
       </ScrollView>
+      {posts && posts.length ? (
+        <View style={st.doneRow}>
+          <View style={{ flexDirection: 'row' }}>
+            {posts.slice(0, 6).map((p, i) => (
+              <View key={p.key} style={[st.miniAvatar, { marginLeft: i ? -10 : 0, zIndex: 10 - i }]}><Text style={st.miniAvatarText}>{p.name[0]?.toUpperCase()}</Text></View>
+            ))}
+          </View>
+          <Text style={T.small}>{posts.length} {posts.length === 1 ? 'person' : 'people'} wrapped {day === 0 ? 'today' : 'that day'}</Text>
+        </View>
+      ) : null}
       <View style={{ gap: 16, marginTop: 14 }}>
         {err ? <Text style={T.small}>{err}</Text> : posts === null ? <Text style={T.small}>Loading photos…</Text> : posts.length === 0 ? (
           <Card style={{ alignItems: 'center', paddingVertical: 28 }}>
@@ -311,17 +360,19 @@ function WallCard({ ch, post }: { ch: Challenge; post: WallPost }) {
   };
   return (
     <Card style={{ padding: 0, overflow: 'hidden' }}>
-      <View style={st.postHead}>
-        <View style={st.avatar}><Text style={st.avatarText}>{post.name[0]?.toUpperCase()}</Text></View>
-        <View style={{ flex: 1 }}>
-          <Text style={T.h3}>{post.name}{post.mine ? ' (you)' : ''}</Text>
-          <Text style={T.small}>Posted at {timeOf(post.at)}</Text>
+      <View>
+        <Image source={{ uri: post.url }} style={st.wallPhoto} resizeMode="cover" accessibilityLabel={`${post.name}'s photo`} />
+        <View style={st.photoChip}>
+          <View style={st.avatar}><Text style={st.avatarText}>{post.name[0]?.toUpperCase()}</Text></View>
+          <View>
+            <Text style={st.photoName}>{post.name}{post.mine ? ' (you)' : ''}</Text>
+            <Text style={st.photoTime}>{timeOf(post.at)}</Text>
+          </View>
         </View>
         {post.status === 'checked' ? (
-          <View style={st.checked}><Icon name="check" size={14} color={C.green} stroke={2.4} /><Text style={st.checkedText}>Checked</Text></View>
+          <View style={st.checkedOnPhoto}><Icon name="check" size={14} color={C.white} stroke={2.6} /><Text style={st.checkedOnPhotoText}>Checked by the rabbi</Text></View>
         ) : null}
       </View>
-      <Image source={{ uri: post.url }} style={st.wallPhoto} resizeMode="cover" accessibilityLabel={`${post.name}'s photo`} />
       <View style={{ padding: 14, gap: 8 }}>
         {comments.map((c, i) => (
           <Text key={c.at + i} style={st.comment}>
@@ -342,6 +393,25 @@ function WallCard({ ch, post }: { ch: Challenge; post: WallPost }) {
 }
 
 const st = StyleSheet.create({
+  hero: { borderRadius: 28, padding: 20, overflow: 'hidden' },
+  heroRow: { flexDirection: 'row', alignItems: 'center', gap: 20 },
+  ringBig: { color: C.white, fontSize: 38, lineHeight: 42, fontWeight: '900', letterSpacing: -1 },
+  ringLabel: { color: 'rgba(255,255,255,0.9)', fontSize: 12, fontWeight: '800' },
+  statLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
+  statValue: { color: C.white, fontSize: 18, fontWeight: '900' },
+  snapCard: { marginTop: 16, flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: C.card, borderRadius: 24, padding: 16, borderWidth: 2, borderColor: C.line },
+  snapIcon: { width: 58, height: 58, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  snapTitle: { fontSize: 18, fontWeight: '900', color: C.ink },
+  doneCard: { marginTop: 16, flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: C.greenPale, borderRadius: 24, padding: 16 },
+  doneIcon: { width: 46, height: 46, borderRadius: 23, backgroundColor: C.green, alignItems: 'center', justifyContent: 'center' },
+  doneRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14 },
+  miniAvatar: { width: 30, height: 30, borderRadius: 15, backgroundColor: C.bluePale, borderWidth: 2, borderColor: C.bg, alignItems: 'center', justifyContent: 'center' },
+  miniAvatarText: { fontSize: 12, fontWeight: '900', color: C.blueDeep },
+  photoChip: { position: 'absolute', left: 12, bottom: 12, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(10,18,28,0.62)', borderRadius: R.pill, paddingLeft: 4, paddingRight: 14, paddingVertical: 4 },
+  photoName: { color: C.white, fontSize: 14, fontWeight: '800' },
+  photoTime: { color: 'rgba(255,255,255,0.8)', fontSize: 12 },
+  checkedOnPhoto: { position: 'absolute', right: 12, top: 12, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(26,107,69,0.92)', borderRadius: R.pill, paddingHorizontal: 10, paddingVertical: 6 },
+  checkedOnPhotoText: { color: C.white, fontSize: 12, fontWeight: '800' },
   streakTop: { flexDirection: 'row', alignItems: 'center', gap: 12, justifyContent: 'center' },
   weekOnBlue: { marginTop: 18, paddingHorizontal: 14 },
   wallHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 },

@@ -17,7 +17,10 @@
 //   GET  /api/photo?key=&exp=&sig=         one photo as a JPEG (signed link from the wall, valid 1 hour)
 //   POST /api/push/register                { token, device }
 //   POST /api/ask                          { name, text, device } question for the rabbi
-// Leaders (Authorization: Bearer <passcode>)
+// Leaders: Authorization: Bearer <passcode> (the rabbi, "owner"), or X-Account: <id>:<token> for an
+// account the rabbi made a leader. New events and Feed posts notify every phone automatically.
+//   GET  /api/admin/people                 everyone who signed up for the app
+//   POST /api/admin/leaders                { id, on } owner only: make someone a leader or not
 //   POST /api/admin/check, PUT /api/admin/content, POST /api/admin/alert, POST /api/admin/push
 //   GET  /api/admin/signups, GET /api/admin/inbox, POST /api/admin/inbox/remove
 //   GET  /api/admin/photos?challenge=ID    check-in photos from the last 7 days (newest first)
@@ -29,7 +32,7 @@ import SEED from '../../../shared/seed.json';
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET,POST,PUT,OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Account',
   'Access-Control-Max-Age': '86400',
 };
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...CORS } });
@@ -62,15 +65,23 @@ async function sameSecret(a, b) {
   return diff === 0;
 }
 
-// Leader auth: passcode in the Authorization header, with a per-IP lockout after 6 misses.
+// Leader auth: the passcode (owner) or a leader account; per-IP lockout after 6 wrong passcodes.
 async function isLeader(request, env) {
+  const xa = request.headers.get('X-Account') || '';
+  if (xa && !request.headers.get('Authorization')) {
+    const [id, token] = xa.split(':');
+    const acc = await getAccount(env, id, token);
+    const admins = (await env.CTEEN.get('admins', 'json')) || {};
+    if (acc && admins[acc.id]) return { ok: true, owner: false, name: acc.name, id: acc.id };
+    return { ok: false, status: 401, msg: 'You are not a leader.' };
+  }
   if (!env.ADMIN_PASSCODE) return { ok: false, status: 503, msg: 'Leader passcode is not set up on the server.' };
   const ip = request.headers.get('CF-Connecting-IP') || 'local';
   const lockKey = 'lock:' + ip;
   const misses = Number((await env.CTEEN.get(lockKey)) || 0);
   if (misses >= 6) return { ok: false, status: 429, msg: 'Too many wrong tries. Wait 15 minutes.' };
   const given = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
-  if (given && (await sameSecret(given, env.ADMIN_PASSCODE))) return { ok: true };
+  if (given && (await sameSecret(given, env.ADMIN_PASSCODE))) return { ok: true, owner: true, name: 'Rabbi Zevy' };
   await env.CTEEN.put(lockKey, String(misses + 1), { expirationTtl: 900 });
   return { ok: false, status: 401, msg: 'Wrong passcode.' };
 }
@@ -465,7 +476,7 @@ export async function onRequest({ request, env, params }) {
     if (path.startsWith('admin/')) {
       const auth = await isLeader(request, env);
       if (!auth.ok) return bad(auth.msg, auth.status);
-      if (path === 'admin/check' && method === 'POST') return json({ ok: true });
+      if (path === 'admin/check' && method === 'POST') return json({ ok: true, owner: !!auth.owner });
       const save = async (next) => {
         const text = JSON.stringify(next);
         if (text.length > 400000) return bad('Too much content.', 413);
@@ -475,7 +486,16 @@ export async function onRequest({ request, env, params }) {
       if (path === 'admin/content' && method === 'PUT') {
         const current = await getContent(env);
         const next = sanitize(body, current.alert || SEED.alert);
-        return (await save(next)) || json(next);
+        const err = await save(next);
+        if (err) return err;
+        // Anything new gets a notification on every phone (at most 3 per save).
+        const oldPosts = new Set(current.posts.map((p) => p.id)), oldEvents = new Set(current.events.map((e) => e.id));
+        const fresh = [
+          ...next.events.filter((e) => !oldEvents.has(e.id)).map((e) => ({ title: 'New event: ' + e.title, body: [e.time, e.place].filter(Boolean).join(' · ') || 'Open CTeen GN to sign up.', target: { type: 'event', id: e.id } })),
+          ...next.posts.filter((p) => !oldPosts.has(p.id)).map((p) => ({ title: p.title, body: (p.body || 'New from CTeen Great Neck').slice(0, 150), target: p.eventId ? { type: 'event', id: p.eventId } : null })),
+        ].slice(0, 3);
+        for (const n of fresh) await pushAll(env, n.title, n.body, { target: n.target });
+        return json(next);
       }
       if (path === 'admin/alert' && method === 'POST') {
         const current = await getContent(env);
@@ -521,6 +541,29 @@ export async function onRequest({ request, env, params }) {
         const out = [];
         for (const d of days) for (const p of (await env.CTEEN.get(`photos:${id}:${d}`, 'json')) || []) out.push({ key: p.key, name: p.name, at: p.at, day: d, status: p.status || '', comments: p.comments || [] });
         return json({ photos: out });
+      }
+      if (path === 'admin/people' && method === 'GET') {
+        const admins = (await env.CTEEN.get('admins', 'json')) || {};
+        const list = await env.CTEEN.list({ prefix: 'account:', limit: 1000 });
+        const people = [];
+        for (const k of list.keys.slice(0, 500)) {
+          const a = await env.CTEEN.get(k.name, 'json');
+          if (!a || !a.name) continue;
+          people.push({ id: a.id, name: a.name, grade: a.grade || '', age: a.age ?? null, gender: a.gender || '', created: a.created || '', via: a.apple ? 'Apple' : a.google ? 'Google' : 'Name', leader: !!admins[a.id] });
+        }
+        people.sort((x, y) => String(y.created).localeCompare(String(x.created)));
+        return json({ people, owner: !!auth.owner });
+      }
+      if (path === 'admin/leaders' && method === 'POST') {
+        if (!auth.owner) return bad('Only Rabbi Zevy (with the leader passcode) can change who is a leader.', 403);
+        if (!idOk(body.id)) return bad('Bad request.');
+        const acc = await env.CTEEN.get('account:' + body.id, 'json');
+        if (!acc) return bad('That person was not found.', 404);
+        const admins = (await env.CTEEN.get('admins', 'json')) || {};
+        if (body.on) admins[body.id] = { name: acc.name, at: new Date().toISOString() };
+        else delete admins[body.id];
+        await env.CTEEN.put('admins', JSON.stringify(admins));
+        return json({ ok: true, leader: !!body.on });
       }
       if (path === 'admin/photo-status' && method === 'POST') {
         const status = ['checked', 'hidden'].includes(body.status) ? body.status : '';

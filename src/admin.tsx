@@ -3,14 +3,14 @@ import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'rea
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, T } from './theme';
 import { EVENT_ICONS, Icon } from './icons';
-import { dateLabel, todayIso, useStore, type Content, type PhotoRow, type Question, type SignupRow, type Target } from './store';
+import { dateLabel, todayIso, useStore, type Content, type Person, type PhotoRow, type Question, type SignupRow, type Target } from './store';
 import { Button, Card, Chips, Field, IconTile, Toggle, s as u } from './ui';
 
 // ───────── form description ─────────
 type Opt = { v: string; l: string };
 type Spec = { k: string; label: string; t: 'text' | 'long' | 'pick' | 'bool' | 'lines'; opts?: Opt[]; hint?: string; ph?: string; show?: (d: Draft) => boolean };
 type Draft = Record<string, string | boolean>;
-type Section = 'Posts' | 'Events' | 'Challenges' | 'Photos' | 'Live banner' | 'Info' | 'Sign-ups' | 'Inbox';
+type Section = 'Posts' | 'Events' | 'Challenges' | 'Photos' | 'Live banner' | 'Info' | 'Sign-ups' | 'People' | 'Inbox';
 type ListKey = 'posts' | 'events' | 'challenges' | 'info';
 
 const cap = (v: string) => v[0].toUpperCase() + v.slice(1);
@@ -37,7 +37,6 @@ function specs(key: ListKey, c: Content, isNew: boolean): Spec[] {
     { k: 'photos', label: 'Photos', t: 'lines', hint: 'Paste image links (https://…), one per line.' },
     { k: 'linkLabel', label: 'Button text (optional)', t: 'text', ph: 'Sign up here' },
     { k: 'linkUrl', label: 'Button link (optional)', t: 'text', ph: 'https://…' },
-    ...notify,
   ];
   if (key === 'events') return [
     { k: 'title', label: 'Event name', t: 'text', ph: 'Mega Chanukah Party' },
@@ -57,7 +56,6 @@ function specs(key: ListKey, c: Content, isNew: boolean): Spec[] {
     { k: 'maxAge', label: 'Oldest age (optional)', t: 'text', ph: '18' },
     { k: 'who', label: "Who it's for (optional)", t: 'text' },
     { k: 'about', label: 'Details', t: 'long' },
-    ...notify,
   ];
   if (key === 'challenges') return [
     { k: 'title', label: 'Challenge name', t: 'text', ph: 'Tefillin Challenge' },
@@ -153,7 +151,7 @@ const LISTS: Record<'Posts' | 'Events' | 'Challenges' | 'Info', { key: ListKey; 
   Challenges: { key: 'challenges', one: 'challenge', prefix: 'c' },
   Info: { key: 'info', one: 'info card', prefix: 'i' },
 };
-const SECTIONS = ['Posts', 'Events', 'Challenges', 'Photos', 'Live banner', 'Info', 'Sign-ups', 'Inbox'] as const;
+const SECTIONS = ['Posts', 'Events', 'Challenges', 'Photos', 'Live banner', 'Info', 'Sign-ups', 'People', 'Inbox'] as const;
 const DURATIONS = [{ l: '1 hour', h: 1 }, { l: 'Today', h: 12 }, { l: '3 days', h: 72 }, { l: '1 week', h: 168 }, { l: 'Until I turn it off', h: 0 }];
 
 export function AdminPanel() {
@@ -275,6 +273,8 @@ export function AdminPanel() {
         }) : null}
       </View>
     );
+  } else if (section === 'People') {
+    body = <PeopleView />;
   } else if (section === 'Photos') {
     body = <PhotoReview />;
   } else if (section === 'Inbox') {
@@ -302,10 +302,12 @@ export function AdminPanel() {
         if (p) return setNote(p);
         const item = fromDraft(cfg.key, { ...d, id: editing.id ?? cfg.prefix + '-' + Date.now().toString(36) });
         const nextList = editing.id ? items.map((x) => (x.id === editing.id ? item : x)) : [item, ...items];
-        if (!(await save({ ...content, [cfg.key]: nextList }, editing.id ? 'Saved.' : 'Live for everyone.'))) return;
-        if (!editing.id && d._notify) {
-          const target: Target = cfg.key === 'events' ? { type: 'event', id: item.id } : cfg.key === 'challenges' ? { type: 'challenge', id: item.id } : item.eventId ? { type: 'event', id: item.eventId } : null;
-          const sent = await store.sendPush(cfg.key === 'posts' ? item.title : `New ${cfg.one}: ${item.title}`, cfg.key === 'posts' ? String(item.body).slice(0, 150) : 'Open CTeen GN to see it.', target);
+        const auto = !editing.id && (cfg.key === 'posts' || cfg.key === 'events');
+        if (!(await save({ ...content, [cfg.key]: nextList }, editing.id ? 'Saved.' : auto ? 'Live for everyone. Every phone got a notification.' : 'Live for everyone.'))) return;
+        // New posts and events notify automatically (server); challenges only when asked.
+        if (!editing.id && d._notify && cfg.key === 'challenges') {
+          const target: Target = { type: 'challenge', id: item.id };
+          const sent = await store.sendPush(`New challenge: ${item.title}`, 'Open CTeen GN to join.', target);
           setNote('Live for everyone. ' + sent);
         }
         setEditing(null);
@@ -370,7 +372,7 @@ export function AdminPanel() {
             <View style={st.modeRow}>
               {(['simple', 'expert'] as const).map((m) => (
                 <Pressable key={m} onPress={() => { setMode(m); setTask(null); }} style={[st.modeBtn, mode === m && st.modeOn]} accessibilityRole="button" accessibilityState={{ selected: mode === m }}>
-                  <Text style={[st.modeText, mode === m && { color: C.white }]}>{m === 'simple' ? 'Simple' : 'Expert'}</Text>
+                  <Text style={[st.modeText, mode === m && { color: C.onInverse }]}>{m === 'simple' ? 'Simple' : 'Expert'}</Text>
                 </Pressable>
               ))}
             </View>
@@ -404,14 +406,15 @@ export function AdminPanel() {
 }
 
 // ───────── Simple mode ─────────
-type Task = 'post' | 'event' | 'alert' | 'signups' | 'photos' | 'inbox';
-const TASK_SECTION: Partial<Record<Task, Section>> = { signups: 'Sign-ups', photos: 'Photos', inbox: 'Inbox' };
+type Task = 'post' | 'event' | 'alert' | 'signups' | 'photos' | 'people' | 'inbox';
+const TASK_SECTION: Partial<Record<Task, Section>> = { signups: 'Sign-ups', photos: 'Photos', people: 'People', inbox: 'Inbox' };
 const TASKS: { k: Task; icon: string; color: 'blue' | 'orange' | 'purple' | 'green' | 'pink' | 'yellow'; title: string; sub: string }[] = [
   { k: 'post', icon: 'chat', color: 'blue', title: 'Post an update', sub: 'Write something for the Feed' },
   { k: 'event', icon: 'calendar', color: 'orange', title: 'Add an event', sub: 'Name, day, time and place' },
   { k: 'alert', icon: 'megaphone', color: 'pink', title: 'Send a quick alert', sub: 'A banner on every phone, plus a notification' },
   { k: 'signups', icon: 'users', color: 'green', title: "See who's coming", sub: 'Sign-ups for each event' },
   { k: 'photos', icon: 'camera', color: 'purple', title: 'Check Tefillin photos', sub: "Look over today's photos" },
+  { k: 'people', icon: 'user', color: 'blue', title: 'People & leaders', sub: 'Everyone who signed up. Make someone a leader.' },
   { k: 'inbox', icon: 'question', color: 'yellow', title: 'Questions from teens', sub: 'What teens asked you' },
 ];
 
@@ -466,14 +469,12 @@ function SimpleForm({ kind, onDone }: { kind: 'post' | 'event' | 'alert'; onDone
       const post = { id: 'p-' + Date.now().toString(36), kind: 'News' as const, pinned: false, title: title.trim(), body: text.trim(), eventId: '', challengeId: '', photos: [], linkLabel: '', linkUrl: '', at: iso(new Date()) };
       const e = await saveContent({ ...content, posts: [post, ...content.posts] });
       if (e) { setBusy(false); return setErr(e); }
-      msg = 'Posted to the Feed.';
-      if (notify) msg += ' ' + (await sendPush(post.title, post.body.slice(0, 150), null));
+      msg = 'Posted to the Feed. Every phone got a notification.';
     } else if (kind === 'event') {
       const ev = { id: 'e-' + Date.now().toString(36), title: title.trim(), icon: 'star', color: 'blue' as const, scope: 'gn' as const, start: day, end: day, time: time.trim(), place: place.trim(), price: '', who: '', about: text.trim(), signup: 'app' as const, url: '', payUrl: '', gender: 'all' as const, minAge: null, maxAge: null };
       const e = await saveContent({ ...content, events: [...content.events, ev] });
       if (e) { setBusy(false); return setErr(e); }
-      msg = 'Event added. Teens can sign up in the app.';
-      if (notify) msg += ' ' + (await sendPush('New event: ' + ev.title, [days.find((d) => d.v === day)?.l, ev.time, ev.place].filter(Boolean).join(' · '), { type: 'event', id: ev.id }));
+      msg = 'Event added. Every phone got a notification, and teens can sign up in the app.';
     } else {
       msg = await sendAlert({ title: title.trim(), text: text.trim(), target: null, hours: 24, push: notify });
     }
@@ -502,15 +503,62 @@ function SimpleForm({ kind, onDone }: { kind: 'post' | 'event' | 'alert'; onDone
         </>
       ) : null}
       <Field label={kind === 'event' ? 'Details (optional)' : kind === 'alert' ? 'More detail (optional)' : 'Message'} value={text} onChange={setText} multiline />
-      <View style={st.toggle}>
-        <Text style={[T.h3, { flex: 1, fontSize: 16 }]}>Send a notification to every phone</Text>
-        <Toggle value={notify} onChange={setNotify} label="Send a notification" />
-      </View>
+      {kind === 'alert' ? (
+        <View style={st.toggle}>
+          <Text style={[T.h3, { flex: 1, fontSize: 16 }]}>Send a notification to every phone</Text>
+          <Toggle value={notify} onChange={setNotify} label="Send a notification" />
+        </View>
+      ) : (
+        <View style={st.autoNote}>
+          <Icon name="bell" size={16} color={C.blueDeep} stroke={2} />
+          <Text style={[T.small, { flex: 1, color: C.ink }]}>Every phone gets a notification automatically.</Text>
+        </View>
+      )}
       {err ? <Text style={{ color: '#C0303F', fontWeight: '700', marginTop: 12 }}>{err}</Text> : null}
       <View style={{ marginTop: 20 }}>
         <Button label={busy ? 'Sending…' : kind === 'post' ? 'Post it' : kind === 'event' ? 'Add the event' : 'Send the alert'} disabled={busy} onPress={go} />
       </View>
     </Card>
+  );
+}
+
+// Everyone who signed up for the app, newest first. The rabbi (passcode) can make anyone a leader;
+// leaders open the leader panel from their own account, no passcode needed.
+function PeopleView() {
+  const { loadPeople, setLeaderFor, isOwner } = useStore();
+  const [people, setPeople] = useState<Person[] | null>(null);
+  const [q, setQ] = useState('');
+  const [note, setNote] = useState<string | null>(null);
+  useEffect(() => { loadPeople().then((r) => setPeople(r ?? [])); }, []);
+  const shown = (people ?? []).filter((p) => p.name.toLowerCase().includes(q.trim().toLowerCase()));
+  const leaders = (people ?? []).filter((p) => p.leader).length;
+  return (
+    <View style={{ gap: 12 }}>
+      <Text style={T.small}>{people === null ? 'Loading…' : `${people.length} signed up · ${leaders} leader${leaders === 1 ? '' : 's'}`}{isOwner ? '' : '. Only Rabbi Zevy can change who is a leader.'}</Text>
+      <Field label="Search" value={q} onChange={setQ} placeholder="Name" />
+      {note ? <Text style={[T.small, { color: '#C0303F' }]}>{note}</Text> : null}
+      <Card style={{ padding: 0 }}>
+        {shown.map((p, i) => (
+          <View key={p.id} style={[st.person, i > 0 && { borderTopWidth: 1, borderTopColor: C.line }]}>
+            <View style={st.personAvatar}><Text style={st.personInitial}>{p.name[0]?.toUpperCase()}</Text></View>
+            <View style={{ flex: 1 }}>
+              <Text style={T.h3}>{p.name}{p.leader ? '  ·  Leader' : ''}</Text>
+              <Text style={T.small}>{[p.grade ? `Grade ${p.grade}` : '', p.age ? `Age ${p.age}` : '', p.gender === 'girl' ? 'Girl' : p.gender === 'boy' ? 'Boy' : '', p.via, p.created ? 'Joined ' + new Date(p.created).toLocaleDateString([], { month: 'short', day: 'numeric' }) : ''].filter(Boolean).join(' · ')}</Text>
+            </View>
+            {isOwner ? (
+              <Toggle value={p.leader} label={`${p.name} is a leader`} onChange={async (on) => {
+                setNote(null);
+                const e = await setLeaderFor(p.id, on);
+                if (e) return setNote(e);
+                setPeople((list) => (list ?? []).map((x) => (x.id === p.id ? { ...x, leader: on } : x)));
+              }} />
+            ) : null}
+          </View>
+        ))}
+        {people && shown.length === 0 ? <Text style={[T.small, { padding: 16 }]}>No one found.</Text> : null}
+      </Card>
+      {isOwner ? <Text style={T.small}>Turn the switch on to make someone a leader. They get the leader panel in their app (Settings → Leader panel) without the passcode.</Text> : null}
+    </View>
   );
 }
 
@@ -566,9 +614,13 @@ function PhotoReview() {
 }
 
 const st = StyleSheet.create({
-  modeRow: { flexDirection: 'row', backgroundColor: C.white, borderRadius: 14, padding: 4, marginBottom: 12, borderWidth: 1, borderColor: C.line },
+  autoNote: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 16, backgroundColor: C.bluePale, borderRadius: 12, padding: 12 },
+  person: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
+  personAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: C.bluePale, alignItems: 'center', justifyContent: 'center' },
+  personInitial: { fontSize: 16, fontWeight: '900', color: C.blueDeep },
+  modeRow: { flexDirection: 'row', backgroundColor: C.card, borderRadius: 14, padding: 4, marginBottom: 12, borderWidth: 1, borderColor: C.line },
   modeBtn: { flex: 1, height: 40, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  modeOn: { backgroundColor: C.ink },
+  modeOn: { backgroundColor: C.inverse },
   modeText: { fontSize: 15, fontWeight: '800', color: C.ink },
   simpleHello: { fontSize: 22, fontWeight: '900', color: C.ink },
   task: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16 },
@@ -582,7 +634,7 @@ const st = StyleSheet.create({
   col: { width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 20 },
   top: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   close: { width: 40, height: 40, borderRadius: 20, backgroundColor: C.card, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.line },
-  note: { backgroundColor: C.ink, color: C.white, fontWeight: '700', fontSize: 14, lineHeight: 19, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 12, overflow: 'hidden' },
+  note: { backgroundColor: C.inverse, color: C.onInverse, fontWeight: '700', fontSize: 14, lineHeight: 19, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 12, overflow: 'hidden' },
   toggle: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 16, minHeight: 44 },
   item: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 },
   itemMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },

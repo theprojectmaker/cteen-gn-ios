@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, PanResponder, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Tabs } from 'expo-router/js-tabs';
-import { C } from './theme';
+import { C, IS_DARK } from './theme';
 import { Icon } from './icons';
 import { Glass } from './glass';
 import { useStore } from './store';
@@ -124,12 +124,12 @@ const st = StyleSheet.create({
   row: { flexDirection: 'row' },
   lens: {
     position: 'absolute', left: 0, top: -2, bottom: -2, borderRadius: 30,
-    backgroundColor: 'rgba(255,255,255,0.55)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.95)',
+    backgroundColor: IS_DARK ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.55)',
+    borderWidth: 1, borderColor: IS_DARK ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.95)',
     shadowColor: '#0b3b66', shadowOpacity: 0.18, shadowRadius: 10, shadowOffset: { width: 0, height: 3 },
     overflow: 'hidden',
   },
-  lensShine: { position: 'absolute', left: 8, right: 8, top: 2, height: '42%', borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.6)' },
+  lensShine: { position: 'absolute', left: 8, right: 8, top: 2, height: '42%', borderRadius: 20, backgroundColor: IS_DARK ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.6)' },
   tab: { flex: 1, alignItems: 'center', paddingVertical: 8 },
   text: { fontSize: 11, fontWeight: '700', color: C.ink },
   badge: { position: 'absolute', top: -5, right: -10, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: '#E0445C', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, borderWidth: 2, borderColor: C.white },

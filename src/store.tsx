@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import SEED from '../shared/seed.json';
 import { API } from './config';
+import { PREFS } from './theme';
 import { enablePush, onNotificationTap, pushState, setReminder, type PushState } from './push';
 
 // ───────── content model (mirrors server/functions/api/[[path]].js) ─────────
@@ -30,6 +31,7 @@ export type Gender = '' | 'boy' | 'girl';
 export type Profile = { name: string; grade: string; age: number | null; gender: Gender; school: string };
 export type Account = { id: string; token: string; google: { email: string } | null; apple?: boolean };
 export type WallComment = { name: string; text: string; at: string; leader?: boolean };
+export type Person = { id: string; name: string; grade: string; age: number | null; gender: string; created: string; via: string; leader: boolean };
 export type PhotoRow = { key: string; name: string; at: string; day: string; status?: string; comments?: WallComment[] };
 export type WallPost = { key: string; name: string; at: string; status: string; mine: boolean; comments: WallComment[]; url: string };
 
@@ -95,7 +97,8 @@ type Ctx = Local & {
   checkin: (id: string, photo?: string) => Promise<{ error?: string; already?: boolean; board?: BoardRow[] }>;
   ask: (text: string) => Promise<string | null>;
   push: PushState; turnOnPush: () => Promise<void>;
-  leader: string | null; adminOpen: boolean; setAdminOpen: (v: boolean) => void;
+  leader: string | null; isOwner: boolean; adminOpen: boolean; setAdminOpen: (v: boolean) => void;
+  loadPeople: () => Promise<Person[] | null>; setLeaderFor: (id: string, on: boolean) => Promise<string | null>;
   leaderLogin: (code: string) => Promise<string | null>; leaderLogout: () => void;
   saveContent: (next: Content) => Promise<string | null>;
   sendAlert: (a: { title: string; text: string; target: Target; hours: number; push: boolean } | null) => Promise<string>;
@@ -112,7 +115,7 @@ const StoreCtx = createContext<Ctx>(null as unknown as Ctx);
 export const useStore = () => useContext(StoreCtx);
 
 export function tap(strong = false) {
-  if (Platform.OS === 'web') return;
+  if (Platform.OS === 'web' || !PREFS.haptics) return;
   (strong ? Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) : Haptics.selectionAsync()).catch(() => {});
 }
 export function open(url: string) {
@@ -123,7 +126,11 @@ export function open(url: string) {
 async function api<T>(path: string, init?: { method?: string; body?: unknown; leader?: string | null }): Promise<T> {
   const res = await fetch(API + path, {
     method: init?.method ?? 'GET',
-    headers: { ...(init?.body ? { 'Content-Type': 'application/json' } : {}), ...(init?.leader ? { Authorization: 'Bearer ' + init.leader } : {}) },
+    headers: {
+      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+      // A leader is either the passcode (the rabbi) or "acct:<id>:<token>" for an account the rabbi made a leader.
+      ...(init?.leader ? (init.leader.startsWith('acct:') ? { 'X-Account': init.leader.slice(5) } : { Authorization: 'Bearer ' + init.leader }) : {}),
+    },
     body: init?.body ? JSON.stringify(init.body) : undefined,
   });
   const data = await res.json().catch(() => ({}));
@@ -144,6 +151,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [googleReady, setGoogleReady] = useState(false);
   const [appleReady, setAppleReady] = useState(false);
   const [leader, setLeader] = useState<string | null>(null);
+  const [isOwner, setIsOwner] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
   const [push, setPush] = useState<PushState>('unsupported');
   const ref = useRef(local);
@@ -204,6 +212,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (!local.device || local.seenInit || online !== true) return;
     patch((s) => ({ ...s, seenInit: true, seenPosts: content.posts.map((p) => p.id), seenEvents: content.events.map((e) => e.id) }));
   }, [local.device, local.seenInit, online, content.posts, patch]);
+
+  // If the rabbi made this account a leader, open the leader panel without a passcode.
+  useEffect(() => {
+    const acc = local.account;
+    if (!acc || (leader && !leader.startsWith('acct:'))) return;
+    const key = `acct:${acc.id}:${acc.token}`;
+    api<{ owner: boolean }>('/admin/check', { method: 'POST', body: {}, leader: key })
+      .then(() => { setLeader(key); setIsOwner(false); })
+      .catch(() => { if (leader === key) setLeader(null); });
+  }, [local.account?.id, local.account?.token]);
 
   const openTarget = useCallback((t: Target) => {
     if (!t) return;
@@ -412,11 +430,22 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       }
     },
     turnOnPush: async () => setPush(await enablePush(registerToken)),
-    leader, adminOpen, setAdminOpen,
+    leader, isOwner, adminOpen, setAdminOpen,
+    loadPeople: () => api<{ people: Person[]; owner: boolean }>('/admin/people', { leader }).then((r) => { setIsOwner(r.owner); return r.people; }).catch(() => null),
+    setLeaderFor: async (id, on) => {
+      try {
+        await api('/admin/leaders', { method: 'POST', body: { id, on }, leader });
+        tap(true);
+        return null;
+      } catch (e) {
+        return msg(e);
+      }
+    },
     leaderLogin: async (code) => {
       try {
-        await api('/admin/check', { method: 'POST', body: {}, leader: code });
+        const r = await api<{ owner: boolean }>('/admin/check', { method: 'POST', body: {}, leader: code });
         setLeader(code);
+        setIsOwner(!!r.owner);
         return null;
       } catch (e) {
         return msg(e);
@@ -455,7 +484,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     removeQuestion: (id) => api('/admin/inbox/remove', { method: 'POST', body: { id }, leader }).then(() => {}).catch(() => {}),
     loadPhotos: (cid) => api<{ photos: PhotoRow[] }>(`/admin/photos?challenge=${cid}`, { leader }).then((r) => r.photos).catch(() => null),
     loadPhoto: (key) => api<{ photo: string }>(`/admin/photo?key=${encodeURIComponent(key)}`, { leader }).then((r) => r.photo).catch(() => null),
-  }), [local, content, online, leader, adminOpen, push, liveAlert, googleReady, appleReady, unreadFeed, newEvents, flip, patch, refresh, keep, openTarget, registerToken]);
+  }), [local, content, online, leader, isOwner, adminOpen, push, liveAlert, googleReady, appleReady, unreadFeed, newEvents, flip, patch, refresh, keep, openTarget, registerToken]);
 
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>;
 }
@@ -534,7 +563,7 @@ export function streak(ch: Challenge, checks: Record<string, string[]>) {
 }
 
 // ───────── Shabbat times for Great Neck (Hebcal, live) ─────────
-export type Shabbat = { candles?: string; havdalah?: string; parsha?: string };
+export type Shabbat = { candles?: string; havdalah?: string; parsha?: string; candlesAt?: number; havdalahAt?: number };
 export function useShabbat() {
   const [data, setData] = useState<Shabbat | null | 'error'>(null);
   useEffect(() => {
@@ -550,7 +579,8 @@ export function useShabbat() {
           const h = Number(m[1]);
           return `${((h + 11) % 12) + 1}:${m[2]} ${h < 12 ? 'AM' : 'PM'}`;
         };
-        setData({ candles: time('candles'), havdalah: time('havdalah'), parsha: items.find((i) => i.category === 'parashat')?.title.replace(/^Parashat /, '') });
+        const at = (cat: string) => { const d = items.find((i) => i.category === cat)?.date; return d ? new Date(d).getTime() : undefined; };
+        setData({ candles: time('candles'), havdalah: time('havdalah'), parsha: items.find((i) => i.category === 'parashat')?.title.replace(/^Parashat /, ''), candlesAt: at('candles'), havdalahAt: at('havdalah') });
       })
       .catch(() => alive && setData('error'));
     return () => {

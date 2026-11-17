@@ -117,12 +117,14 @@ preview misses. `dist/` is ignored by git.
 | `app/event/[id].tsx` | Event details as Apple's slide-up sheet (grab pill, drag down to close) |
 | `app/challenges.tsx` | List of live challenges (trophy button when more than one) |
 | `app/challenge/[id].tsx`, `app/account.tsx` | Challenge page (`src/rewards.tsx`, photo check-ins via `src/photo.ts`) and account page (`src/account.tsx`) |
-| `src/shell.tsx` | Glass header with the Events and account buttons, top live banner (older iOS and web), over-the-air update check |
+| `src/shell.tsx` | Page wrapper: one-piece glass header (greeting, trophy, profile), pull to refresh, Shabbat banners, footer, over-the-air update check |
+| `app/settings.tsx`, `src/prefs.ts`, `src/prefs.native.ts` | Settings (appearance, haptics, motion, intro); device prefs read synchronously at startup |
+| `src/intro.tsx` | Opening animation |
 | `src/screens.tsx` | Home, Events, Feed and Chapter tabs, event sheet |
 | `src/rewards.tsx` | Challenge cards; challenge page: sign up, streak, daily photo wall with comments |
 | `src/admin.tsx` | Leader panel: Simple mode (six plain tasks for the rabbi) and Expert mode (everything) |
 | `src/store.tsx` | All data: server calls, saved state on the phone, date helpers |
-| `src/ui.tsx`, `src/glass.tsx`, `src/icons.tsx`, `src/theme.ts` | Shared pieces, glass surface, icons, colors |
+| `src/ui.tsx`, `src/glass.tsx`, `src/icons.tsx`, `src/theme.ts` | Shared pieces, glass surface, icons, light and dark colors (use `C.*` tokens, never hard-coded white or black) |
 | `src/push.ts` | Notifications and challenge reminders |
 | `src/config.ts` | Address of the chapter server |
 | `shared/seed.json` | Starter content, used until a leader saves something |

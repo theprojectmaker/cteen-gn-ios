@@ -36,5 +36,5 @@ export default function EventRoute() {
 const st = StyleSheet.create({
   col: { width: '100%', maxWidth: 600, alignSelf: 'center' },
   webPill: { position: 'absolute', top: 8, alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.85)' },
-  close: { position: 'absolute', right: 14, top: 14, width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.92)', alignItems: 'center', justifyContent: 'center' },
+  close: { position: 'absolute', right: 14, top: 14, width: 38, height: 38, borderRadius: 19, backgroundColor: C.card, alignItems: 'center', justifyContent: 'center' },
 });

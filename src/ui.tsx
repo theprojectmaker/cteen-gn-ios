@@ -72,7 +72,7 @@ export function IconTile({ icon, color = 'blue', size = 44, solid }: { icon: str
 export function ScopeBadge({ scope, style }: { scope: 'gn' | 'intl'; style?: ViewStyle }) {
   const gn = scope === 'gn';
   return (
-    <View style={[s.scope, { backgroundColor: gn ? C.blue : C.ink }, style]}>
+    <View style={[s.scope, { backgroundColor: gn ? C.blue : C.night }, style]}>
       <Icon name={gn ? 'pin' : 'globe'} size={12} color={C.white} stroke={2.4} />
       <Text style={s.scopeText}>{gn ? 'Great Neck' : 'International'}</Text>
     </View>
@@ -197,15 +197,15 @@ export const s = StyleSheet.create({
   chips: { gap: 8, paddingHorizontal: 20, paddingVertical: 4 },
   chipsFlow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { paddingHorizontal: 16, height: 38, borderRadius: R.pill, backgroundColor: C.card, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.line },
-  chipOn: { backgroundColor: C.ink, borderColor: C.ink },
+  chipOn: { backgroundColor: C.inverse, borderColor: C.inverse },
   chipText: { fontSize: 14, fontWeight: '700', color: C.ink },
-  chipTextOn: { color: C.white },
+  chipTextOn: { color: C.onInverse },
   btn: { minHeight: 50, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 18 },
   btnSmall: { minHeight: 38, borderRadius: R.pill, paddingHorizontal: 16 },
   btnGhost: { backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
   btnText: { fontSize: 16, fontWeight: '800' },
   fieldLabel: { fontSize: 12, fontWeight: '800', color: C.sub, letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: 6 },
-  input: { backgroundColor: C.white, borderWidth: 1, borderColor: C.line, borderRadius: 12, paddingHorizontal: 14, minHeight: 48, fontSize: 16, color: C.ink },
+  input: { backgroundColor: C.card, borderWidth: 1, borderColor: C.line, borderRadius: 12, paddingHorizontal: 14, minHeight: 48, fontSize: 16, color: C.ink },
   inputMulti: { minHeight: 96, paddingVertical: 12, textAlignVertical: 'top' },
   switch: { width: 50, height: 30, borderRadius: 15, backgroundColor: '#C9D3DC', padding: 3, justifyContent: 'center' },
   knob: { width: 24, height: 24, borderRadius: 12, backgroundColor: C.white },

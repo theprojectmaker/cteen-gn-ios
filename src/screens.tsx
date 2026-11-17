@@ -21,9 +21,6 @@ export function Home() {
   const hello = h < 12 ? 'Good morning' : h < 18 ? 'Hey' : 'Good evening';
   return (
     <>
-      <Text style={st.hello}>{hello}{first ? `, ${first}` : ''}</Text>
-      <Text style={st.helloSub}>Here's what's happening at CTeen Great Neck.</Text>
-
       {next ? (
         <Pressable onPress={() => openEvent(next.id)} style={({ pressed }) => [st.hero, pressed && u.pressed]} accessibilityRole="button" accessibilityLabel={next.title}>
           <Cover e={next} style={u.fill} iconSize={150} />
@@ -34,7 +31,7 @@ export function Home() {
           <Text style={st.heroDate}>{dateLabel(next)}{next.time ? ` · ${next.time}` : ''}</Text>
           <View style={st.heroBtn}>
             <Text style={st.heroBtnText}>{next.signup === 'app' ? 'Sign up' : 'View details'}</Text>
-            <Icon name="right" size={15} color={C.ink} stroke={2.4} />
+            <Icon name="right" size={15} color={C.night} stroke={2.4} />
           </View>
         </Pressable>
       ) : null}
@@ -215,7 +212,7 @@ function WebsiteSignup({ e }: { e: EventItem }) {
       </View>
       {e.url ? (
         <View style={{ marginTop: 10 }}>
-          <Button label="Register on the CTeen website" icon="external" color={C.ink} onPress={() => open(e.url!)} />
+          <Button label="Register on the CTeen website" icon="external" color={C.night} onPress={() => open(e.url!)} />
         </View>
       ) : null}
     </View>
@@ -291,7 +288,7 @@ function PostCard({ post }: { post: Post }) {
       </View>
       <View style={{ paddingHorizontal: 16 }}>
         <Text style={[T.h2, { fontSize: 18, lineHeight: 23 }]}>{post.title}</Text>
-        {post.body ? <Text style={[T.body, { marginTop: 6, color: '#34424F' }]}>{post.body}</Text> : null}
+        {post.body ? <Text style={[T.body, { marginTop: 6, color: C.ink }]}>{post.body}</Text> : null}
       </View>
       {ev ? (
         <Pressable onPress={() => openEvent(ev.id)} style={({ pressed }) => [st.attach, pressed && u.pressed]} accessibilityRole="button" accessibilityLabel={`Open ${ev.title}`}>
@@ -470,12 +467,12 @@ const st = StyleSheet.create({
   helloSub: { fontSize: 16, lineHeight: 22, color: C.sub, marginTop: 6 },
   section: { fontSize: 20, fontWeight: '900', color: C.ink, letterSpacing: -0.2, marginTop: 38, marginBottom: 14 },
   quickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  hero: { marginTop: 24, borderRadius: 28, overflow: 'hidden', minHeight: 280, justifyContent: 'flex-end', padding: 20, backgroundColor: C.blueDeep },
+  hero: { marginTop: 0, borderRadius: 28, overflow: 'hidden', minHeight: 280, justifyContent: 'flex-end', padding: 20, backgroundColor: C.blueDeep },
   heroKicker: { color: 'rgba(255,255,255,0.92)', fontSize: 13, fontWeight: '800' },
   heroTitle: { color: C.white, fontSize: 28, lineHeight: 32, fontWeight: '900', letterSpacing: -0.4, marginTop: 4 },
   heroDate: { color: C.white, fontSize: 14, fontWeight: '700', marginTop: 6 },
   heroBtn: { marginTop: 16, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: C.white, borderRadius: R.pill, paddingHorizontal: 18, height: 42 },
-  heroBtnText: { color: C.ink, fontSize: 15, fontWeight: '800' },
+  heroBtnText: { color: C.night, fontSize: 15, fontWeight: '800' },
   notify: { marginTop: 24, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
   quickRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
   quick: { width: '47%', flexGrow: 1, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 16, paddingHorizontal: 14 },

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Platform, View, type ViewStyle } from 'react-native';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
+import { IS_DARK } from './theme';
 
 // True on iOS 26+ where the system Liquid Glass material exists.
 export const LIQUID = (() => {
@@ -18,7 +19,7 @@ const webBlur = { backdropFilter: 'blur(22px) saturate(180%)', WebkitBackdropFil
 export function Glass({ style, children, interactive }: { style?: ViewStyle | ViewStyle[]; children?: React.ReactNode; interactive?: boolean }) {
   if (LIQUID) {
     return (
-      <GlassView glassEffectStyle="regular" isInteractive={interactive} style={style}>
+      <GlassView glassEffectStyle="regular" colorScheme={IS_DARK ? 'dark' : 'light'} isInteractive={interactive} style={style}>
         {children}
       </GlassView>
     );
@@ -27,9 +28,9 @@ export function Glass({ style, children, interactive }: { style?: ViewStyle | Vi
 }
 
 const fallback: ViewStyle = {
-  backgroundColor: Platform.OS === 'web' ? 'rgba(255,255,255,0.72)' : 'rgba(255,255,255,0.94)',
+  backgroundColor: IS_DARK ? (Platform.OS === 'web' ? 'rgba(21,31,43,0.72)' : 'rgba(21,31,43,0.94)') : Platform.OS === 'web' ? 'rgba(255,255,255,0.72)' : 'rgba(255,255,255,0.94)',
   borderWidth: 1,
-  borderColor: 'rgba(255,255,255,0.7)',
+  borderColor: IS_DARK ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.7)',
   shadowColor: '#13202C',
   shadowOpacity: 0.12,
   shadowRadius: 18,
