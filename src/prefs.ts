@@ -1,8 +1,8 @@
 // Device settings read synchronously at startup (so colors are right on the first frame).
 // Web version: browser storage. The phone version is prefs.native.ts.
-export type ThemeMode = 'system' | 'light' | 'dark';
-export type Prefs = { theme: ThemeMode; haptics: boolean; reduceMotion: boolean; intro: boolean };
-export const DEFAULT_PREFS: Prefs = { theme: 'system', haptics: true, reduceMotion: false, intro: true };
+import { DEFAULT_PREFS, type Prefs } from './prefsDefaults';
+export { DEFAULT_PREFS };
+export type { Prefs, ThemeMode } from './prefsDefaults';
 const KEY = 'cteengn.prefs';
 
 export function readPrefs(): Prefs {

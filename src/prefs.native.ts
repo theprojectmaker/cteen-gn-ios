@@ -1,11 +1,11 @@
 // Device settings read synchronously at startup (so colors are right on the first frame).
 // Phone version: a small JSON file read with expo-file-system's sync API.
-// (Not expo-sqlite: it compiles its own copy of SQLite into the app, which clashes with the one
-// expo-updates uses at launch and crashed the app on opening in build 0121b70.)
-import { DEFAULT_PREFS, type Prefs } from './prefs';
+// Never import from './prefs' here: on the phone that path is this very file, which made
+// DEFAULT_PREFS undefined and crashed builds 7 to 10 on launch. Shared bits live in prefsDefaults.ts.
+import { DEFAULT_PREFS, type Prefs } from './prefsDefaults';
 
 export { DEFAULT_PREFS };
-export type { Prefs, ThemeMode } from './prefs';
+export type { Prefs, ThemeMode } from './prefsDefaults';
 
 type FileLike = { exists: boolean; textSync(): string; write(s: string): void; create(): void };
 function prefsFile(): FileLike | null {

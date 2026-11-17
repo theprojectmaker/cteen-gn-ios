@@ -13,6 +13,8 @@ Remove your line when it ships.
 
 ## Log
 
+- 2026-11-16 · Solomon · THE ACTUAL LAUNCH CRASH (builds 7-10), found from the iPhone crash report (thrown on expo.controller.errorRecoveryQueue = a JS error at startup): src/prefs.native.ts imported DEFAULT_PREFS from './prefs', which on the phone resolves to prefs.native.ts itself, so DEFAULT_PREFS was undefined, readPrefs() returned undefined and theme.ts crashed reading PREFS.theme. Defaults now live in src/prefsDefaults.ts and theme.ts falls back to them. The expo-sqlite removal was not the cause (harmless). Lesson: a .native.ts file must never import its own base name.
+
 - 2026-11-16 · Solomon · Delight pass: posting your tefillin photo turns the sheet into a celebration (confetti, check, streak, check-ins, next reward, success haptic); hearts pop on like; breathing grey board while photos load; tefillin icon on Feed cards (Cover takes challengeIcon); Chapter join button is now a quiet chabadgn.com link.
 
 - 2026-11-16 · Solomon · REAL LAUNCH-CRASH FIX: removed expo-sqlite. It compiles its own copy of SQLite into the app, which clashes with the system SQLite that expo-updates opens natively at launch, so builds 0121b70 and 383c73d crash on opening (no OTA can fix that). Settings are now a small JSON file via expo-file-system (src/prefs.native.ts). Never add expo-sqlite back while expo-updates is in the app.

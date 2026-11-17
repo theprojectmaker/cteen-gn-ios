@@ -3,6 +3,7 @@
 // setting); changing it restarts the app so every screen redraws with the new colors.
 import { Appearance } from 'react-native';
 import { readPrefs } from './prefs';
+import { DEFAULT_PREFS } from './prefsDefaults';
 
 const LIGHT = {
   bg: '#F3F6F9',
@@ -46,7 +47,7 @@ const DARK: typeof LIGHT = {
   night: '#13202C',
 };
 
-export const PREFS = readPrefs();
+export const PREFS = (() => { try { return { ...DEFAULT_PREFS, ...(readPrefs() || {}) }; } catch { return DEFAULT_PREFS; } })();
 export const IS_DARK = PREFS.theme === 'dark' || (PREFS.theme === 'system' && Appearance.getColorScheme() === 'dark');
 export const C = IS_DARK ? DARK : LIGHT;
 
