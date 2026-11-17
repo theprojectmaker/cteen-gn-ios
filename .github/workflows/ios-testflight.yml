@@ -3,7 +3,7 @@
 # Runs automatically on every push to main (see CLAUDE.md), or by hand from
 # GitHub: Actions > "iOS build to TestFlight" > Run workflow.
 # Needs one repository secret: EXPO_TOKEN (expo.dev > Account settings > Access tokens;
-# see SHIP.md).
+# see CLAUDE.md).
 # Signing uses the certificates/profiles already stored on Expo (credentialsSource: remote).
 name: iOS build to TestFlight
 
