@@ -1,0 +1,39 @@
+# Every push to main tells the public builds repo (theprojectmaker/cteen-gn-builds)
+# to build this commit and send it to TestFlight. This step takes a few seconds;
+# the real build runs over there, where Mac minutes are free.
+# Pushes that only touch notes or the server do not start a build.
+name: Send to the build repo
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'server/**'
+  workflow_dispatch:
+
+concurrency:
+  group: trigger-build
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Open the build repo
+        uses: actions/checkout@v4
+        with:
+          repository: theprojectmaker/cteen-gn-builds
+          ssh-key: ${{ secrets.BUILDER_DEPLOY_KEY }}
+
+      - name: Ask it to build this commit
+        run: |
+          echo "${{ github.sha }}" > BUILD_SHA
+          git config user.name "cteen-gn build trigger"
+          git config user.email "197445453+theprojectmaker@users.noreply.github.com"
+          git commit -am "Build ${GITHUB_SHA::7}"
+          git push
