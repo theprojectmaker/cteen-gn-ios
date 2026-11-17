@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AiPlanner, EventForm, PosterForm } from './leaderEvents';
 import { ChallengeEditor, FoodForm, MinyanEditor, PhotoPicker, PopupEditor, WhatsAppImport, publishPhotos } from './leaderTools';
 import type { Snap } from './photo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -391,7 +392,10 @@ export function AdminPanel() {
                     <View style={{ transform: [{ scaleX: -1 }] }}><Icon name="right" size={18} color={C.blueDeep} stroke={2.4} /></View>
                     <Text style={st.backText}>Back</Text>
                   </Pressable>
-                  {task === 'post' || task === 'event' || task === 'alert' || task === 'notify' ? <SimpleForm kind={task} onDone={(msg) => { setNote(msg); setTask(null); }} />
+                  {task === 'event' ? <EventForm onDone={(msg) => { setNote(msg); setTask(null); }} />
+                    : task === 'poster' ? <PosterForm onDone={(msg) => { setNote(msg); setTask(null); }} />
+                    : task === 'ai' ? <AiPlanner onDone={(msg) => { setNote(msg); setTask(null); }} />
+                    : task === 'post' || task === 'alert' || task === 'notify' ? <SimpleForm kind={task} onDone={(msg) => { setNote(msg); setTask(null); }} />
                     : task === 'challenge' ? <ChallengeEditor onDone={(msg) => { setNote(msg); setTask(null); }} />
                     : task === 'food' ? <FoodForm onDone={(msg) => { setNote(msg); setTask(null); }} />
                     : task === 'whatsapp' ? <WhatsAppImport onDone={(msg) => { setNote(msg); setTask(null); }} />
@@ -414,7 +418,7 @@ export function AdminPanel() {
 }
 
 // ───────── Simple mode ─────────
-type Task = 'post' | 'notify' | 'challenge' | 'whatsapp' | 'food' | 'event' | 'alert' | 'popup' | 'minyan' | 'signups' | 'photos' | 'people' | 'inbox';
+type Task = 'post' | 'notify' | 'challenge' | 'poster' | 'ai' | 'whatsapp' | 'food' | 'event' | 'alert' | 'popup' | 'minyan' | 'signups' | 'photos' | 'people' | 'inbox';
 const TASK_SECTION: Partial<Record<Task, Section>> = { signups: 'Sign-ups', photos: 'Photos', people: 'People', inbox: 'Inbox' };
 const TASKS: { k: Task; icon: string; color: 'blue' | 'orange' | 'purple' | 'green' | 'pink' | 'yellow'; title: string; sub: string }[] = [
   { k: 'post', icon: 'chat', color: 'blue', title: 'Post an update', sub: 'Write something, add photos' },
@@ -437,11 +441,12 @@ function SimpleHome({ onPick }: { onPick: (k: Task) => void }) {
   const popupOn = content.popup?.on && content.popup.title ? content.popup : null;
   const share: { k: Task | 'compose'; icon: string; color: 'blue' | 'orange' | 'purple' | 'green' | 'pink' | 'yellow'; title: string }[] = [
     { k: 'compose', icon: 'camera', color: 'blue', title: 'New post' },
-    { k: 'notify', icon: 'bell', color: 'purple', title: 'Notification' },
-    { k: 'alert', icon: 'megaphone', color: 'pink', title: 'Live banner' },
+    { k: 'poster', icon: 'ticket', color: 'pink', title: 'Poster' },
     { k: 'event', icon: 'calendar', color: 'orange', title: 'Event' },
+    { k: 'ai', icon: 'star', color: 'purple', title: 'AI planner' },
+    { k: 'notify', icon: 'bell', color: 'blue', title: 'Notification' },
+    { k: 'alert', icon: 'megaphone', color: 'pink', title: 'Live banner' },
     { k: 'food', icon: 'food', color: 'yellow', title: 'Food' },
-    { k: 'popup', icon: 'star', color: 'purple', title: 'Pop-up' },
     { k: 'whatsapp', icon: 'send', color: 'green', title: 'From WhatsApp' },
   ];
   const manage: { k: Task; icon: string; title: string }[] = [

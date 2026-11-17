@@ -4,11 +4,12 @@ import { Appearance, Platform, Pressable, Text, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { C, IS_DARK, PREFS, F } from '../src/theme';
-import { StoreProvider } from '../src/store';
+import { StoreProvider, useStore } from '../src/store';
 import { AdminPanel } from '../src/admin';
 import { Setup } from '../src/setup';
 import { Intro } from '../src/intro';
 import { StartupPopup } from '../src/popup';
+import { Tour } from '../src/tour';
 import { Composer } from '../src/composer';
 import { WrapReminderSync } from '../src/wrapReminders';
 import { useOtaUpdates } from '../src/shell';
@@ -60,8 +61,16 @@ function Root() {
       {introDone ? <Setup /> : null}
       <Intro onDone={() => setIntroDone(true)} />
       <StartupPopup ready={introDone} />
+      <TourGate ready={introDone} />
     </>
   );
+}
+
+// The quick tour: once, after sign-up, never on top of the leaders' pop-up.
+function TourGate({ ready }: { ready: boolean }) {
+  const { onboarded, device, tourSeen, content } = useStore();
+  if (!ready || !device || !onboarded || tourSeen || content.popup?.on) return null;
+  return <Tour />;
 }
 
 export default function RootLayout() {

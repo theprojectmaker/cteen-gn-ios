@@ -29,6 +29,7 @@
 //   POST /api/push/register                { token, device }
 //   POST /api/push/prefs                   { device, photos } photo alerts on/off (on unless turned off)
 //   POST /api/admin/push-me                { device } this leader phone gets a notification for every comment
+//   POST /api/admin/ai-event               { prompt, info, keep } AI drafts an event (keep = use the details as given)
 //   GET  /api/broadcasts                   everything sent to everyone, newest first (the Inbox in Settings)
 //   POST /api/ask                          { name, text, device } question for the rabbi
 // Leaders: Authorization: Bearer <passcode> (the rabbi, "owner"), or X-Account: <id>:<token> for an
@@ -289,6 +290,7 @@ function sanitize(doc, alert) {
       time: clean(e.time, 40), place: clean(e.place, 120), price: clean(e.price, 40), who: clean(e.who, 300), about: clean(e.about, 1200),
       signup: e.signup === 'link' ? 'link' : 'app', url: urlOk(e.url) ? e.url : '', payUrl: urlOk(e.payUrl) ? e.payUrl : '',
       gender: ['boys', 'girls'].includes(e.gender) ? e.gender : 'all', minAge: ageOk(e.minAge), maxAge: ageOk(e.maxAge),
+      poster: typeof e.poster === 'string' && /^https:\/\/\S{4,400}$/.test(e.poster) ? e.poster : '', showGoing: !!e.showGoing,
     })),
     challenges: list(doc.challenges, 20).filter((c) => idOk(c.id)).map((c) => ({
       id: c.id, title: clean(c.title, 60), icon: clean(c.icon, 20), color: color(c.color), every: c.every === 'week' ? 'week' : 'day',
@@ -307,6 +309,7 @@ function sanitize(doc, alert) {
     popup: doc.popup && typeof doc.popup === 'object' ? {
       on: !!doc.popup.on, id: clean(doc.popup.id, 40) || 'p' + Date.now().toString(36),
       title: clean(doc.popup.title, 80), body: clean(doc.popup.body, 600), button: clean(doc.popup.button, 30),
+      image: typeof doc.popup.image === 'string' && /^https:\/\/\S{4,400}$/.test(doc.popup.image) ? doc.popup.image : '', more: clean(doc.popup.more, 800),
       target: doc.popup.target && ['event', 'challenge', 'post'].includes(doc.popup.target.type) && idOk(doc.popup.target.id) ? { type: doc.popup.target.type, id: doc.popup.target.id } : null,
     } : { on: false, id: '', title: '', body: '', button: '', target: null },
     minyan: doc.minyan && typeof doc.minyan === 'object' ? {
@@ -344,11 +347,11 @@ async function logBroadcast(env, kind, title, text, target) {
   await env.CTEEN.put('broadcasts', JSON.stringify(list.slice(0, 100)));
 }
 
-async function pushAll(env, title, body, data) {
+async function pushAll(env, title, body, data, image) {
   const tokens = Object.values((await env.CTEEN.get('push', 'json')) || {});
   let sent = 0;
   for (let i = 0; i < tokens.length; i += 100) {
-    const batch = tokens.slice(i, i + 100).map((to) => ({ to, title, body, sound: 'default', data: data || {} }));
+    const batch = tokens.slice(i, i + 100).map((to) => ({ to, title, body, sound: 'default', data: { ...(data || {}), image: image || undefined }, ...(image ? { richContent: { image }, mutableContent: true } : {}) }));
     const res = await fetch('https://exp.host/--/api/v2/push/send', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(batch) }).catch(() => null);
     if (res && res.ok) sent += batch.length;
   }
@@ -604,8 +607,14 @@ export async function onRequest({ request, env, params, waitUntil }) {
       const counts = {};
       const evs = content.events.filter((x) => x.signup === 'app');
       const rows = await Promise.all(evs.map((e) => env.CTEEN.get('signups:' + e.id, 'json')));
-      evs.forEach((e, i) => { counts[e.id] = (rows[i] || []).length; });
-      return json({ counts });
+      const names = {};
+      evs.forEach((e, i) => {
+        if (!e.showGoing) return; // private unless the rabbi turns on "Show who's going"
+        const list = rows[i] || [];
+        counts[e.id] = list.length;
+        names[e.id] = list.slice(-30).map((r) => String(r.name || '').split(' ')[0]).filter(Boolean);
+      });
+      return json({ counts, names });
     });
     // An event as a calendar file (Apple Calendar opens it with "Add to Calendar").
     let im = /^events\/([a-z0-9-]+)\/ics$/.exec(path);
@@ -876,7 +885,8 @@ export async function onRequest({ request, env, params, waitUntil }) {
         const title = clean(body.title, 60), text = clean(body.text, 160);
         if (title.length < 2) return bad('Add a title.');
         const target = targetOk(body.target);
-        const push = await pushAll(env, title, text, { target });
+        const image = typeof body.image === 'string' && /^https:\/\/\S{4,400}$/.test(body.image) ? body.image : '';
+        const push = await pushAll(env, title, text, { target }, image);
         await logBroadcast(env, 'notification', title, text, target);
         return json({ push });
       }
@@ -932,6 +942,25 @@ export async function onRequest({ request, env, params, waitUntil }) {
         const status = ['checked', 'hidden'].includes(body.status) ? body.status : '';
         const ok = await editPhotoEntry(env, String(body.key || ''), (p) => { p.status = status; });
         return ok ? json({ ok: true }) : bad('That photo is gone.', 404);
+      }
+      if (path === 'admin/ai-event' && method === 'POST') {
+        const prompt = clean(body.prompt, 600), info = clean(body.info, 2000);
+        if (prompt.length + info.length < 4) return bad('Tell the AI what the event is.');
+        const keep = body.keep !== false;
+        const out = await aiJson(env,
+          'You help Rabbi Zevy of CTeen Great Neck (a Jewish teen chapter at Chabad of Great Neck, 400 East Shore Road, Great Neck NY) set up an event in the chapter app. Reply with JSON only: {"title","date":"YYYY-MM-DD","time","place","about","who","price","post":{"title","body"}}. ' +
+          (keep
+            ? 'KEEP MODE: use the details exactly as given. Do not invent dates, times, places, prices or names. Leave a field empty ("") if it was not given. Only tidy the wording.'
+            : 'IMPROVE MODE: keep every fact that was given exactly, and you may make the title catchier and the description more exciting for teens, and suggest a time if none was given (say "suggested" nowhere, just give a normal time). Never invent prices, names or dates that were not given; leave unknown dates empty.') +
+          ' title: max 60 chars. about: 2-4 friendly sentences for teens, max 500 chars. who: who it is for, short. post: a short Feed announcement for it. No emojis, no hashtags, no markdown. Resolve words like "next Thursday" using today\'s date.',
+          `Today is ${nyDate()} (${new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: 'America/New_York' })}).\nIdea: ${prompt}\nDetails from the rabbi: ${info || '(none)'}`);
+        if (!out || !out.title) return bad('The AI could not plan that. Try again with a little more detail.', 502);
+        const noEmoji = (s) => String(s || '').replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu, '').replace(/[*_#]/g, '').trim();
+        return json({
+          title: clean(noEmoji(out.title), 80), date: dateOk(out.date) ? out.date : '', time: clean(noEmoji(out.time), 40), place: clean(noEmoji(out.place), 120),
+          about: clean(noEmoji(out.about), 1200), who: clean(noEmoji(out.who), 300), price: clean(noEmoji(out.price), 40),
+          post: out.post && typeof out.post === 'object' ? { title: clean(noEmoji(out.post.title), 120), body: clean(noEmoji(out.post.body), 1500) } : null,
+        });
       }
       if (path === 'admin/push-me' && method === 'POST') {
         const device = clean(body.device, 40);

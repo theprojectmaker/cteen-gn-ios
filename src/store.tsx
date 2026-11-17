@@ -17,12 +17,14 @@ export type EventItem = {
   start: string; end: string; time?: string; place?: string; price?: string; who?: string; about?: string;
   signup: 'app' | 'link'; url?: string; payUrl?: string;
   gender?: 'all' | 'boys' | 'girls'; minAge?: number | null; maxAge?: number | null;
+  poster?: string; showGoing?: boolean;
 };
 export type Challenge = { id: string; title: string; icon: string; color: ColorKey; every: 'day' | 'week'; goal: number; about: string; active: boolean; photo?: boolean; starts?: string; rules?: string[]; image?: string; rewards: { at: number; prize: string }[] };
 export type Post = { id: string; kind: 'News' | 'Events' | 'Photos' | 'Rewards' | 'Food'; pinned?: boolean; title: string; body: string; eventId?: string; challengeId?: string; photos?: string[]; linkLabel?: string; linkUrl?: string; at: string };
 export type Info = { id: string; icon: string; title: string; body: string };
 export type Alert = { id: string; on: boolean; title: string; text: string; target: Target; until: string };
-export type Popup = { on: boolean; id: string; title: string; body: string; button: string; target: { type: 'event' | 'challenge' | 'post'; id: string } | null };
+export type Popup = { on: boolean; id: string; title: string; body: string; button: string; target: { type: 'event' | 'challenge' | 'post'; id: string } | null; image?: string; more?: string };
+export type AiEvent = { title: string; date: string; time: string; place: string; about: string; who: string; price: string; post: { title: string; body: string } | null };
 export type MinyanRow = { label: string; time: string };
 export type Minyan = { weekday: MinyanRow[]; shabbat: MinyanRow[]; note: string };
 export type PostComment = { name: string; text: string; at: string };
@@ -83,7 +85,7 @@ export const IMAGES: Record<string, ImageSourcePropType> = {
 // ───────── device-local state ─────────
 type Local = {
   device: string; name: string; grade: string; age: number | null; gender: Gender; school: string;
-  account: Account | null; onboarded: boolean; inboxSeen?: string;
+  account: Account | null; onboarded: boolean; inboxSeen?: string; tourSeen?: boolean;
   seenPosts: string[]; seenInit: boolean; seenEvents: string[]; tipSeen: boolean;
   saved: string[]; liked: string[]; going: string[]; joined: string[]; dismissed: string[];
   checks: Record<string, string[]>; // challenge id -> period keys checked in
@@ -137,11 +139,14 @@ type Ctx = Local & {
   setPhotoAlerts: (on: boolean) => Promise<void>;
   loadBroadcasts: () => Promise<Broadcast[] | null>;
   markInboxSeen: () => void;
+  markTourSeen: () => void;
   inboxUnread: number;
   aiDraft: (text: string) => Promise<AiDraft | { error: string }>;
   minyanFromText: (text: string) => Promise<Minyan | { error: string }>;
   sendAlert: (a: { title: string; text: string; target: Target; hours: number; push: boolean } | null) => Promise<string>;
-  sendPush: (title: string, text: string, target: Target) => Promise<string>;
+  sendPush: (title: string, text: string, target: Target, image?: string) => Promise<string>;
+  aiEvent: (prompt: string, info: string, keep: boolean) => Promise<AiEvent | { error: string }>;
+  goingNames: Record<string, string[]>;
   loadSignups: () => Promise<{ signups: Record<string, SignupRow[]>; phones: number } | null>;
   loadInbox: () => Promise<Question[] | null>; removeQuestion: (id: string) => Promise<void>;
   loadPhotos: (challengeId: string) => Promise<PhotoRow[] | null>; loadPhoto: (key: string) => Promise<string | null>;
@@ -195,6 +200,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [composerOpen, setComposerOpen] = useState(false);
   const [push, setPush] = useState<PushState>('unsupported');
   const [goingCount, setGoingCount] = useState<Record<string, number>>({});
+  const [goingNames, setGoingNames] = useState<Record<string, string[]>>({});
   const [postMeta, setPostMeta] = useState<Record<string, { likes: number; comments: number }>>({});
   const [broadcasts, setBroadcasts] = useState<Broadcast[]>([]);
   const lastRefresh = useRef(0);
@@ -219,7 +225,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     try {
       keep(await api<Content>('/content'));
       setOnline(true);
-      api<{ counts: Record<string, number> }>('/events/counts').then((r) => setGoingCount(r.counts || {})).catch(() => {});
+      api<{ counts: Record<string, number>; names?: Record<string, string[]> }>('/events/counts').then((r) => { setGoingCount(r.counts || {}); setGoingNames(r.names || {}); }).catch(() => {});
       api<{ meta: Record<string, { likes: number; comments: number }> }>('/posts/meta').then((r) => setPostMeta(r.meta || {})).catch(() => {});
       api<{ items: Broadcast[] }>('/broadcasts').then((r) => setBroadcasts(r.items || [])).catch(() => {});
     } catch {
@@ -549,6 +555,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       try { const r = await api<{ items: Broadcast[] }>('/broadcasts'); setBroadcasts(r.items || []); return r.items || []; } catch { return null; }
     },
     markInboxSeen: () => patch((s) => ({ ...s, inboxSeen: new Date().toISOString() })),
+    markTourSeen: () => patch((s) => ({ ...s, tourSeen: true })),
     inboxUnread: broadcasts.filter((b) => !local.inboxSeen || b.at > local.inboxSeen).length,
     setPhotoAlerts: async (on) => {
       try { await api('/push/prefs', { method: 'POST', body: { device: ref.current.device, photos: on } }); } catch {}
@@ -581,9 +588,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         return msg(e);
       }
     },
-    sendPush: async (title, text, target) => {
+    aiEvent: async (prompt, info, keep) => {
+      try { return await api<AiEvent>('/admin/ai-event', { method: 'POST', body: { prompt, info, keep }, leader }); } catch (e) { return { error: msg(e) }; }
+    },
+    goingNames,
+    sendPush: async (title, text, target, image) => {
       try {
-        const r = await api<{ push: { phones: number; sent: number } }>('/admin/push', { method: 'POST', body: { title, text, target }, leader });
+        const r = await api<{ push: { phones: number; sent: number } }>('/admin/push', { method: 'POST', body: { title, text, target, image }, leader });
         return pushNote(r.push).trim();
       } catch (e) {
         return msg(e);
@@ -594,7 +605,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     removeQuestion: (id) => api('/admin/inbox/remove', { method: 'POST', body: { id }, leader }).then(() => {}).catch(() => {}),
     loadPhotos: (cid) => api<{ photos: PhotoRow[] }>(`/admin/photos?challenge=${cid}`, { leader }).then((r) => r.photos).catch(() => null),
     loadPhoto: (key) => api<{ photo: string }>(`/admin/photo?key=${encodeURIComponent(key)}`, { leader }).then((r) => r.photo).catch(() => null),
-  }), [local, content, online, leader, isOwner, adminOpen, composerOpen, push, liveAlert, googleReady, appleReady, unreadFeed, newEvents, goingCount, postMeta, broadcasts, flip, patch, refresh, keep, openTarget, registerToken]);
+  }), [local, content, online, leader, isOwner, adminOpen, composerOpen, push, liveAlert, googleReady, appleReady, unreadFeed, newEvents, goingCount, goingNames, postMeta, broadcasts, flip, patch, refresh, keep, openTarget, registerToken]);
 
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>;
 }
