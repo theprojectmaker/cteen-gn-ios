@@ -211,7 +211,7 @@ VIEWS.events = async (main) => {
   const row = (e) => { const list = s.signups[e.id] || []; return `<tr><td><b>${esc(e.title)}</b>${e.scope === 'intl' ? ' <span class="tag cy">International</span>' : ''}<div class="small muted">${esc([e.time, e.place].filter(Boolean).join(' · '))}</div></td>
     <td>${fmtDay(e.start)}${e.end !== e.start ? ' – ' + fmtDay(e.end) : ''}</td><td>${e.gender === 'all' ? 'Both' : e.gender === 'boys' ? 'Boys' : 'Girls'}</td>
     <td>${e.signup === 'app' ? `<a href="#" data-going="${esc(e.id)}">${list.length} going</a>` : '<span class="muted">CTeen site</span>'}</td>
-    <td style="text-align:right"><button class="btn sec sm" data-edit="${esc(e.id)}">Edit</button></td></tr>`; };
+    <td style="text-align:right;white-space:nowrap"><button class="btn sec sm" data-dup="${esc(e.id)}">Copy</button> <button class="btn sec sm" data-edit="${esc(e.id)}">Edit</button></td></tr>`; };
   const up = evs.filter((e) => e.end >= t), past = evs.filter((e) => e.end < t).reverse();
   main.innerHTML = head('Events', 'New events notify every phone. Sign-ups show here as they come in.', `<button class="btn sec" id="aiBtn">Plan with AI</button><button class="btn" id="newEv">New event</button>`) +
     `<div class="card"><table><thead><tr><th>Event</th><th>When</th><th>For</th><th>Sign-ups</th><th></th></tr></thead><tbody>${up.map(row).join('') || '<tr><td colspan="5" class="empty">No upcoming events.</td></tr>'}</tbody></table></div>` +
@@ -219,6 +219,7 @@ VIEWS.events = async (main) => {
   $('#newEv').onclick = () => editEvent(null);
   $('#aiBtn').onclick = aiPlan;
   main.querySelectorAll('[data-edit]').forEach((b) => (b.onclick = () => editEvent(content.events.find((e) => e.id === b.dataset.edit))));
+  main.querySelectorAll('[data-dup]').forEach((b) => (b.onclick = () => { const o = content.events.find((e) => e.id === b.dataset.dup); const { id, ...rest } = o; editEvent(null, { ...rest, title: o.title, start: '', end: '' }); }));
   main.querySelectorAll('[data-going]').forEach((a) => (a.onclick = (ev) => { ev.preventDefault(); const e = content.events.find((x) => x.id === a.dataset.going); showGoing(e, s.signups[e.id] || []); }));
 };
 function showGoing(e, list) {
@@ -397,29 +398,65 @@ VIEWS.photos = async (main) => {
 };
 
 // ═════ Challenges ═════
+const COLORS = [['blue', 'Cyan'], ['orange', 'Orange'], ['purple', 'Purple'], ['green', 'Green'], ['pink', 'Pink'], ['yellow', 'Yellow']];
+const CH_ICONS = [['trophy', 'Trophy'], ['tefillin', 'Tefillin'], ['flame', 'Flame'], ['star', 'Star'], ['book', 'Book'], ['heart', 'Heart'], ['sun', 'Sun'], ['gift', 'Gift'], ['camera', 'Camera'], ['music', 'Music'], ['ball', 'Ball']];
 VIEWS.challenges = async (main) => {
   await loadContent();
-  main.innerHTML = head('Challenges', 'Rules and rewards show on each challenge page in the app.') +
+  main.innerHTML = head('Challenges', 'Streak challenges teens join in the app. Rules and rewards show on each challenge page.', `<button class="btn" id="newCh">New challenge</button>`) +
     `<div class="grid g2">${content.challenges.map((c) => `<div class="card"><div class="spread"><h3>${esc(c.title)}</h3><span class="tag ${c.active ? 'gr' : ''}">${c.active ? 'Live' : 'Off'}</span></div>
-      <p class="small muted" style="margin:6px 0 0">${esc(c.about)}</p><div class="small" style="margin-top:10px">Goal: ${c.goal} ${c.every === 'week' ? 'weeks' : 'days'}${c.starts ? ' · started ' + esc(fmtDay(c.starts)) : ''}</div>
-      ${(c.rewards || []).map((r) => `<div class="small muted">${r.at}: ${esc(r.prize)}</div>`).join('')}
-      <button class="btn sec sm" style="margin-top:14px" data-edit="${esc(c.id)}">Edit</button></div>`).join('')}</div>`;
+      <p class="small muted" style="margin:6px 0 0">${esc(c.about)}</p><div class="small" style="margin-top:10px">Goal: ${c.goal} ${c.every === 'week' ? 'weeks' : 'days'}${c.photo ? ' · photo check-ins' : ''}${c.starts ? ' · starts ' + esc(fmtDay(c.starts)) : ''}</div>
+      ${(c.rewards || []).map((r) => `<div class="small muted">${r.at} ${c.every === 'week' ? 'weeks' : 'days'}: ${esc(r.prize)}</div>`).join('')}
+      <div class="row" style="margin-top:14px"><button class="btn sec sm" data-edit="${esc(c.id)}">Edit</button><button class="btn sec sm" data-tog="${esc(c.id)}">${c.active ? 'Turn off' : 'Turn on'}</button>${c.photo ? `<button class="btn sec sm" data-ph="${esc(c.id)}">Photos</button>` : ''}</div></div>`).join('') || '<div class="card empty">No challenges yet.</div>'}</div>`;
+  $('#newCh').onclick = () => editChallenge(null);
   main.querySelectorAll('[data-edit]').forEach((b) => (b.onclick = () => editChallenge(content.challenges.find((c) => c.id === b.dataset.edit))));
+  main.querySelectorAll('[data-tog]').forEach((b) => (b.onclick = async () => { b.disabled = true; await saveContent({ ...content, challenges: content.challenges.map((c) => (c.id === b.dataset.tog ? { ...c, active: !c.active } : c)) }, 'Updated.'); show('challenges'); }));
+  main.querySelectorAll('[data-ph]').forEach((b) => (b.onclick = () => { VIEWS.photos.ch = b.dataset.ph; show('photos'); }));
 };
 async function editChallenge(c) {
-  const ok = await dialogLoop('Edit ' + c.title,
-    field('cTitle', 'Name', c.title, 'text', 'maxlength="60"') + field('cAbout', 'About', c.about, 'area', 'maxlength="400"') +
-    `<div class="grid g2">${field('cGoal', 'Goal', c.goal, 'number', 'min="1" max="366"')}${field('cStarts', 'Started on', c.starts || '', 'date')}</div>` +
+  const isNew = !c;
+  c = c || { id: newId('c'), title: '', icon: 'trophy', color: 'blue', every: 'day', goal: 30, about: '', active: true, photo: true, starts: today(), rules: [], image: '', rewards: [] };
+  const ok = await dialogLoop(isNew ? 'New challenge' : 'Edit ' + c.title,
+    field('cTitle', 'Name', c.title, 'text', 'maxlength="60" placeholder="Like: Shabbat candles challenge"') + field('cAbout', 'About (one or two lines)', c.about, 'area', 'maxlength="400"') +
+    `<div class="grid g3">${select('cEvery', 'Check in every', [['day', 'Day'], ['week', 'Week']], c.every)}${field('cGoal', 'Goal (how many)', c.goal, 'number', 'min="1" max="366"')}${field('cStarts', 'Starts on', c.starts || '', 'date')}</div>` +
+    `<div class="grid g2">${select('cIcon', 'Icon', CH_ICONS, c.icon)}${select('cColor', 'Color', COLORS, c.color)}</div>` +
+    check('cPhoto', 'Teens check in with a photo (shows on the photo wall)', c.photo) +
     field('cRules', 'Rules (one per line)', (c.rules || []).join('\n'), 'area') +
     field('cRewards', 'Rewards (one per line, like "30: Backpack")', (c.rewards || []).map((r) => r.at + ': ' + r.prize).join('\n'), 'area') +
+    photoField('cImg', 'Rules page picture (optional)', c.image) +
     check('cActive', 'Live in the app', c.active),
-    { ok: 'Save' },
+    { ok: isNew ? 'Create challenge' : 'Save', danger: isNew ? '' : 'Delete', after: () => wirePhoto('cImg') },
     async () => {
-      const rewards = val('cRewards').split('\n').map((l) => l.match(/^\s*(\d+)\s*[:\-]\s*(.+)$/)).filter(Boolean).map((m) => ({ at: Number(m[1]), prize: m[2].trim() }));
-      const next = { ...c, title: val('cTitle'), about: val('cAbout'), goal: Number(val('cGoal')) || c.goal, starts: val('cStarts'), rules: val('cRules').split('\n').map((s) => s.trim()).filter(Boolean), rewards, active: val('cActive') };
-      await saveContent({ ...content, challenges: content.challenges.map((x) => (x.id === c.id ? next : x)) }, 'Saved.');
-    });
+      if (val('cTitle').length < 2) throw new Error('Name the challenge.');
+      const rewards = val('cRewards').split('\n').filter((l) => l.trim()).map((l) => { const m = l.match(/^\s*(\d+)\s*[:\-]\s*(.+)$/); if (!m) throw new Error('Write each reward like "30: Backpack".'); return { at: Number(m[1]), prize: m[2].trim() }; });
+      const image = await photoValue('cImg');
+      const next = { ...c, title: val('cTitle'), about: val('cAbout'), every: val('cEvery'), goal: Number(val('cGoal')) || c.goal, starts: val('cStarts'), icon: val('cIcon'), color: val('cColor'), photo: val('cPhoto'), rules: val('cRules').split('\n').map((s) => s.trim()).filter(Boolean), rewards, image, active: val('cActive') };
+      await saveContent({ ...content, challenges: isNew ? [...content.challenges, next] : content.challenges.map((x) => (x.id === c.id ? next : x)) }, isNew ? 'Challenge created. It shows in the app now.' : 'Saved.');
+    },
+    async () => { if (!confirm('Delete ' + c.title + '? Teens lose it from the app (their old photos stay on the server).')) throw new Error('Not deleted.'); await saveContent({ ...content, challenges: content.challenges.filter((x) => x.id !== c.id) }, 'Deleted.'); });
   if (ok && view === 'challenges') show('challenges');
+}
+
+// ═════ Chapter info ═════
+const INFO_ICONS = [['pin', 'Pin'], ['users', 'People'], ['globe', 'Globe'], ['food', 'Food'], ['cap', 'Cap'], ['book', 'Book'], ['heart', 'Heart'], ['phone', 'Phone'], ['clock', 'Clock'], ['star', 'Star'], ['gift', 'Gift'], ['question', 'Question']];
+VIEWS.info = async (main) => {
+  await loadContent();
+  const info = content.info || [];
+  main.innerHTML = head('Chapter info', 'The rows on the Chapter tab. Use Up and Down to change the order.', `<button class="btn" id="newInfo">Add a row</button>`) +
+    `<div class="card"><div class="list">${info.map((i, n) => `<div class="item"><div style="flex:1"><b>${esc(i.title)}</b><div class="small muted">${esc(i.body)}</div></div>
+      <div class="row"><button class="btn sec sm" data-up="${n}" ${n ? '' : 'disabled'}>Up</button><button class="btn sec sm" data-down="${n}" ${n < info.length - 1 ? '' : 'disabled'}>Down</button><button class="btn sec sm" data-edit="${esc(i.id)}">Edit</button></div></div>`).join('') || '<div class="empty">No rows yet.</div>'}</div></div>`;
+  const move = async (n, d) => { const list = [...info]; [list[n], list[n + d]] = [list[n + d], list[n]]; await saveContent({ ...content, info: list }, 'Order saved.'); show('info'); };
+  main.querySelectorAll('[data-up]').forEach((b) => (b.onclick = () => move(Number(b.dataset.up), -1)));
+  main.querySelectorAll('[data-down]').forEach((b) => (b.onclick = () => move(Number(b.dataset.down), 1)));
+  main.querySelectorAll('[data-edit]').forEach((b) => (b.onclick = () => editInfo(info.find((i) => i.id === b.dataset.edit))));
+  $('#newInfo').onclick = () => editInfo(null);
+};
+async function editInfo(i) {
+  const isNew = !i; i = i || { id: newId('i'), icon: 'pin', title: '', body: '' };
+  const ok = await dialogLoop(isNew ? 'Add a row' : 'Edit row', field('fTitle', 'Title', i.title, 'text', 'maxlength="60"') + field('fBody', 'Text', i.body, 'area', 'maxlength="600"') + select('fIcon', 'Icon', INFO_ICONS, i.icon),
+    { ok: 'Save', danger: isNew ? '' : 'Delete' },
+    async () => { if (val('fTitle').length < 2) throw new Error('Add a title.'); const next = { ...i, title: val('fTitle'), body: val('fBody'), icon: val('fIcon') }; await saveContent({ ...content, info: isNew ? [...content.info, next] : content.info.map((x) => (x.id === i.id ? next : x)) }, 'Saved.'); },
+    async () => { if (!confirm('Delete this row?')) throw new Error('Not deleted.'); await saveContent({ ...content, info: content.info.filter((x) => x.id !== i.id) }, 'Deleted.'); });
+  if (ok && view === 'info') show('info');
 }
 
 // ═════ Minyan ═════
