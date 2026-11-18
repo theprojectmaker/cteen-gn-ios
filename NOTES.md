@@ -9,7 +9,7 @@ Read the top few entries before you start; add yours before you push.
 Write here what you are in the middle of, so the other person does not start the same thing.
 Remove your line when it ships.
 
-- (nothing right now)
+- Solomon (2026-11-17): account sync (profile, challenges, RSVPs, invite answers save to your account), new sign-up, leader dashboard website. Please avoid src/setup.tsx, src/store.tsx account code and server account routes until this lands.
 
 ## Log
 
