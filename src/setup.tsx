@@ -9,7 +9,7 @@ import { tap, useStore, type Gender } from './store';
 // a progress bar, and a finish screen. Everything can be changed later from the account page.
 const GRADES = ['8', '9', '10', '11', '12'];
 const AGES = [12, 13, 14, 15, 16, 17, 18];
-const STEPS = 4; // after the welcome screen: name, about you, notifications, done
+const STEPS = 3; // after the welcome screen: you, notifications, done
 
 function Progress({ step }: { step: number }) {
   return (
@@ -83,10 +83,10 @@ export function Setup() {
     const e = await saveProfile({ name, grade, age, gender });
     setBusy(false);
     if (e) return setErr(e);
-    go(3);
+    go(2);
   };
 
-  const canNext = [true, name.trim().length >= 2, !!grade && age != null && !!gender, true, true][step];
+  const canNext = [true, name.trim().length >= 2 && !!grade && age != null && !!gender, true, true][step];
   let body: React.ReactNode;
   let cta = 'Continue';
   let onCta: () => void = () => go(step + 1);
@@ -119,7 +119,7 @@ export function Setup() {
                   if (e) return setErr(e);
                   const n = store.name || '';
                   setName((cur) => cur || n);
-                  go(n.trim().length >= 2 ? 2 : 1);
+                  go(1);
                 }}
                 style={({ pressed }) => [st.appleBtn, pressed && { opacity: 0.9 }]}
                 accessibilityRole="button"
@@ -128,8 +128,9 @@ export function Setup() {
                 <Text style={st.appleText}>Continue with Apple</Text>
               </Pressable>
             ) : null}
+            {appleReady ? <Text style={st.appleNote}>Your streak, sign-ups and invites save to your Apple ID, so a new phone picks up where you left off.</Text> : null}
             <Pressable onPress={() => go(1)} style={({ pressed }) => [st.nameBtn, pressed && { opacity: 0.85 }]} accessibilityRole="button">
-              <Text style={st.nameBtnText}>{appleReady ? 'Sign up with your name' : 'Sign up'}</Text>
+              <Text style={st.nameBtnText}>{appleReady ? 'Sign up without Apple' : 'Sign up'}</Text>
             </Pressable>
             {googleReady && Platform.OS !== 'web' ? (
               <Pressable onPress={async () => { const e = await linkGoogle(); if (e) setErr(e); }} hitSlop={8} style={{ marginTop: 14, alignSelf: 'center' }} accessibilityRole="button">
@@ -144,31 +145,25 @@ export function Setup() {
   }
 
   if (step === 1) {
+    cta = busy ? 'Saving…' : 'Continue';
+    onCta = saveAndNext;
+    const viaApple = !!store.account?.apple;
     body = (
       <>
-        <Text style={st.q}>What's your name?</Text>
-        <Text style={st.qSub}>First name and last initial. It shows on event sign-ups and the leaderboard.</Text>
+        <Text style={st.q}>{first && viaApple ? `Hi ${first}` : 'About you'}</Text>
+        <Text style={st.qSub}>So you see the events that are for you. Only Rabbi Zevy and the leaders see this.</Text>
         <TextInput
           value={name}
           onChangeText={setName}
-          placeholder="Noah S."
+          placeholder="First name and last initial"
           placeholderTextColor={C.faint}
-          autoFocus
+          autoFocus={!name}
           autoCapitalize="words"
-          returnKeyType="next"
-          onSubmitEditing={() => canNext && go(2)}
-          style={st.bigInput}
+          returnKeyType="done"
+          style={st.nameInput}
           accessibilityLabel="Your name"
         />
-      </>
-    );
-  } else if (step === 2) {
-    cta = busy ? 'Saving…' : 'Continue';
-    onCta = saveAndNext;
-    body = (
-      <>
-        <Text style={st.q}>A bit about you{first ? `, ${first}` : ''}</Text>
-        <Text style={st.qSub}>Some events are for a certain age, or are a girls' or boys' night. This makes sure you see the right ones.</Text>
+        {viaApple ? <Text style={st.synced}>Signed in with Apple. This saves to your account.</Text> : null}
         <Text style={st.label}>Grade</Text>
         <View style={st.pills}>
           {GRADES.map((g) => <Pill key={g} label={`${g}th`} on={grade === g} onPress={() => setGrade(g)} />)}
@@ -178,57 +173,62 @@ export function Setup() {
           {AGES.map((a) => <Pill key={a} label={a === 18 ? '18+' : String(a)} on={age === a} onPress={() => setAge(a)} />)}
         </View>
         <Text style={st.label}>I'm a</Text>
-        <View style={{ gap: 10 }}>
-          <Choice label="Boy" icon="user" on={gender === 'boy'} onPress={() => setGender('boy')} />
-          <Choice label="Girl" icon="user" on={gender === 'girl'} onPress={() => setGender('girl')} />
-        </View>
-        <View style={st.privacy}>
-          <Icon name="lock" size={16} color={C.sub} stroke={2} />
-          <Text style={st.privacyText}>Only Rabbi Zevy and chapter leaders can see this. It is never shown to other teens.</Text>
+        <View style={st.seg2}>
+          {(['boy', 'girl'] as const).map((g) => (
+            <Pressable key={g} onPress={() => { tap(); setGender(g); }} style={[st.segBtn, gender === g && st.segOn]} accessibilityRole="radio" accessibilityState={{ checked: gender === g }}>
+              <Text style={[st.choiceText, gender === g && { color: C.blueDeep }]}>{g === 'boy' ? 'Boy' : 'Girl'}</Text>
+            </Pressable>
+          ))}
         </View>
       </>
     );
-  } else if (step === 3) {
+  } else if (step === 2) {
     const native = push !== 'unsupported';
     cta = native && push === 'off' ? 'Turn on notifications' : 'Continue';
-    onCta = native && push === 'off' ? async () => { await turnOnPush(); go(4); } : () => go(4);
+    onCta = native && push === 'off' ? async () => { await turnOnPush(); go(3); } : () => go(3);
     body = (
-      <View style={{ alignItems: 'center', paddingTop: 24 }}>
-        <View style={st.bellWrap}>
-          <Icon name="bell" size={52} color={C.white} stroke={1.8} />
+      <>
+        <Text style={st.q}>Stay in the loop</Text>
+        <Text style={st.qSub}>A few notifications a week, never spam. Change them any time in Settings.</Text>
+        <View style={{ marginTop: 18 }}>
+          {[
+            ['New events and invites', 'When sign-ups open or Rabbi Zevy invites you.'],
+            ['Your streak', 'A reminder before the day closes if you have not checked in.'],
+            ['Changes', 'If a time or place moves.'],
+          ].map(([a, b]) => (
+            <View key={a} style={st.perk}>
+              <View style={{ width: 4, borderRadius: 2, backgroundColor: C.orange }} />
+              <View style={{ flex: 1 }}><Text style={st.perkTitle}>{a}</Text><Text style={st.perkSub}>{b}</Text></View>
+            </View>
+          ))}
         </View>
-        <Text style={[st.q, { textAlign: 'center', marginTop: 28 }]}>Don't miss a thing</Text>
-        <Text style={[st.qSub, { textAlign: 'center' }]}>Get a heads-up when sign-ups open, when plans change, and when it's time to keep your streak.</Text>
         {push === 'on' ? <Text style={[st.qSub, { color: C.green, fontWeight: '700' }]}>Notifications are on.</Text> : null}
         {push === 'unsupported' ? <Text style={[st.qSub, { fontSize: 13 }]}>Notifications work in the app on your phone.</Text> : null}
-      </View>
+      </>
     );
   } else {
     cta = "Let's go";
     onCta = () => { tap(true); done(); };
     body = (
-      <View style={{ alignItems: 'center', paddingTop: 24 }}>
-        <View style={[st.bellWrap, { backgroundColor: C.green }]}>
-          <Icon name="tick" size={54} color={C.white} stroke={2.6} />
-        </View>
-        <Text style={[st.q, { textAlign: 'center', marginTop: 28 }]}>You're in{first ? `, ${first}` : ''}</Text>
-        <Text style={[st.qSub, { textAlign: 'center' }]}>Welcome to CTeen Great Neck. Here's your profile.</Text>
-        <View style={st.summary}>
+      <>
+        <Text style={st.q}>You're in{first ? `, ${first}` : ''}</Text>
+        <Text style={st.qSub}>Welcome to CTeen Great Neck.</Text>
+        <View style={[st.summary, { justifyContent: 'flex-start' }]}>
           {[name.trim(), grade ? `${grade}th grade` : '', age ? `Age ${age === 18 ? '18+' : age}` : ''].filter(Boolean).map((t) => (
             <View key={t} style={st.tag}><Text style={st.tagText}>{t}</Text></View>
           ))}
         </View>
-        <Text style={[st.qSub, { fontSize: 13, textAlign: 'center' }]}>You can change any of this from your account.</Text>
-      </View>
+        <Text style={[st.qSub, { fontSize: 14 }]}>{store.account ? 'Saved to your account. Sign in on a new phone and everything comes back.' : 'You can change any of this from your account. Sign in with Apple there to keep it if you switch phones.'}</Text>
+      </>
     );
   }
 
   return (
-    <Modal visible animationType="fade" onRequestClose={() => step > 1 && step < 4 && go(step - 1)}>
+    <Modal visible animationType="fade" onRequestClose={() => step > 1 && step < 3 && go(step - 1)}>
       <KeyboardAvoidingView behavior={undefined} style={{ flex: 1, backgroundColor: C.bg }}>
         <View style={[st.top, { paddingTop: insets.top + 10 }]}>
-          <Pressable onPress={() => go(step - 1)} hitSlop={10} style={st.back} accessibilityRole="button" accessibilityLabel="Back" disabled={step >= 4}>
-            {step < 4 ? <Icon name="right" size={20} color={C.ink} stroke={2.4} /> : null}
+          <Pressable onPress={() => go(step - 1)} hitSlop={10} style={st.back} accessibilityRole="button" accessibilityLabel="Back" disabled={step >= 3}>
+            {step < 3 ? <Icon name="right" size={20} color={C.ink} stroke={2.4} /> : null}
           </Pressable>
           <Progress step={step} />
           <View style={{ width: 44 }} />
@@ -241,8 +241,8 @@ export function Setup() {
           <Pressable onPress={onCta} disabled={!canNext || busy} style={({ pressed }) => [st.cta, (!canNext || busy) && { opacity: 0.4 }, pressed && { opacity: 0.85 }]} accessibilityRole="button" accessibilityState={{ disabled: !canNext || busy }}>
             <Text style={st.ctaText}>{cta}</Text>
           </Pressable>
-          {step === 3 && push === 'off' ? (
-            <Pressable onPress={() => go(4)} hitSlop={8} style={{ alignSelf: 'center', marginTop: 14 }} accessibilityRole="button">
+          {step === 2 && push === 'off' ? (
+            <Pressable onPress={() => go(3)} hitSlop={8} style={{ alignSelf: 'center', marginTop: 14 }} accessibilityRole="button">
               <Text style={st.skip}>Not now</Text>
             </Pressable>
           ) : null}
@@ -306,6 +306,15 @@ const st = StyleSheet.create({
   pill: { minWidth: 62, height: 48, paddingHorizontal: 16, borderRadius: 16, backgroundColor: C.card, alignItems: 'center', justifyContent: 'center' },
   pillOn: { backgroundColor: C.blue },
   pillText: { fontSize: 17, fontWeight: '800', color: C.ink },
+  appleNote: { fontSize: 13, lineHeight: 18, color: C.sub, textAlign: 'center', marginTop: 2, marginBottom: 6, paddingHorizontal: 12 },
+  seg2: { flexDirection: 'row', gap: 10 },
+  segBtn: { flex: 1, height: 52, borderRadius: 16, backgroundColor: C.card, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'transparent' },
+  segOn: { borderColor: C.blue, backgroundColor: C.bluePale },
+  nameInput: { marginTop: 22, fontSize: 22, fontWeight: '700', color: C.ink, backgroundColor: C.card, borderRadius: 16, paddingHorizontal: 16, height: 56, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null) },
+  synced: { fontSize: 13, color: C.sub, marginTop: 8 },
+  perk: { flexDirection: 'row', gap: 12, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.line },
+  perkTitle: { fontSize: 16, fontWeight: '700', color: C.ink },
+  perkSub: { fontSize: 14, color: C.sub, marginTop: 2, lineHeight: 19 },
   privacy: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', marginTop: 24, backgroundColor: C.card, borderRadius: 16, padding: 14 },
   privacyText: { flex: 1, fontSize: 13, lineHeight: 19, color: C.sub },
   bellWrap: { width: 120, height: 120, borderRadius: 40, backgroundColor: C.blue, alignItems: 'center', justifyContent: 'center' },

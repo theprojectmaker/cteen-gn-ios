@@ -9,10 +9,10 @@ Read the top few entries before you start; add yours before you push.
 Write here what you are in the middle of, so the other person does not start the same thing.
 Remove your line when it ships.
 
-- Solomon (2026-11-17): account sync (profile, challenges, RSVPs, invite answers save to your account), new sign-up, leader dashboard website. Please avoid src/setup.tsx, src/store.tsx account code and server account routes until this lands.
 
 ## Log
 
+- 2026-11-17 · Solomon · Account sync: when signed in (Apple), challenge check-ins, streak counts, RSVPs, saved/liked posts, invite answers and reminders save to the account (POST /api/account/state, KV state:<id>, debounced 1.5s) and merge back on sign-in or a new phone (union, never loses local data). Sign-up redesigned: Apple first with a line saying what it saves, then one About you screen (name, grade, age, boy/girl), notifications, done (3 steps instead of 4). Leader dashboard website at https://cteen-gn.pages.dev/admin/ (server/public/admin, passcode login, same /api/admin routes): overview, Feed posts (photo upload, pin, WhatsApp AI), events (AI planner, poster, who is going + CSV), invitations with answers, notification / live banner / pop-up, people (leaders, CSV), questions, challenge photos, challenges (rules, rewards), minyan times. Server deployed.
 - 2026-11-17 · Babak · Profile picture on the Account page: tap the avatar circle to pick a photo from your library; saved on this device only (AsyncStorage). Server-backed avatars (Path B) need Solomon to add a new upload endpoint and an avatar field on the account record.
 
 - 2026-11-17 · Solomon · Autosave: after every Claude reply, scripts/autosave.cjs uploads the whole folder (unfinished edits too) to branch autosave/<git name>; it never touches main, so nothing ships. whats-new.cjs tells the other person when that snapshot changes.

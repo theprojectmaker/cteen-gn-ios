@@ -526,6 +526,21 @@ export async function onRequest({ request, env, params, waitUntil }) {
       return json({ account: publicAccount(acc), token });
     }
 
+    // Your app data (challenges, check-ins, RSVPs, saved, liked, invitation answers) saved on your
+    // account, so signing in with Apple on a new phone brings it all back. { id, token, state? }
+    if (path === 'account/state' && method === 'POST') {
+      const acc = await getAccount(env, body.id, body.token);
+      if (!acc) return bad('Please sign in again.', 401);
+      const key = 'state:' + acc.id;
+      if (body.state && typeof body.state === 'object') {
+        const text = JSON.stringify(body.state);
+        if (text.length > 60000) return bad('Too much to save.', 413);
+        await env.CTEEN.put(key, text);
+        return json({ ok: true });
+      }
+      return json({ state: (await env.CTEEN.get(key, 'json')) || null });
+    }
+
     if (path === 'auth/config' && method === 'GET') return json({ google: !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) });
 
     if (path === 'auth/google/start' && method === 'GET') {

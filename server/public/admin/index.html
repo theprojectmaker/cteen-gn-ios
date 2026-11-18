@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>CTeen GN Leaders</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F2F6F9;--card:#fff;--ink:#0F1D2B;--sub:#5B6B7A;--faint:#8D9BA8;--line:#E2E9EF;--cyan:#0BAFE6;--cyanDeep:#0786B3;--cyanPale:#E3F5FC;--orange:#FF7A2F;--orangeDeep:#E2601A;--orangePale:#FFF0E6;--green:#1E9E61;--red:#C0303F;--r:14px}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:"Bricolage Grotesque",-apple-system,sans-serif;font-weight:800;letter-spacing:-.02em;margin:0}
+h1{font-size:28px}h2{font-size:20px}h3{font-size:16px}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--cyanDeep)}
+.hide{display:none!important}
+/* login */
+#login{min-height:100vh;display:grid;place-items:center;padding:16px}
+.loginCard{background:var(--card);border-radius:20px;padding:32px;width:100%;max-width:380px;box-shadow:0 1px 2px rgba(15,29,43,.05),0 12px 40px rgba(15,29,43,.07)}
+.brand{display:flex;align-items:center;gap:10px;margin-bottom:22px}
+.brand img{width:22px;height:38px;object-fit:contain}
+.brand b{font-family:"Bricolage Grotesque";font-weight:800;font-size:20px;letter-spacing:-.02em}
+/* layout */
+#app{display:grid;grid-template-columns:232px 1fr;min-height:100vh}
+nav{background:var(--card);border-right:1px solid var(--line);padding:22px 14px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column}
+nav .brand{padding:0 8px}
+nav button{display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;border:0;background:none;padding:9px 10px;border-radius:10px;cursor:pointer;color:var(--sub);font-weight:600}
+nav button:hover{background:var(--bg);color:var(--ink)}
+nav button.on{background:var(--cyanPale);color:var(--cyanDeep)}
+nav .group{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);padding:16px 10px 6px}
+nav .count{font-size:12px;background:var(--orange);color:#fff;border-radius:99px;padding:0 7px;line-height:18px}
+nav .foot{margin-top:auto;font-size:13px;color:var(--faint);padding:8px 10px}
+main{padding:28px 36px 60px;max-width:1180px;width:100%}
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:22px;flex-wrap:wrap}
+.head p{margin:4px 0 0;color:var(--sub)}
+.card{background:var(--card);border-radius:var(--r);border:1px solid var(--line);padding:20px}
+.grid{display:grid;gap:14px}
+.g4{grid-template-columns:repeat(4,1fr)}.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}
+.stat .n{font-family:"Bricolage Grotesque";font-weight:800;font-size:34px;letter-spacing:-.03em;line-height:1.1}
+.stat .l{color:var(--sub);font-size:13px;margin-top:2px}
+.btn{border:0;border-radius:99px;padding:9px 16px;font-weight:700;cursor:pointer;background:var(--orange);color:#fff;white-space:nowrap}
+.btn:hover{background:var(--orangeDeep)}
+.btn.sec{background:var(--bg);color:var(--ink);border:1px solid var(--line)}
+.btn.sec:hover{background:var(--line)}
+.btn.cy{background:var(--cyan)}.btn.cy:hover{background:var(--cyanDeep)}
+.btn.danger{background:none;color:var(--red);border:1px solid var(--line)}
+.btn.sm{padding:5px 12px;font-size:13px}
+.btn:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.spread{display:flex;justify-content:space-between;align-items:center;gap:12px}
+table{width:100%;border-collapse:collapse}
+th{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:11px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+.muted{color:var(--sub)}.small{font-size:13px}.faint{color:var(--faint)}
+.tag{display:inline-block;font-size:12px;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--bg);color:var(--sub)}
+.tag.cy{background:var(--cyanPale);color:var(--cyanDeep)}.tag.or{background:var(--orangePale);color:var(--orangeDeep)}.tag.gr{background:#E4F6EC;color:var(--green)}
+label.f{display:block;margin-top:14px}
+label.f>span{display:block;font-size:13px;font-weight:700;color:var(--sub);margin-bottom:6px}
+input[type=text],input[type=password],input[type=date],input[type=number],input[type=search],select,textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 12px;background:#fff;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--cyan);box-shadow:0 0 0 3px var(--cyanPale)}
+textarea{min-height:90px;resize:vertical}
+.check{display:flex;gap:8px;align-items:center;margin-top:14px;font-weight:600}
+.err{color:var(--red);font-weight:600;margin-top:10px;font-size:14px}
+.list>*+*{border-top:1px solid var(--line)}
+.item{padding:14px 0;display:flex;gap:14px;align-items:flex-start}
+.item:first-child{padding-top:0}.item:last-child{padding-bottom:0}
+.thumb{width:64px;height:64px;border-radius:10px;object-fit:cover;background:var(--bg);flex:none}
+.photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}
+.ph{background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.ph img{width:100%;aspect-ratio:1;object-fit:cover;display:block;background:var(--bg)}
+.ph .b{padding:10px 12px}
+.ph.hidden img{opacity:.35}
+dialog{border:0;border-radius:18px;padding:0;width:min(640px,calc(100vw - 32px));max-height:calc(100vh - 48px);box-shadow:0 30px 80px rgba(15,29,43,.25)}
+dialog::backdrop{background:rgba(15,29,43,.35)}
+dialog .dh{padding:20px 22px 0;display:flex;justify-content:space-between;align-items:center}
+dialog .db{padding:4px 22px 18px;overflow:auto;max-height:calc(100vh - 190px)}
+dialog .df{padding:14px 22px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end}
+.x{border:0;background:var(--bg);width:32px;height:32px;border-radius:99px;cursor:pointer;font-size:18px;line-height:1}
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:10px 18px;border-radius:99px;font-weight:600;opacity:0;transition:.2s;pointer-events:none;z-index:9}
+#toast.on{opacity:1;transform:translateX(-50%)}
+.empty{color:var(--faint);text-align:center;padding:28px}
+.seg{display:inline-flex;background:var(--bg);border-radius:99px;padding:3px;gap:2px}
+.seg button{border:0;background:none;border-radius:99px;padding:6px 14px;font-weight:600;color:var(--sub);cursor:pointer}
+.seg button.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(15,29,43,.1)}
+.bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:8px}.bar i{display:block;height:100%;background:var(--cyan)}
+.pre{white-space:pre-wrap}
+@media (max-width:860px){#app{grid-template-columns:1fr}nav{position:static;height:auto;flex-direction:row;flex-wrap:wrap;gap:4px;padding:12px}nav .brand,nav .group,nav .foot{display:none}nav button{width:auto}main{padding:20px 16px 60px}.g4,.g3{grid-template-columns:1fr 1fr}.g2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<section id="login">
+  <form class="loginCard" id="loginForm">
+    <div class="brand"><img src="/admin/logo.png" alt=""><b>CTeen Great Neck</b></div>
+    <h1>Leader dashboard</h1>
+    <p class="muted" style="margin:6px 0 4px">Run the chapter app from your computer. Everything here shows up on every phone right away.</p>
+    <label class="f"><span>Leader passcode</span><input type="password" id="pass" autocomplete="current-password" autofocus></label>
+    <div class="err" id="loginErr"></div>
+    <button class="btn" style="width:100%;margin-top:18px;padding:12px">Sign in</button>
+  </form>
+</section>
+
+<div id="app" class="hide">
+  <nav id="nav">
+    <div class="brand"><img src="/admin/logo.png" alt=""><b>CTeen GN</b></div>
+    <button data-v="overview" class="on">Overview</button>
+    <div class="group">Share</div>
+    <button data-v="posts">Feed posts</button>
+    <button data-v="events">Events</button>
+    <button data-v="invites">Invitations</button>
+    <button data-v="broadcast">Notify and banners</button>
+    <div class="group">Manage</div>
+    <button data-v="people">People</button>
+    <button data-v="questions">Questions <span class="count hide" id="qCount"></span></button>
+    <button data-v="photos">Challenge photos</button>
+    <button data-v="challenges">Challenges</button>
+    <button data-v="minyan">Minyan times</button>
+    <div class="foot"><a href="#" id="signOut">Sign out</a></div>
+  </nav>
+  <main id="main"></main>
+</div>
+
+<dialog id="dlg"><form method="dialog" id="dlgForm"><div class="dh"><h2 id="dlgTitle"></h2><button class="x" value="cancel" formnovalidate aria-label="Close">&times;</button></div><div class="db" id="dlgBody"></div><div class="df" id="dlgFoot"></div></form></dialog>
+<div id="toast"></div>
+
+<script src="/admin/app.js"></script>
+</body>
+</html>

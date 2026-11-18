@@ -120,7 +120,7 @@ preview misses. `dist/` is ignored by git.
 | `app/_layout.tsx` | Root stack: the tabs, plus the challenge and account pages that slide in on top; event sheet, leader panel, first-launch welcome |
 | `app/(tabs)/_layout.tsx` | Tab bar: Apple's own on iPhone (real Liquid Glass on iOS 26, Feed badge, live banner in its bottom accessory); `src/webTabs.tsx` imitates it on web |
 | `app/(tabs)/index.tsx`, `events.tsx`, `feed.tsx`, `chapter.tsx` | One file per tab (expo-router); each wraps a screen from `src/screens.tsx` |
-| `src/setup.tsx` | Required first-launch setup: Continue with Apple or your name, then grade, age, boy/girl, notifications |
+| `src/setup.tsx` | Required first-launch setup: Continue with Apple (saves streaks, RSVPs and invites to the account via /api/account/state) or sign up without it, then one About you screen, notifications |
 | `app/event/[id].tsx`, `app/post/[id].tsx` | Event details and full Feed posts as Apple card pop-ups (drag down to close) |
 | `app/challenges.tsx` | List of live challenges (trophy button when more than one) |
 | `app/challenge/[id].tsx`, `app/account.tsx` | Challenge page (`src/rewards.tsx`, photo check-ins via `src/photo.ts`) and account page (`src/account.tsx`) |
@@ -136,6 +136,7 @@ preview misses. `dist/` is ignored by git.
 | `src/config.ts` | Address of the chapter server |
 | `shared/seed.json` | Starter content, used until a leader saves something |
 | `server/` | The chapter server (Cloudflare). Only Solomon can deploy it |
+| `server/public/admin/` | Leader dashboard website (cteen-gn.pages.dev/admin): plain HTML + JS on the same /api/admin routes; ships with a server deploy, not with an app push |
 | `.github/workflows/trigger-build.yml` | Hands each push on `main` to the public build repo (OTA + TestFlight) |
 | `scripts/whats-new.cjs` | Auto-pulls/merges the other person's work and reports builds |
 | `scripts/autosave.cjs` | Uploads unfinished work to `autosave/<name>` after every Claude reply |

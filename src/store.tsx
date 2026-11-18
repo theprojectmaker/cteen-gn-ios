@@ -45,6 +45,25 @@ export type AiDraft = { title: string; body: string; kind: Post['kind']; event: 
 // Tefillin is for boys: girls never see that challenge as something to do.
 export const challengeFits = (ch: { id: string }, gender: Gender) => !(ch.id === 'tefillin' && gender === 'girl');
 
+// What follows you between phones when you're signed in.
+type Synced = Pick<Local, 'joined' | 'checks' | 'counts' | 'reminders' | 'going' | 'saved' | 'liked' | 'invites' | 'tourSeen' | 'onboarded'>;
+const pickSynced = (s: Local): Synced => ({ joined: s.joined, checks: s.checks, counts: s.counts, reminders: s.reminders, going: s.going, saved: s.saved, liked: s.liked, invites: s.invites, tourSeen: s.tourSeen, onboarded: s.onboarded });
+const union = (a: string[] = [], b: string[] = []) => [...new Set([...a, ...b])];
+function mergeSynced(local: Synced, remote: Partial<Synced> | null): Synced {
+  if (!remote) return local;
+  const checks: Record<string, string[]> = { ...(remote.checks || {}) };
+  for (const [k, v] of Object.entries(local.checks || {})) checks[k] = union(checks[k], v);
+  const counts: Record<string, number> = { ...(remote.counts || {}) };
+  for (const [k, v] of Object.entries(local.counts || {})) counts[k] = Math.max(counts[k] ?? 0, v);
+  return {
+    joined: union(remote.joined, local.joined), checks, counts,
+    reminders: { ...(remote.reminders || {}), ...(local.reminders || {}) },
+    going: union(remote.going, local.going), saved: union(remote.saved, local.saved), liked: union(remote.liked, local.liked),
+    invites: { ...(remote.invites || {}), ...(local.invites || {}) },
+    tourSeen: !!(local.tourSeen || remote.tourSeen), onboarded: !!(local.onboarded || remote.onboarded),
+  };
+}
+
 export const sortPosts = (posts: Post[]) => [...posts].sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || b.at.localeCompare(a.at));
 export type Tab = 'Home' | 'Events' | 'Feed' | 'Chapter';
 const TAB_PATH = { Home: '/', Events: '/events', Feed: '/feed', Chapter: '/chapter' } as const;
@@ -303,6 +322,34 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     api('/push/prefs', { method: 'POST', body: { device: local.device, photos: false } }).catch(() => {});
   }, [local.gender, local.device]);
 
+  // Bring back what this account saved on another phone, merged with this phone's data.
+  const pullSynced = useCallback(async (account: { id: string; token: string }) => {
+    try {
+      const r = await api<{ state: Partial<Synced> | null }>('/account/state', { method: 'POST', body: { id: account.id, token: account.token } });
+      const merged = mergeSynced(pickSynced(ref.current), r.state);
+      ref.current = { ...ref.current, ...merged };
+      patch((s) => ({ ...s, ...merged }));
+    } catch {}
+  }, [patch]);
+  const syncedKey = local.account ? JSON.stringify(pickSynced(local)) : '';
+  const lastSaved = useRef('');
+  useEffect(() => {
+    const acc = local.account;
+    if (!acc || !syncedKey || syncedKey === lastSaved.current) return;
+    const t = setTimeout(() => {
+      lastSaved.current = syncedKey;
+      api('/account/state', { method: 'POST', body: { id: acc.id, token: acc.token, state: JSON.parse(syncedKey) } }).catch(() => { lastSaved.current = ''; });
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [syncedKey]);
+  // first launch on a phone that's already signed in: pull once
+  const pulledOnce = useRef(false);
+  useEffect(() => {
+    if (pulledOnce.current || !local.account || !local.device) return;
+    pulledOnce.current = true;
+    pullSynced(local.account);
+  }, [local.account?.id, local.device]);
+
   const flip = useCallback((field: 'saved' | 'liked', id: string) => {
     tap();
     patch((s) => ({ ...s, [field]: s[field].includes(id) ? s[field].filter((x) => x !== id) : [...s[field], id] }));
@@ -359,6 +406,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         const next = { account, name: r.account.name || name || me.name, grade: r.account.grade || me.grade, age: r.account.age ?? me.age, gender: r.account.gender || me.gender };
         ref.current = { ...ref.current, ...next };
         patch((s) => ({ ...s, ...next }));
+        await pullSynced(account);
         tap(true);
         return null;
       } catch (e: any) {
