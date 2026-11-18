@@ -12,6 +12,8 @@ Remove your line when it ships.
 
 ## Log
 
+- 2026-11-18 · Solomon · Home carousel now features the 3 soonest upcoming events in date order (dropped the rule that forced a Great Neck event to the front).
+
 - 2026-11-18 · Solomon · Events + Feed info pass: event cards (Events tab, Home) show a two-line description preview; Events header shows a live count ("3 coming up · 1 in Great Neck"); Feed event posts show the going count; long challenge/event attach titles wrap instead of cutting off.
 
 - 2026-11-18 · Solomon · Home is richer and nothing is cut off: challenge card shows the full title, a progress bar, days done of the goal and the top prize; From Rabbi Zevy shows 3 posts with a two-line preview, photo thumbnail and comment count; event hero adds place and price; This Shabbat adds the Teen Minyan time. Chapter About rows show a one-line preview before you tap.

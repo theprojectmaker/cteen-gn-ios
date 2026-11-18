@@ -17,9 +17,8 @@ import { greetingNow } from './shell';
 // the newest post, Shabbat, then the shortcuts at the bottom.
 export function Home() {
   const { content, go, openEvent, name, push, turnOnPush, fits, gender, postMeta } = useStore();
-  const up = upcoming(content.events).filter(fits);
-  const next = up.find((e) => e.scope === 'gn') ?? up[0];
-  const coming = next ? [next, ...up.filter((e) => e.id !== next.id)].slice(0, 3) : [];
+  // The 3 soonest upcoming events, in date order (upcoming() already sorts by start date).
+  const coming = upcoming(content.events).filter(fits).slice(0, 3);
   const live = content.challenges.filter((c) => c.active && challengeFits(c, gender));
   const posts = sortPosts(content.posts).filter((p) => p.kind !== 'Food');
   const food = [...content.posts].filter((p) => p.kind === 'Food' && Date.now() - new Date(p.at).getTime() < 4 * 864e5).sort((a, b) => b.at.localeCompare(a.at))[0];
