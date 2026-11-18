@@ -105,7 +105,7 @@ export function Screen({ children }: { children: React.ReactNode }) {
 function Header() {
   return (
     <Glass style={st.header}>
-      <Image source={require('../assets/logo.png')} style={st.logo} resizeMode="contain" />
+      <Image source={require('../assets/icon.png')} style={st.logo} resizeMode="contain" />
       <View style={{ flex: 1 }}>
         <Text style={st.topEyebrow}>YOUR CHAPTER</Text>
         <Text style={st.topName} numberOfLines={1}>{CHAPTER.name}, NY</Text>
@@ -317,7 +317,7 @@ const st = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 22, paddingHorizontal: 14, paddingVertical: 9, zIndex: 5, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 14, shadowOffset: { width: 0, height: 4 } },
   pinned: { position: 'absolute', left: 0, right: 0, top: 0, zIndex: 20 },
   topFade: { position: 'absolute', left: 0, right: 0, top: 0, zIndex: 19 },
-  logo: { width: 20, height: 35 },
+  logo: { width: 30, height: 30, borderRadius: 7 },
   topEyebrow: { fontSize: 10, fontWeight: '800', letterSpacing: 0.8, color: C.sub },
   topName: { fontSize: 16, fontWeight: '900', color: C.ink, letterSpacing: -0.2 },
   hBtns: { flexDirection: 'row', alignItems: 'center', gap: 8 },

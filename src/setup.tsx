@@ -105,7 +105,7 @@ export function Setup() {
           </Animated.View>
           <Animated.View style={[st.welcomeText, { opacity: fade, transform: [{ translateY: slide }] }]}>
             <View style={st.brandRow}>
-              <Image source={require('../assets/logo.png')} style={st.brandLogo} resizeMode="contain" />
+              <Image source={require('../assets/icon.png')} style={st.brandLogo} resizeMode="contain" />
               <Text style={st.brandName}>CTeen Great Neck</Text>
             </View>
             <Text style={st.welcomeLine}>The teen chapter at Chabad of Great Neck, with Rabbi Zevy and Shani Geisinsky.</Text>
@@ -262,7 +262,7 @@ const st = StyleSheet.create({
   phHalf: { width: '100%', height: '48.8%' },
   welcomeText: { marginTop: 26, width: '100%', maxWidth: 560, alignSelf: 'center' },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  brandLogo: { width: 26, height: 46 },
+  brandLogo: { width: 44, height: 44, borderRadius: 10 },
   brandName: { fontSize: 32, fontFamily: F.display, color: C.ink, letterSpacing: -0.8 },
   welcomeLine: { fontSize: 17, lineHeight: 24, color: C.sub, marginTop: 10 },
   welcomeButtons: { marginTop: 'auto', paddingTop: 24, width: '100%', maxWidth: 560, alignSelf: 'center', gap: 10 },

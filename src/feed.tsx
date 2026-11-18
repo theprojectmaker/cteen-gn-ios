@@ -94,7 +94,7 @@ export function PostCard({ post, full, compact }: { post: Post; full?: boolean; 
     <View style={st.card}>
       {/* header */}
       <View style={st.head}>
-        <View style={st.avatarRing}><Image source={require('../assets/logo.png')} style={st.avatar} resizeMode="contain" /></View>
+        <View style={st.avatarRing}><Image source={require('../assets/icon.png')} style={st.avatar} resizeMode="contain" /></View>
         <View style={{ flex: 1 }}>
           <Text style={st.author} numberOfLines={1}>{CHAPTER.name} <Text style={st.ago}>· {timeAgo(post.at)}</Text></Text>
           <Text style={st.kind}>{post.kind}</Text>
@@ -268,7 +268,7 @@ const st = StyleSheet.create({
   card: { backgroundColor: C.card, borderRadius: 24, overflow: 'hidden', borderWidth: 1, borderColor: C.line },
   head: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
   avatarRing: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: C.blue, alignItems: 'center', justifyContent: 'center', backgroundColor: C.card },
-  avatar: { width: 18, height: 32 },
+  avatar: { width: 34, height: 34, borderRadius: 17 },
   author: { fontSize: 15, fontWeight: '800', color: C.ink },
   ago: { fontSize: 14, fontWeight: '500', color: C.faint },
   kind: { fontSize: 12, color: C.sub, marginTop: 1 },
