@@ -209,7 +209,7 @@ VIEWS.events = async (main) => {
   const t = today();
   const evs = [...content.events].sort((a, b) => a.start.localeCompare(b.start));
   const row = (e) => { const list = s.signups[e.id] || []; return `<tr><td><b>${esc(e.title)}</b>${e.scope === 'intl' ? ' <span class="tag cy">International</span>' : ''}<div class="small muted">${esc([e.time, e.place].filter(Boolean).join(' · '))}</div></td>
-    <td>${fmtDay(e.start)}${e.end !== e.start ? ' – ' + fmtDay(e.end) : ''}</td><td>${e.gender === 'all' ? 'Everyone' : e.gender === 'boys' ? 'Boys' : 'Girls'}</td>
+    <td>${fmtDay(e.start)}${e.end !== e.start ? ' – ' + fmtDay(e.end) : ''}</td><td>${e.gender === 'all' ? 'Both' : e.gender === 'boys' ? 'Boys' : 'Girls'}</td>
     <td>${e.signup === 'app' ? `<a href="#" data-going="${esc(e.id)}">${list.length} going</a>` : '<span class="muted">CTeen site</span>'}</td>
     <td style="text-align:right"><button class="btn sec sm" data-edit="${esc(e.id)}">Edit</button></td></tr>`; };
   const up = evs.filter((e) => e.end >= t), past = evs.filter((e) => e.end < t).reverse();
@@ -233,8 +233,8 @@ async function editEvent(e, draft) {
     `<div class="grid g2">${field('eStart', 'Date', e.start, 'date')}${field('eEnd', 'Ends (if more than one day)', e.end !== e.start ? e.end : '', 'date')}</div>` +
     `<div class="grid g2">${field('eTime', 'Time', e.time, 'text', 'placeholder="7:00 PM"')}${field('ePlace', 'Place', e.place)}</div>` +
     field('eAbout', 'About', e.about, 'area', 'maxlength="1200"') +
-    `<div class="grid g2">${field('ePrice', 'Price (optional)', e.price)}${field('eWho', 'Who it is for (optional)', e.who)}</div>` +
-    `<div class="grid g3">${select('eGender', 'Open to', [['all', 'Everyone'], ['boys', 'Boys'], ['girls', 'Girls']], e.gender)}${field('eMin', 'Min age', e.minAge ?? '', 'number', 'min="10" max="25"')}${field('eMax', 'Max age', e.maxAge ?? '', 'number', 'min="10" max="25"')}</div>` +
+    `<div class="grid g2">${field('ePrice', 'Price (optional)', e.price)}${select('eGender', 'Who it is for', [['all', 'Both'], ['boys', 'Boys'], ['girls', 'Girls']], e.gender)}</div>` +
+    `<div class="grid g2">${field('eMin', 'Min age (optional)', e.minAge ?? '', 'number', 'min="10" max="25"')}${field('eMax', 'Max age (optional)', e.maxAge ?? '', 'number', 'min="10" max="25"')}</div>` +
     `<div class="grid g2">${select('eSignup', 'Sign-up', [['app', 'In the app'], ['link', 'On a website']], e.signup)}${field('eUrl', 'Website link', e.url, 'text', 'placeholder="https://"')}</div>` +
     photoField('ePoster', 'Poster', e.poster) +
     check('eShow', 'Let teens see who else is going (first names)', e.showGoing) +
@@ -246,7 +246,7 @@ async function editEvent(e, draft) {
       const url = val('eUrl'); if (url && !/^https:\/\//.test(url)) throw new Error('The link has to start with https://');
       const poster = await photoValue('ePoster');
       const num = (v) => (v === '' ? null : Number(v));
-      const next = { ...e, title: val('eTitle'), start: val('eStart'), end: val('eEnd') && val('eEnd') >= val('eStart') ? val('eEnd') : val('eStart'), time: val('eTime'), place: val('ePlace'), about: val('eAbout'), price: val('ePrice'), who: val('eWho'), gender: val('eGender'), minAge: num(val('eMin')), maxAge: num(val('eMax')), signup: val('eSignup'), url, poster, showGoing: val('eShow') };
+      const next = { ...e, title: val('eTitle'), start: val('eStart'), end: val('eEnd') && val('eEnd') >= val('eStart') ? val('eEnd') : val('eStart'), time: val('eTime'), place: val('ePlace'), about: val('eAbout'), price: val('ePrice'), gender: val('eGender'), minAge: num(val('eMin')), maxAge: num(val('eMax')), signup: val('eSignup'), url, poster, showGoing: val('eShow') };
       await saveContent({ ...content, events: isNew ? [...content.events, next] : content.events.map((x) => (x.id === e.id ? next : x)) }, isNew ? 'Event created. Everyone gets a notification.' : 'Saved.');
     },
     async () => { if (!confirm('Delete this event? Its sign-up list goes away from the app.')) throw new Error('Not deleted.'); await saveContent({ ...content, events: content.events.filter((x) => x.id !== e.id) }, 'Deleted.'); });
