@@ -25,6 +25,24 @@ export async function snapPhoto(): Promise<Snap | { error: string } | null> {
   }
 }
 
+// Pick a single photo from the library and shrink it to a ~300px square JPEG for use as an avatar.
+// Returns a data URI string (safe to store in AsyncStorage), null if cancelled, or { error }.
+export async function pickAvatar(): Promise<string | { error: string } | null> {
+  try {
+    if (Platform.OS !== 'web') {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) return { error: 'CTeen GN needs access to your photos. Turn it on in Settings.' };
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 1 });
+    if (result.canceled || !result.assets?.[0]) return null;
+    const small = await manipulateAsync(result.assets[0].uri, [{ resize: { width: 300 } }], { compress: 0.7, format: SaveFormat.JPEG, base64: true });
+    if (!small.base64) return { error: "Couldn't read that photo. Try again." };
+    return 'data:image/jpeg;base64,' + small.base64;
+  } catch {
+    return { error: "Couldn't open your photos. Try again." };
+  }
+}
+
 // Leader panel: pick up to 4 photos from the camera roll for a Feed post, shrunk to ~1080px JPEGs.
 export async function pickPhotos(max = 4): Promise<Snap[] | { error: string } | null> {
   try {

@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, R, T, F } from './theme';
 import { Icon } from './icons';
 import { useStore, type Gender } from './store';
 import { Button, Card, Field, s as u } from './ui';
+import { pickAvatar } from './photo';
 
 const GRADES = ['8', '9', '10', '11', '12'];
 const AGES = [12, 13, 14, 15, 16, 17, 18];
@@ -120,18 +122,44 @@ function GoogleRow() {
   );
 }
 
+const AVATAR_KEY = 'cteengn.avatar';
+
 // app/account.tsx
 export function AccountPage() {
   const { name, account, signOut } = useStore();
   const [saved, setSaved] = useState(false);
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const [avatarErr, setAvatarErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem(AVATAR_KEY).then((v) => { if (v) setAvatarUri(v); }).catch(() => {});
+  }, []);
+
+  const changeAvatar = async () => {
+    setAvatarErr(null);
+    const result = await pickAvatar();
+    if (!result) return;
+    if (typeof result === 'object') { setAvatarErr(result.error); return; }
+    await AsyncStorage.setItem(AVATAR_KEY, result).catch(() => {});
+    setAvatarUri(result);
+  };
+
   return (
     <View>
       <View style={st.head}>
-        <View style={st.avatarBig}>
-          {name ? <Text style={st.avatarLetter}>{name[0].toUpperCase()}</Text> : <Icon name="user" size={34} color={C.white} />}
-        </View>
+        <Pressable onPress={changeAvatar} style={({ pressed }) => [st.avatarWrap, pressed && { opacity: 0.75 }]} accessibilityRole="button" accessibilityLabel="Change profile photo">
+          <View style={st.avatarBig}>
+            {avatarUri
+              ? <Image source={{ uri: avatarUri }} style={st.avatarImg} />
+              : name ? <Text style={st.avatarLetter}>{name[0].toUpperCase()}</Text> : <Icon name="user" size={34} color={C.white} />}
+          </View>
+          <View style={st.avatarCamera}>
+            <Icon name="camera" size={13} color={C.white} />
+          </View>
+        </Pressable>
         <Text style={st.title}>{name || 'Your account'}</Text>
         <Text style={[T.small, { marginTop: 4 }]}>{account ? 'Saved to your CTeen GN account' : 'Not saved yet'}</Text>
+        {avatarErr ? <Text style={[st.err, { marginTop: 8 }]}>{avatarErr}</Text> : null}
       </View>
       <Card style={{ padding: 20 }}>
         <ProfileForm cta={saved ? 'Saved' : 'Save'} onSaved={() => setSaved(true)} />
@@ -154,7 +182,10 @@ const st = StyleSheet.create({
   chip: { minWidth: 56, ...{ shadowOpacity: 0 } },
   err: { color: '#C0303F', fontWeight: '700', fontSize: 13, marginTop: 12 },
   head: { alignItems: 'center', paddingTop: 8, paddingBottom: 24 },
-  avatarBig: { width: 84, height: 84, borderRadius: 42, backgroundColor: C.blue, alignItems: 'center', justifyContent: 'center' },
+  avatarWrap: { position: 'relative' },
+  avatarBig: { width: 84, height: 84, borderRadius: 42, backgroundColor: C.blue, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  avatarImg: { width: 84, height: 84 },
+  avatarCamera: { position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: 13, backgroundColor: C.orange, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: C.bg },
   avatarLetter: { color: C.white, fontSize: 36, fontFamily: F.display },
   title: { fontSize: 28, fontFamily: F.display, color: C.ink, marginTop: 14, letterSpacing: -0.4 },
   section: { fontSize: 19, fontFamily: F.display, color: C.ink, marginTop: 30, marginBottom: 12 },
