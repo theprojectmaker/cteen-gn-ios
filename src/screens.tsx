@@ -140,7 +140,7 @@ export function Events() {
   return (
     <>
       <Text style={T.h1}>Events</Text>
-      <Text style={[T.small, { marginTop: 4, marginBottom: 14 }]}>What's coming up in Great Neck and around CTeen</Text>
+      <Text style={[T.small, { marginTop: 4, marginBottom: 14 }]}>{(() => { const all = upcoming(content.events).filter(fits); const gn = all.filter((e) => e.scope === 'gn').length; return all.length ? `${all.length} coming up${gn ? ` · ${gn} in Great Neck` : ''}` : "What's coming up in Great Neck and around CTeen"; })()}</Text>
       <InviteCards eventOnly />
       <Chips options={EVENT_FILTERS} value={f} onChange={setF} />
       <View style={{ gap: 26, marginTop: 18 }}>

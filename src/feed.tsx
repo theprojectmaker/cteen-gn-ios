@@ -45,7 +45,7 @@ export function Feed() {
 }
 
 export function PostCard({ post, full, compact }: { post: Post; full?: boolean; compact?: boolean }) {
-  const { liked, likePost, postMeta, openEvent, openChallenge, content, leader, saveContent } = useStore();
+  const { liked, likePost, postMeta, openEvent, openChallenge, content, leader, saveContent, goingCount } = useStore();
   const on = liked.includes(post.id);
   const meta = postMeta[post.id] ?? { likes: 0, comments: 0 };
   const pop = useRef(new Animated.Value(1)).current;
@@ -126,6 +126,7 @@ export function PostCard({ post, full, compact }: { post: Post; full?: boolean; 
               <View style={st.mediaChip}>
                 <Text style={st.mediaChipTitle} numberOfLines={1}>{ev!.title}</Text>
                 <EventMeta e={ev!} />
+                {ev!.signup === 'app' && (goingCount[ev!.id] ?? 0) > 0 ? <Text style={st.mediaGoing}>{goingCount[ev!.id]} going</Text> : null}
               </View>
             </Pressable>
           )}
@@ -173,14 +174,14 @@ export function PostCard({ post, full, compact }: { post: Post; full?: boolean; 
       {ev && media !== 'event' ? (
         <Pressable onPress={() => openEvent(ev.id)} style={({ pressed }) => [st.attach, pressed && u.pressed]} accessibilityRole="button" accessibilityLabel={`Open ${ev.title}`}>
           <Cover e={ev} style={st.attachImg} iconSize={22} />
-          <View style={{ flex: 1 }}><Text style={T.h3} numberOfLines={1}>{ev.title}</Text><EventMeta e={ev} /></View>
+          <View style={{ flex: 1 }}><Text style={T.h3} numberOfLines={1}>{ev.title}</Text><EventMeta e={ev} />{ev.signup === 'app' && (goingCount[ev.id] ?? 0) > 0 ? <Text style={[T.small, { color: C.sub, marginTop: 2 }]}>{goingCount[ev.id]} going</Text> : null}</View>
           <Icon name="right" size={18} color={C.faint} stroke={2.4} />
         </Pressable>
       ) : null}
       {ch ? (
         <Pressable onPress={() => openChallenge(ch.id)} style={({ pressed }) => [st.attach, pressed && u.pressed]} accessibilityRole="button" accessibilityLabel={`Open ${ch.title}`}>
           <Cover e={ch} style={st.attachImg} iconSize={22} />
-          <View style={{ flex: 1 }}><Text style={T.h3} numberOfLines={1}>{ch.title}</Text><Text style={st.kind}>{ch.active ? 'Live now' : 'Ended'}</Text></View>
+          <View style={{ flex: 1 }}><Text style={T.h3} numberOfLines={2}>{ch.title}</Text><Text style={st.kind}>{ch.active ? 'Live now' : 'Ended'}</Text></View>
           <Icon name="right" size={18} color={C.faint} stroke={2.4} />
         </Pressable>
       ) : null}
@@ -278,6 +279,7 @@ const st = StyleSheet.create({
   media: { width: '100%', aspectRatio: 4 / 5, maxHeight: 520, backgroundColor: C.line, overflow: 'hidden' },
   mediaShade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '45%', backgroundColor: 'rgba(8,20,32,0.35)' },
   mediaChip: { position: 'absolute', left: 12, right: 12, bottom: 12, padding: 12, borderRadius: 16, backgroundColor: C.card },
+  mediaGoing: { color: C.sub, fontSize: 12, fontWeight: '700', marginTop: 3 },
   mediaChipTitle: { fontSize: 16, fontWeight: '800', color: C.ink },
   bigHeart: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   dots: { position: 'absolute', bottom: 12, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 6 },

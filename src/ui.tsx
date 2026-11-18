@@ -141,6 +141,7 @@ export function EventCard({ e, width }: { e: EventItem; width?: number }) {
         </View>
         <Text style={[T.h3, { marginTop: 10 }]} numberOfLines={2}>{e.title}</Text>
         <EventMeta e={e} />
+        {e.about ? <Text style={[T.small, { marginTop: 6, lineHeight: 19 }]} numberOfLines={2}>{e.about}</Text> : null}
         {n > 0 || going.includes(e.id) ? (
           <View style={s.goingRow}>
             <Icon name={going.includes(e.id) ? 'check' : 'users'} size={14} color={going.includes(e.id) ? C.green : C.sub} stroke={2.2} />
