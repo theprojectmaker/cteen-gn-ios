@@ -19,7 +19,7 @@ const unit = (ch: Challenge, n: number) => (ch.every === 'day' ? `day${n === 1 ?
 
 // Home card for a live challenge: one clear line and one clear button.
 export function ChallengeBanner({ ch }: { ch: Challenge }) {
-  const { checks, joined, openChallenge } = useStore();
+  const { checks, joined, openChallenge, counts } = useStore();
   const w = useWrapStatus();
   const wrapNow = ch.id === 'tefillin' && !!w && w.needed;
   const hue = HUES[ch.color] ?? HUES.blue;
@@ -29,16 +29,27 @@ export function ChallengeBanner({ ch }: { ch: Challenge }) {
   const line = wrapNow && w ? (w.lastHour ? `Only ${leftText(w.left)} left to wrap today` : `${leftText(w.left)} left to wrap today`) : !mine ? 'Tap to join. Win the backpack.' : done ? `${fire} ${unit(ch, fire)} in a row. See you tomorrow.` : fire > 0 ? `${fire} ${unit(ch, fire)} in a row. Keep it alive.` : 'Start your streak today.';
   const action = !mine ? 'Join' : done ? 'Done' : ch.photo ? 'Snap' : 'Check in';
   return (
-    <Card style={st.banner} onPress={() => openChallenge(ch.id)} label={`${ch.title}. ${line}`}>
+    <Card style={st.bannerCard} onPress={() => openChallenge(ch.id)} label={`${ch.title}. ${line}`}>
+      <View style={st.banner}>
       {ch.id === 'tefillin' ? <FireBadge lit={done} streak={fire} size={50} /> : <IconTile icon={challengeIcon(ch)} color={ch.color} size={52} solid />}
       <View style={{ flex: 1 }}>
-        <Text style={T.h3} numberOfLines={1}>{ch.title}</Text>
+        <Text style={T.h3} numberOfLines={2}>{ch.title}</Text>
         <Text style={[T.small, { marginTop: 2 }]} numberOfLines={2}>{line}</Text>
       </View>
       <View style={[st.pill, { backgroundColor: done ? hue.pale : C.orange }]}>
         {done ? <Icon name="tick" size={14} color={hue.deep} stroke={2.8} /> : ch.photo && mine ? <Icon name="camera" size={14} color={C.white} stroke={2.4} /> : null}
         <Text style={[st.pillText, done && { color: hue.deep }]}>{action}</Text>
       </View>
+      </View>
+      {mine ? (
+        <View style={st.bannerFoot}>
+          <View style={st.bannerTrack}><View style={[st.bannerFill, { width: `${Math.min(100, Math.round(((counts[ch.id] ?? 0) / Math.max(1, ch.goal)) * 100))}%`, backgroundColor: hue.solid }]} /></View>
+          <View style={st.bannerFootRow}>
+            <Text style={st.bannerFootText}>{counts[ch.id] ?? 0} of {ch.goal} {unit(ch, ch.goal)}</Text>
+            {ch.rewards.length ? <Text style={st.bannerFootText} numberOfLines={1}>{ch.rewards[ch.rewards.length - 1].prize}</Text> : null}
+          </View>
+        </View>
+      ) : null}
     </Card>
   );
 }
@@ -713,7 +724,13 @@ const st = StyleSheet.create({
   send: { width: 42, height: 42, borderRadius: 21, backgroundColor: C.blue, alignItems: 'center', justifyContent: 'center' },
   track: { overflow: 'hidden' },
   fillBar: { position: 'absolute', left: 0, top: 0, bottom: 0 },
-  banner: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16 },
+  bannerCard: { padding: 16 },
+  banner: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  bannerFoot: { marginTop: 14 },
+  bannerTrack: { height: 6, borderRadius: 3, backgroundColor: C.line, overflow: 'hidden' },
+  bannerFill: { height: 6, borderRadius: 3 },
+  bannerFootRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, marginTop: 8 },
+  bannerFootText: { fontSize: 12, fontWeight: '700', color: C.sub, flexShrink: 1 },
   pill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: R.pill, paddingHorizontal: 16, minHeight: 38, justifyContent: 'center' },
   pillText: { color: C.white, fontSize: 14, fontWeight: '800' },
   head: { alignItems: 'center', paddingHorizontal: 12, paddingTop: 8, paddingBottom: 26 },

@@ -12,6 +12,8 @@ Remove your line when it ships.
 
 ## Log
 
+- 2026-11-18 · Solomon · Home is richer and nothing is cut off: challenge card shows the full title, a progress bar, days done of the goal and the top prize; From Rabbi Zevy shows 3 posts with a two-line preview, photo thumbnail and comment count; event hero adds place and price; This Shabbat adds the Teen Minyan time. Chapter About rows show a one-line preview before you tap.
+
 - 2026-11-18 · Solomon · In-app logo is now a transparent mark (assets/mark.png, the C / TEEN / GN icon with its navy background cut out) so it sits on light and dark themes without a box. Used in the intro, Home header, Feed avatar, Chapter header and welcome. Dashboard posts take up to 10 photos as a slideshow (Feed already shows them as a swipeable carousel). Not yet: App Store metadata, more features, the wider polish pass. Those need Solomon to choose.
 
 - 2026-11-18 · Solomon · New app icon used across the app: the in-app logo (intro, Home header, Feed avatar, Chapter header, first-launch welcome) now shows the new C / TEEN / GN icon as a rounded square instead of the old tall logo. Icon commit 6724db3 (assets/icon.png) is the source. Icons can only change with a new TestFlight install; the OTA part is layout only.

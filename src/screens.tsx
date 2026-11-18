@@ -16,7 +16,7 @@ import { greetingNow } from './shell';
 // One thing per section, lots of room: who you are, what's next, your challenge,
 // the newest post, Shabbat, then the shortcuts at the bottom.
 export function Home() {
-  const { content, go, openEvent, name, push, turnOnPush, fits, gender } = useStore();
+  const { content, go, openEvent, name, push, turnOnPush, fits, gender, postMeta } = useStore();
   const up = upcoming(content.events).filter(fits);
   const next = up.find((e) => e.scope === 'gn') ?? up[0];
   const coming = next ? [next, ...up.filter((e) => e.id !== next.id)].slice(0, 3) : [];
@@ -62,12 +62,13 @@ export function Home() {
             <Pressable onPress={() => go('Feed')} hitSlop={10} accessibilityRole="button"><Text style={u.link}>See all</Text></Pressable>
           </View>
           <View style={st.latest}>
-            {posts.slice(0, 2).map((p, i) => (
+            {posts.slice(0, 3).map((p, i) => (
               <Pressable key={p.id} onPress={() => router.push(`/post/${p.id}`)} style={({ pressed }) => [st.latestRow, i > 0 && st.rule, pressed && { backgroundColor: C.bg }]} accessibilityRole="button" accessibilityLabel={p.title}>
-                
+                {p.photos?.[0] ? <Image source={{ uri: p.photos[0] }} style={st.latestThumb} resizeMode="cover" /> : null}
                 <View style={{ flex: 1 }}>
-                  <Text style={T.h3} numberOfLines={1}>{p.title}</Text>
-                  <Text style={T.small} numberOfLines={1}>{p.pinned ? 'Pinned · ' : ''}{p.kind} · {timeAgo(p.at)}</Text>
+                  <Text style={T.h3} numberOfLines={2}>{p.title}</Text>
+                  {p.body ? <Text style={[T.small, { marginTop: 2 }]} numberOfLines={2}>{p.body}</Text> : null}
+                  <Text style={st.latestMeta} numberOfLines={1}>{p.pinned ? 'Pinned · ' : ''}{p.kind} · {timeAgo(p.at)}{postMeta?.[p.id]?.comments ? ` · ${postMeta[p.id].comments} ${postMeta[p.id].comments === 1 ? 'comment' : 'comments'}` : ''}</Text>
                 </View>
                 <Icon name="right" size={16} color={C.faint} stroke={2.4} />
               </Pressable>
@@ -95,7 +96,9 @@ function Quick({ icon, color, label, onPress }: { icon: string; color: ColorKey;
 
 function ShabbatCard() {
   const sh = useShabbat();
+  const { content } = useStore();
   if (sh === 'error') return null;
+  const teen = (content.minyan?.shabbat ?? MINYAN_FALLBACK.shabbat).find((r) => /teen/i.test(r.label));
   return (
     <Card style={st.shabbat}>
       <IconTile icon="flame" color="orange" size={42} />
@@ -114,6 +117,12 @@ function ShabbatCard() {
             </View>
           </View>
         ) : <Text style={[T.small, { marginTop: 6 }]}>Loading this week's times…</Text>}
+        {teen ? (
+          <View style={st.shabbatExtra}>
+            <Text style={st.shabbatExtraLabel} numberOfLines={1}>{teen.label} · Saturday</Text>
+            <Text style={st.shabbatExtraTime}>{minyanTime(teen.time, sh || null).time}</Text>
+          </View>
+        ) : null}
       </View>
     </Card>
   );
@@ -325,6 +334,7 @@ function EventsCarousel({ events, onOpen }: { events: EventItem[]; onOpen: (id: 
             <Text style={st.heroKicker}>{countdown(ev)}</Text>
             <Text style={st.heroTitle} numberOfLines={2}>{ev.title}</Text>
             <Text style={st.heroDate}>{dateLabel(ev)}{ev.time ? ` · ${ev.time}` : ''}</Text>
+            {ev.place || ev.price ? <Text style={st.heroWhere} numberOfLines={1}>{[ev.place, ev.price].filter(Boolean).join(' · ')}</Text> : null}
             <View style={st.heroBtn}>
               <Text style={st.heroBtnText}>{ev.signup === 'app' ? 'RSVP' : 'View details'}</Text>
               <Icon name="right" size={15} color={C.night} stroke={2.4} />
@@ -518,7 +528,7 @@ function InfoRow({ icon, title, body, first }: { icon: string; title: string; bo
       <View style={[st.gBody, !first && st.gRule, { alignItems: 'flex-start' }]}>
         <View style={{ flex: 1 }}>
           <Text style={st.gTitle}>{title}</Text>
-          {open ? <Text style={[st.gSub, { lineHeight: 19, marginTop: 4 }]}>{body}</Text> : null}
+          <Text style={[st.gSub, { lineHeight: 19, marginTop: 4 }]} numberOfLines={open ? undefined : 1}>{body}</Text>
         </View>
         <View style={{ transform: [{ rotate: open ? '90deg' : '0deg' }], marginTop: 3 }}><Icon name="right" size={14} color={C.faint} stroke={2.4} /></View>
       </View>
@@ -681,6 +691,12 @@ const st = StyleSheet.create({
   homeSection: { fontSize: 20, fontFamily: F.display, color: C.ink, letterSpacing: -0.3, marginTop: 32, marginBottom: 12 },
   homeHeadRow: { flexDirection: 'row', alignItems: 'center', marginTop: 32, marginBottom: 12 },
   latest: { borderRadius: 22, backgroundColor: C.card, borderWidth: 1, borderColor: C.line, overflow: 'hidden' },
+  latestThumb: { width: 52, height: 52, borderRadius: 12, backgroundColor: C.line },
+  latestMeta: { fontSize: 12, fontWeight: '600', color: C.faint, marginTop: 4 },
+  heroWhere: { color: 'rgba(255,255,255,0.88)', fontSize: 13, fontWeight: '600', marginTop: 3 },
+  shabbatExtra: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 12, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line },
+  shabbatExtraLabel: { fontSize: 14, fontWeight: '600', color: C.sub, flex: 1 },
+  shabbatExtraTime: { fontSize: 15, fontWeight: '800', color: C.ink },
   latestRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 14 },
   latestDot: { width: 40, height: 40, borderRadius: 12, backgroundColor: C.bluePale, alignItems: 'center', justifyContent: 'center' },
   food: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderRadius: 22, backgroundColor: '#FDF0E3', borderWidth: 1, borderColor: '#F4D2AE' },
