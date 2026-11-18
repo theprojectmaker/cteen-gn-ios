@@ -385,7 +385,7 @@ export function Chapter() {
   return (
     <>
       <View style={st.pageHead}>
-        <Image source={require('../assets/icon.png')} style={st.pageLogo} resizeMode="contain" />
+        <Image source={require('../assets/mark.png')} style={st.pageLogo} resizeMode="contain" />
         <View style={{ flex: 1 }}>
           <Text style={st.pageTitle}>{CHAPTER.name}</Text>
           <Text style={st.pageSub}>{CHAPTER.org} · 400 East Shore Road</Text>
@@ -594,7 +594,7 @@ function LinkRow({ icon, title, sub, url, first }: { icon: string; title: string
 
 const st = StyleSheet.create({
   pageHead: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 2, marginBottom: 18 },
-  pageLogo: { width: 36, height: 36, borderRadius: 8 },
+  pageLogo: { width: 31, height: 40 },
   pageTitle: { fontSize: 27, fontFamily: F.display, color: C.ink, letterSpacing: -0.6 },
   pageSub: { fontSize: 14, color: C.sub, marginTop: 1 },
   shabCard: { borderRadius: 22, backgroundColor: C.card, padding: 18, shadowColor: '#0F1D2B', shadowOpacity: 0.06, shadowRadius: 16, shadowOffset: { width: 0, height: 6 } },

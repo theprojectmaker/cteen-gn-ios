@@ -61,7 +61,7 @@ export function Intro({ onDone }: { onDone?: () => void }) {
               { scale: logo.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1] }) },
             ],
           }}>
-            <Image source={require('../assets/icon.png')} style={st.logo} resizeMode="contain" />
+            <Image source={require('../assets/mark.png')} style={st.logo} resizeMode="contain" />
           </Animated.View>
         </View>
         <View style={st.word}>
@@ -86,7 +86,7 @@ const st = StyleSheet.create({
   root: { backgroundColor: C.card, zIndex: 1000, overflow: 'hidden' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   logoWrap: { width: 180, height: 190, alignItems: 'center', justifyContent: 'center' },
-  logo: { width: 96, height: 96, borderRadius: 22 },
+  logo: { width: 93, height: 120 },
   word: { flexDirection: 'row', marginTop: 18 },
   letter: { color: C.blue, fontSize: 20, fontWeight: '900', letterSpacing: 5 },
   line: { width: 120, height: 3, borderRadius: 2, backgroundColor: C.blue, opacity: 0.25, marginTop: 14 },

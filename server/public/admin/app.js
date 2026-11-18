@@ -174,20 +174,50 @@ VIEWS.posts = async (main) => {
     show('posts');
   }));
 };
+// Slideshow photos: the ones already on the post (remove with x) and new picks, in order.
+let keptSlides = [], pendingSlides = [];
+function slidePicker(p) {
+  keptSlides = [...(p.photos || [])].slice(0, 10);
+  pendingSlides = [];
+  const box = $('#pSlides'), input = $('#pFiles');
+  const draw = () => {
+    const thumbs = [
+      ...keptSlides.map((u, i) => ['kept', i, u]),
+      ...pendingSlides.map((f, i) => ['new', i, URL.createObjectURL(f)]),
+    ];
+    box.innerHTML = thumbs.map(([kind, i, src], n) => `<div class="slide"><img src="${esc(src)}" alt=""><span class="n">${n + 1}</span><button type="button" class="x" data-k="${kind}" data-i="${i}" aria-label="Remove photo">&times;</button></div>`).join('') || '<div class="faint small">No photos yet. A post can be text only.</div>';
+    box.querySelectorAll('button[data-k]').forEach((b) => (b.onclick = () => {
+      const i = Number(b.dataset.i);
+      if (b.dataset.k === 'kept') keptSlides.splice(i, 1); else pendingSlides.splice(i, 1);
+      draw();
+    }));
+  };
+  input.addEventListener('change', () => {
+    const room = 10 - keptSlides.length - pendingSlides.length;
+    pendingSlides.push(...[...input.files].slice(0, Math.max(0, room)));
+    input.value = '';
+    draw();
+  });
+  draw();
+}
 async function editPost(p, draft) {
   const isNew = !p; p = p || { id: newId('p'), kind: 'News', pinned: false, title: '', body: '', eventId: '', challengeId: '', photos: [], linkLabel: '', linkUrl: '', at: today(), ...(draft || {}) };
   const evOpts = [['', 'None'], ...content.events.map((e) => [e.id, e.title])];
   const ok = await dialogLoop(isNew ? 'New post' : 'Edit post',
     field('pTitle', 'Title', p.title, 'text', 'maxlength="120" required') + field('pBody', 'Text', p.body, 'area', 'maxlength="1500"') +
     `<div class="grid g2">${select('pKind', 'Type', KINDS.map((k) => [k, k]), p.kind)}${select('pEvent', 'Links to event', evOpts, p.eventId)}</div>` +
-    photoField('pPhoto', 'Photo', (p.photos || [])[0]) +
+    `<label class="f"><span>Photos (up to 10, in order: a slideshow in the Feed)</span><div id="pSlides" class="slides"></div><input type="file" id="pFiles" accept="image/*" multiple></label>` +
+    '<p class="small muted" style="margin:6px 0 0">For an Instagram slideshow, save the pictures from the post and add them here, then paste the post link under Button link.</p>' +
     `<div class="grid g2">${field('pLinkLabel', 'Button text (optional)', p.linkLabel)}${field('pLinkUrl', 'Button link', p.linkUrl, 'text', 'placeholder="https://"')}</div>` +
     check('pPinned', 'Pin to the top of the Feed', p.pinned) + (isNew ? '<p class="small muted">Posting sends a notification to every phone.</p>' : ''),
-    { ok: isNew ? 'Post it' : 'Save', danger: isNew ? '' : 'Delete', after: () => wirePhoto('pPhoto') },
+    { ok: isNew ? 'Post it' : 'Save', danger: isNew ? '' : 'Delete', after: () => slidePicker(p) },
     async () => {
       if (val('pTitle').length < 2) throw new Error('Add a title.');
-      const photo = await photoValue('pPhoto');
-      const next = { ...p, title: val('pTitle'), body: val('pBody'), kind: val('pKind'), eventId: val('pEvent'), linkLabel: val('pLinkLabel'), linkUrl: val('pLinkUrl'), pinned: val('pPinned'), photos: photo ? [photo, ...(p.photos || []).slice(1)] : (p.photos || []).slice(1) };
+      const added = [];
+      for (const file of pendingSlides) added.push(await uploadPhoto(file));
+      pendingSlides = [];
+      const photos = [...keptSlides, ...added].slice(0, 10);
+      const next = { ...p, title: val('pTitle'), body: val('pBody'), kind: val('pKind'), eventId: val('pEvent'), linkLabel: val('pLinkLabel'), linkUrl: val('pLinkUrl'), pinned: val('pPinned'), photos };
       if (next.linkUrl && !/^https:\/\//.test(next.linkUrl)) throw new Error('The button link has to start with https://');
       await saveContent({ ...content, posts: isNew ? [next, ...content.posts] : content.posts.map((x) => (x.id === p.id ? next : x)) }, isNew ? 'Posted. Everyone gets a notification.' : 'Saved.');
     },
