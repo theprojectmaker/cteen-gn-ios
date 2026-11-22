@@ -12,6 +12,8 @@ Remove your line when it ships.
 
 ## Log
 
+- 2026-11-21 · Solomon · Publish prep + more. App v1.1.0 (app.json). In-app: account page now has a "Your CTeen" summary (your RSVPs, saved events, challenge streaks → tap to open) and a Notifications & settings row (src/account.tsx); events you RSVP to now schedule a local reminder the evening before + morning of (src/push.ts scheduleEventReminders, EventReminderSync in src/screens.tsx mounted in app/_layout.tsx); event detail got a Get directions button (Apple Maps). Dashboard: Overview has a clean quick-action grid (New post/event/invitation, Notify, Tefillin photos, Minyan) — one click to anything; deployed. Docs: docs/app-store-listing.md (paste-ready store copy) + docs/publish-checklist.md. Remaining for publish: privacy-policy URL, support URL, screenshots (all yours).
+
 - 2026-11-21 · Solomon · Calendar day picker is now a clean solid cyan circle (Apple-style) that springs between days, not the frosted glass bubble. Selected day number turns white; today keeps a cyan ring when not selected.
 
 - 2026-11-21 · Solomon · New Calendar tab (5th tab, between Events and Feed): a live month grid of all chapter events (src/calendar.tsx). Days with events show colored dots (multi-day events fill their span); tapping a day springs a Liquid Glass lens onto it and lists that day's events (tap to open). Glass month bar with prev/next and jump-to-today; months slide and fade on change. Reads content.events, so whatever the rabbi posts from the leader panel or dashboard shows instantly. Wired into native tabs (SF calendar icon) and the web glass tab bar.

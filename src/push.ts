@@ -105,3 +105,20 @@ export async function scheduleInviteReminders(times: { id: string; at: number; t
     }
   } catch {}
 }
+
+// A heads-up the evening before an event the teen RSVP'd to. Identifiers start with 'evr-'.
+export async function scheduleEventReminders(times: { id: string; at: number; title: string; body: string; target: string }[]) {
+  if (!NATIVE) return;
+  try {
+    const all = await Notifications.getAllScheduledNotificationsAsync();
+    await Promise.all(all.filter((n) => n.identifier.startsWith('evr-')).map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier).catch(() => {})));
+    for (const t of times) {
+      if (t.at <= Date.now() + 60000) continue;
+      await Notifications.scheduleNotificationAsync({
+        identifier: t.id,
+        content: { title: t.title, body: t.body, data: { target: { type: 'event', id: t.target } } },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(t.at) },
+      });
+    }
+  } catch {}
+}

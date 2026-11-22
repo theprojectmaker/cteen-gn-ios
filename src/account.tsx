@@ -4,7 +4,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, R, T, F } from './theme';
 import { Icon } from './icons';
-import { useStore, type Gender } from './store';
+import { router } from 'expo-router';
+import { dateLabel, streak, useStore, type Gender } from './store';
 import { Button, Card, Field, s as u } from './ui';
 import { pickAvatar } from './photo';
 
@@ -122,6 +123,46 @@ function GoogleRow() {
   );
 }
 
+// A quick look at what's yours: events you're going to, saved events, and your challenge streaks.
+function ActivityRow({ icon, title, sub, onPress, first }: { icon: string; title: string; sub: string; onPress: () => void; first?: boolean }) {
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [st.actRow, !first && st.actRule, pressed && { backgroundColor: C.bg }]} accessibilityRole="button" accessibilityLabel={title}>
+      <View style={st.actIcon}><Icon name={icon} size={18} color={C.blueDeep} stroke={2} /></View>
+      <View style={{ flex: 1 }}>
+        <Text style={T.h3} numberOfLines={1}>{title}</Text>
+        <Text style={T.small} numberOfLines={1}>{sub}</Text>
+      </View>
+      <Icon name="right" size={16} color={C.faint} stroke={2.4} />
+    </Pressable>
+  );
+}
+
+function YourCteen() {
+  const { going, saved, joined, content, counts, checks, openEvent, openChallenge } = useStore();
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+  const myEvents = content.events.filter((e) => going.includes(e.id) && e.end >= today).sort((a, b) => a.start.localeCompare(b.start));
+  const savedEvents = content.events.filter((e) => saved.includes(e.id) && e.end >= today && !going.includes(e.id)).sort((a, b) => a.start.localeCompare(b.start));
+  const myChallenges = content.challenges.filter((c) => joined.includes(c.id) && c.active);
+  if (!myEvents.length && !savedEvents.length && !myChallenges.length) return null;
+  return (
+    <>
+      <Text style={st.section}>Your CTeen</Text>
+      <Card style={{ padding: 0, overflow: 'hidden' }}>
+        {myChallenges.map((c, i) => {
+          const s = streak(c, checks), n = counts[c.id] ?? 0;
+          return <ActivityRow key={c.id} first={i === 0} icon="flame" title={c.title} sub={s > 0 ? `${s} ${c.every === 'week' ? 'week' : 'day'}${s === 1 ? '' : 's'} in a row · ${n} of ${c.goal}` : `${n} of ${c.goal} done — keep it going`} onPress={() => openChallenge(c.id)} />;
+        })}
+        {myEvents.map((e, i) => (
+          <ActivityRow key={e.id} first={i === 0 && !myChallenges.length} icon="check" title={e.title} sub={`Going · ${dateLabel(e)}`} onPress={() => openEvent(e.id)} />
+        ))}
+        {savedEvents.map((e) => (
+          <ActivityRow key={e.id} icon="heart" title={e.title} sub={`Saved · ${dateLabel(e)}`} onPress={() => openEvent(e.id)} />
+        ))}
+      </Card>
+    </>
+  );
+}
+
 const AVATAR_KEY = 'cteengn.avatar';
 
 // app/account.tsx
@@ -161,9 +202,16 @@ export function AccountPage() {
         <Text style={[T.small, { marginTop: 4 }]}>{account ? 'Saved to your CTeen GN account' : 'Not saved yet'}</Text>
         {avatarErr ? <Text style={[st.err, { marginTop: 8 }]}>{avatarErr}</Text> : null}
       </View>
+      <YourCteen />
+      <Text style={st.section}>Your details</Text>
       <Card style={{ padding: 20 }}>
         <ProfileForm cta={saved ? 'Saved' : 'Save'} onSaved={() => setSaved(true)} />
       </Card>
+      <Pressable onPress={() => router.push('/settings')} style={({ pressed }) => [st.settingsRow, pressed && { backgroundColor: C.bg }]} accessibilityRole="button" accessibilityLabel="Notifications and settings">
+        <View style={st.actIcon}><Icon name="bell" size={18} color={C.blueDeep} stroke={2} /></View>
+        <Text style={[T.h3, { flex: 1 }]}>Notifications & settings</Text>
+        <Icon name="right" size={16} color={C.faint} stroke={2.4} />
+      </Pressable>
       <Text style={st.section}>Sign in</Text>
       <Card style={{ padding: 20 }}>
         <AppleRow />
@@ -189,6 +237,10 @@ const st = StyleSheet.create({
   avatarLetter: { color: C.white, fontSize: 36, fontFamily: F.display },
   title: { fontSize: 28, fontFamily: F.display, color: C.ink, marginTop: 14, letterSpacing: -0.4 },
   section: { fontSize: 19, fontFamily: F.display, color: C.ink, marginTop: 30, marginBottom: 12 },
+  actRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 14 },
+  actRule: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line },
+  actIcon: { width: 36, height: 36, borderRadius: 12, backgroundColor: C.bluePale, alignItems: 'center', justifyContent: 'center' },
+  settingsRow: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.line, paddingHorizontal: 16, paddingVertical: 14, marginTop: 16 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   gButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, minHeight: 50, borderRadius: R.pill, borderWidth: 1, borderColor: C.line, backgroundColor: C.card },
   gBadge: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#F1F3F4', alignItems: 'center', justifyContent: 'center' },

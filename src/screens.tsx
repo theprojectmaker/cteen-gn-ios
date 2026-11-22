@@ -11,6 +11,29 @@ import { InviteCards } from './invites';
 import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Rect, Stop } from 'react-native-svg';
 import { MINYAN_FALLBACK, MinyanCard, minyanTime } from './minyan';
 import { greetingNow } from './shell';
+import { scheduleEventReminders } from './push';
+
+// Schedules a heads-up the evening before and the morning of each event the teen RSVP'd to.
+export function EventReminderSync() {
+  const { going, content, push, name } = useStore();
+  const todayNY = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+  const mine = content.events.filter((e) => going.includes(e.id) && e.start >= todayNY);
+  const key = mine.map((e) => e.id + e.start + (e.time || '')).join('|') + push + name;
+  useEffect(() => {
+    if (push !== 'on') return;
+    const first = name.trim().split(' ')[0];
+    const times: { id: string; at: number; title: string; body: string; target: string }[] = [];
+    for (const e of mine.slice(0, 20)) {
+      const [y, m, d] = e.start.split('-').map(Number);
+      const eve = new Date(y, m - 1, d - 1, 18, 0, 0);
+      times.push({ id: `evr-${e.id}-eve`, at: eve.getTime(), title: `Tomorrow: ${e.title}`, body: `${first ? first + ", you're" : "You're"} going${e.time ? ` · ${e.time}` : ''}${e.place ? ` · ${e.place}` : ''}.`, target: e.id });
+      const morn = new Date(y, m - 1, d, 9, 0, 0);
+      times.push({ id: `evr-${e.id}-morn`, at: morn.getTime(), title: `Today: ${e.title}`, body: `See you there${e.time ? ` · ${e.time}` : ''}${e.place ? ` · ${e.place}` : ''}.`, target: e.id });
+    }
+    scheduleEventReminders(times);
+  }, [key]);
+  return null;
+}
 
 // ───────────────────────── Home ─────────────────────────
 // One thing per section, lots of room: who you are, what's next, your challenge,
@@ -192,6 +215,11 @@ export function EventDetails({ e }: { e: EventItem }) {
         <View style={{ marginTop: 10 }}>
           <Button kind="ghost" icon="calendar" label="Add to Apple Calendar" onPress={() => open(calendarUrl(e))} />
         </View>
+        {e.place ? (
+          <View style={{ marginTop: 10 }}>
+            <Button kind="ghost" icon="pin" label="Get directions" onPress={() => open('https://maps.apple.com/?q=' + encodeURIComponent(e.place!))} />
+          </View>
+        ) : null}
       </View>
     </>
   );
@@ -248,7 +276,7 @@ function InAppSignup({ e }: { e: EventItem }) {
         </View>
         {names.length ? <Text style={st.goingNames} numberOfLines={2}>{names.slice(0, 4).join(', ')}{names.length > 4 ? ` and ${names.length - 4} more` : ''}</Text> : null}
         <Text style={st.rsvpNote}>
-          {!e.showGoing ? (mine ? 'Rabbi Zevy has you on the list.' : 'Tap Going and Rabbi Zevy saves you a spot.') : mine ? `Rabbi Zevy has you on the list.${others > 0 ? ` You and ${others} other${others === 1 ? '' : 's'} are going.` : ''}` : count > 0 ? `${count} from Great Neck ${count === 1 ? 'is' : 'are'} going so far.` : 'Be the first to RSVP.'}
+          {!e.showGoing ? (mine ? 'Rabbi Zevy has you on the list. We’ll remind you before it starts.' : 'Tap Going and Rabbi Zevy saves you a spot.') : mine ? `Rabbi Zevy has you on the list. We’ll remind you before it starts.${others > 0 ? ` You and ${others} other${others === 1 ? '' : 's'} are going.` : ''}` : count > 0 ? `${count} from Great Neck ${count === 1 ? 'is' : 'are'} going so far.` : 'Be the first to RSVP.'}
         </Text>
       </View>
       {err ? <Text style={st.err} accessibilityLiveRegion="polite">{err}</Text> : null}

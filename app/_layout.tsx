@@ -11,6 +11,7 @@ import { Intro } from '../src/intro';
 import { StartupPopup } from '../src/popup';
 import { Tour } from '../src/tour';
 import { InviteReminderSync } from '../src/invites';
+import { EventReminderSync } from '../src/screens';
 import { Composer } from '../src/composer';
 import { WrapReminderSync } from '../src/wrapReminders';
 import { useOtaUpdates } from '../src/shell';
@@ -61,6 +62,7 @@ function Root() {
       <Composer />
       <WrapReminderSync />
       <InviteReminderSync />
+      <EventReminderSync />
       {introDone ? <Setup /> : null}
       <Intro onDone={() => setIntroDone(true)} />
       <StartupPopup ready={introDone} />

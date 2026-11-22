@@ -128,6 +128,8 @@ preview misses. `dist/` is ignored by git.
 | `app/settings.tsx`, `src/prefs.ts`, `src/prefs.native.ts` | Settings (appearance, haptics, motion, intro); device prefs read synchronously at startup |
 | `src/intro.tsx` | Opening animation |
 | `src/screens.tsx` | Home, Events, Feed and Chapter tabs, event sheet |
+| `src/calendar.tsx` | Calendar tab: live month grid of chapter events |
+| `docs/` | App Store listing copy and the publish checklist |
 | `src/rewards.tsx` | Challenge cards; challenge page: sign up, streak, daily photo wall with comments |
 | `src/admin.tsx` | Leader panel: Simple mode (six plain tasks for the rabbi) and Expert mode (everything) |
 | `src/store.tsx` | All data: server calls, saved state on the phone, date helpers |

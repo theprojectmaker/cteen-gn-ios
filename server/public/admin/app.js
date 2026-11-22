@@ -138,9 +138,17 @@ VIEWS.overview = async (main) => {
   const t = today();
   const upcoming = content.events.filter((e) => e.end >= t).sort((a, b) => a.start.localeCompare(b.start));
   const week = people.people.filter((p) => p.created && Date.now() - new Date(p.created) < 7 * 864e5).length;
-  main.innerHTML = head('Overview', new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
-    `<button class="btn sec" data-go="broadcast">Send a notification</button><button class="btn" data-go="posts" data-new="1">New post</button>`) +
-    `<div class="grid g4">
+  const acts = [
+    ['post', 'New post', 'Share to the Feed'],
+    ['event', 'New event', 'With sign-ups'],
+    ['invite', 'Invitation', 'A personal invite'],
+    ['broadcast', 'Notify everyone', 'Push, banner or pop-up'],
+    ['photos', 'Tefillin photos', 'See today’s check-ins'],
+    ['minyan', 'Minyan times', 'Edit the schedule'],
+  ];
+  main.innerHTML = head('Overview', new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })) +
+    `<div class="quick">${acts.map(([k, t, s]) => `<button class="qa" data-do="${k}"><b>${esc(t)}</b><span>${esc(s)}</span></button>`).join('')}</div>
+    <div class="grid g4" style="margin-top:16px">
       <div class="card stat"><div class="n">${people.people.length}</div><div class="l">Teens signed up${week ? ` · ${week} this week` : ''}</div></div>
       <div class="card stat"><div class="n">${signups.phones || 0}</div><div class="l">Phones with notifications</div></div>
       <div class="card stat"><div class="n">${upcoming.length}</div><div class="l">Upcoming events</div></div>
@@ -153,6 +161,12 @@ VIEWS.overview = async (main) => {
         <div class="list" style="margin-top:12px">${(bc.items || []).slice(0, 6).map((b) => `<div class="item"><div style="flex:1"><b>${esc(b.title)}</b><div class="small muted">${esc((b.body || '').slice(0, 110))}</div></div><span class="small faint">${esc(fmtAt(b.at))}</span></div>`).join('') || '<div class="empty">Nothing sent yet.</div>'}</div></div>
     </div>`;
   main.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => { show(b.dataset.go).then(() => { if (b.dataset.new) editPost(null); }); }));
+  main.querySelectorAll('[data-do]').forEach((b) => b.addEventListener('click', async () => {
+    const k = b.dataset.do;
+    const target = k === 'post' ? 'posts' : k === 'event' ? 'events' : k === 'invite' ? 'invites' : k;
+    await show(target);
+    if (k === 'post') editPost(null); else if (k === 'event') editEvent(null); else if (k === 'invite') newInvite();
+  }));
 };
 
 // ═════ Feed posts ═════
