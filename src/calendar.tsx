@@ -115,8 +115,8 @@ export function CalendarScreen() {
 
       <Animated.View style={[st.grid, { opacity: slide.interpolate({ inputRange: [-36, 0, 36], outputRange: [0.3, 1, 0.3] }), transform: [{ translateX: slide }] }]} onLayout={(e) => setGridW(e.nativeEvent.layout.width)}>
         {cellW ? (
-          <Animated.View pointerEvents="none" style={[st.lensWrap, { width: cellW, height: CELL_H, transform: [{ translateX: lensX }, { translateY: lensY }, { scale: lensIn.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }], opacity: lensIn }]}>
-            <Glass style={st.lens}><View style={st.lensShine} /></Glass>
+          <Animated.View pointerEvents="none" style={[st.lensWrap, { width: cellW, height: CELL_H, transform: [{ translateX: lensX }, { translateY: lensY }, { scale: lensIn.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }) }], opacity: lensIn }]}>
+            <View style={st.lensCircle} />
           </Animated.View>
         ) : null}
         {cells.map((day, i) => {
@@ -128,7 +128,7 @@ export function CalendarScreen() {
           return (
             <Pressable key={i} onPress={() => { tap(); setSelected(key); }} style={st.cell} accessibilityRole="button" accessibilityLabel={`${MONTHS[cursor.m]} ${day}${evs ? `, ${evs.length} event${evs.length > 1 ? 's' : ''}` : ''}`}>
               <View style={[st.dayNumWrap, isToday && !isSel && st.todayRing]}>
-                <Text style={[st.dayNum, isSel && { color: C.blueDeep, fontWeight: '800' }, isToday && !isSel && { color: C.blue, fontWeight: '800' }]}>{day}</Text>
+                <Text style={[st.dayNum, isSel && { color: C.white, fontWeight: '800' }, isToday && !isSel && { color: C.blue, fontWeight: '800' }]}>{day}</Text>
               </View>
               <View style={st.dots}>
                 {(evs || []).slice(0, 3).map((e, n) => <View key={n} style={[st.dot, { backgroundColor: (HUES[e.color] ?? HUES.blue).solid }]} />)}
@@ -183,9 +183,8 @@ const st = StyleSheet.create({
   dayNum: { fontSize: 16, fontWeight: '600', color: C.ink },
   dots: { flexDirection: 'row', gap: 3, height: 5 },
   dot: { width: 5, height: 5, borderRadius: 3 },
-  lensWrap: { position: 'absolute', left: 0, top: 0, alignItems: 'center', justifyContent: 'center', paddingVertical: 5 },
-  lens: { flex: 1, alignSelf: 'stretch', marginHorizontal: 8, borderRadius: 16, overflow: 'hidden', backgroundColor: C.bluePale },
-  lensShine: { position: 'absolute', left: 6, right: 6, top: 3, height: '40%', borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.45)' },
+  lensWrap: { position: 'absolute', left: 0, top: 0, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 5 },
+  lensCircle: { width: 32, height: 32, borderRadius: 16, backgroundColor: C.blue, shadowColor: C.blue, shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } },
   dayHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginTop: 22, marginBottom: 12 },
   dayHeadText: { fontSize: 18, fontFamily: F.display, color: C.ink, letterSpacing: -0.3, flex: 1 },
   dayCount: { fontSize: 13, fontWeight: '800', color: C.blue },

@@ -12,6 +12,8 @@ Remove your line when it ships.
 
 ## Log
 
+- 2026-11-21 · Solomon · Calendar day picker is now a clean solid cyan circle (Apple-style) that springs between days, not the frosted glass bubble. Selected day number turns white; today keeps a cyan ring when not selected.
+
 - 2026-11-21 · Solomon · New Calendar tab (5th tab, between Events and Feed): a live month grid of all chapter events (src/calendar.tsx). Days with events show colored dots (multi-day events fill their span); tapping a day springs a Liquid Glass lens onto it and lists that day's events (tap to open). Glass month bar with prev/next and jump-to-today; months slide and fade on change. Reads content.events, so whatever the rabbi posts from the leader panel or dashboard shows instantly. Wired into native tabs (SF calendar icon) and the web glass tab bar.
 
 - 2026-11-18 · Solomon · Home carousel now features the 3 soonest upcoming events in date order (dropped the rule that forced a Great Neck event to the front).
