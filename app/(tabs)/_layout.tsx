@@ -23,6 +23,10 @@ export default function TabsLayout() {
         <NativeTabs.Trigger.Label>Events</NativeTabs.Trigger.Label>
         {newEvents > 0 ? <NativeTabs.Trigger.Badge>{String(newEvents)}</NativeTabs.Trigger.Badge> : null}
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="calendar">
+        <NativeTabs.Trigger.Icon sf={{ default: 'calendar', selected: 'calendar' }} />
+        <NativeTabs.Trigger.Label>Calendar</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="feed">
         <NativeTabs.Trigger.Icon sf={{ default: 'bubble.left.and.bubble.right', selected: 'bubble.left.and.bubble.right.fill' }} />
         <NativeTabs.Trigger.Label>Feed</NativeTabs.Trigger.Label>

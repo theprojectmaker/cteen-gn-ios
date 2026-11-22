@@ -12,6 +12,7 @@ import { useStore } from './store';
 const ITEMS: Record<string, { label: string; icon: string }> = {
   index: { label: 'Home', icon: 'home' },
   events: { label: 'Events', icon: 'ticket' },
+  calendar: { label: 'Calendar', icon: 'calendar' },
   feed: { label: 'Feed', icon: 'chat' },
   chapter: { label: 'Chapter', icon: 'users' },
 };
@@ -112,6 +113,7 @@ export function WebTabs() {
     <Tabs screenOptions={{ headerShown: false, animation: 'fade' }} tabBar={(p) => <GlassBar {...(p as unknown as BarProps)} />}>
       <Tabs.Screen name="index" />
       <Tabs.Screen name="events" />
+      <Tabs.Screen name="calendar" />
       <Tabs.Screen name="feed" />
       <Tabs.Screen name="chapter" />
     </Tabs>
