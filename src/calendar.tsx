@@ -119,23 +119,28 @@ export function CalendarScreen() {
             <View style={st.lensCircle} />
           </Animated.View>
         ) : null}
-        {cells.map((day, i) => {
-          if (!day) return <View key={i} style={st.cell} />;
-          const key = ymd(cursor.y, cursor.m, day);
-          const evs = byDay[key];
-          const isToday = key === today;
-          const isSel = key === selected;
-          return (
-            <Pressable key={i} onPress={() => { tap(); setSelected(key); }} style={st.cell} accessibilityRole="button" accessibilityLabel={`${MONTHS[cursor.m]} ${day}${evs ? `, ${evs.length} event${evs.length > 1 ? 's' : ''}` : ''}`}>
-              <View style={[st.dayNumWrap, isToday && !isSel && st.todayRing]}>
-                <Text style={[st.dayNum, isSel && { color: C.white, fontWeight: '800' }, isToday && !isSel && { color: C.blue, fontWeight: '800' }]}>{day}</Text>
-              </View>
-              <View style={st.dots}>
-                {(evs || []).slice(0, 3).map((e, n) => <View key={n} style={[st.dot, { backgroundColor: (HUES[e.color] ?? HUES.blue).solid }]} />)}
-              </View>
-            </Pressable>
-          );
-        })}
+        {[0, 1, 2, 3, 4, 5].map((r) => (
+          <View key={r} style={st.week}>
+            {cells.slice(r * 7, r * 7 + 7).map((day, c) => {
+              const i = r * 7 + c;
+              if (!day) return <View key={i} style={st.cell} />;
+              const key = ymd(cursor.y, cursor.m, day);
+              const evs = byDay[key];
+              const isToday = key === today;
+              const isSel = key === selected;
+              return (
+                <Pressable key={i} onPress={() => { tap(); setSelected(key); }} style={st.cell} accessibilityRole="button" accessibilityLabel={`${MONTHS[cursor.m]} ${day}${evs ? `, ${evs.length} event${evs.length > 1 ? 's' : ''}` : ''}`}>
+                  <View style={[st.dayNumWrap, isToday && !isSel && st.todayRing]}>
+                    <Text style={[st.dayNum, isSel && { color: C.white, fontWeight: '800' }, isToday && !isSel && { color: C.blue, fontWeight: '800' }]}>{day}</Text>
+                  </View>
+                  <View style={st.dots}>
+                    {(evs || []).slice(0, 3).map((e, n) => <View key={n} style={[st.dot, { backgroundColor: (HUES[e.color] ?? HUES.blue).solid }]} />)}
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        ))}
       </Animated.View>
 
       <View style={st.dayHead}>
@@ -174,10 +179,11 @@ const st = StyleSheet.create({
   monthLabelWrap: { flex: 1, alignItems: 'center' },
   monthLabel: { fontSize: 18, fontFamily: F.display, color: C.ink, letterSpacing: -0.4 },
   todayHint: { fontSize: 11, fontWeight: '800', color: C.blue, letterSpacing: 0.4, textTransform: 'uppercase', marginTop: 1 },
-  weekRow: { flexDirection: 'row', paddingHorizontal: 2, marginBottom: 4 },
+  weekRow: { flexDirection: 'row', marginBottom: 4 },
   weekLabel: { flex: 1, textAlign: 'center', fontSize: 12, fontWeight: '800', color: C.faint },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', position: 'relative' },
-  cell: { width: `${100 / 7}%`, height: CELL_H, alignItems: 'center', justifyContent: 'center', gap: 3 },
+  grid: { position: 'relative' },
+  week: { flexDirection: 'row' },
+  cell: { flex: 1, height: CELL_H, alignItems: 'center', justifyContent: 'center', gap: 3 },
   dayNumWrap: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   todayRing: { borderWidth: 2, borderColor: C.blue },
   dayNum: { fontSize: 16, fontWeight: '600', color: C.ink },
