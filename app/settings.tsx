@@ -95,7 +95,7 @@ export default function SettingsRoute() {
           <Row icon="user" color="green" title="Edit profile" sub="Name, grade, age, sign-in" onPress={() => router.push('/account')} chevron />
           {appleReady && !account?.apple ? <Row icon="lock" color="blue" title="Link Apple account" sub="Keep your streak and RSVPs on a new phone" onPress={async () => { const e = await signInWithApple(); if (e) setAppleErr(e); }} chevron rule /> : null}
           {appleErr ? <Text style={{ color: '#C0303F', fontSize: 13, paddingHorizontal: 16, paddingBottom: 12 }}>{appleErr}</Text> : null}
-          <Row icon="lock" color="orange" title={leader ? 'Leader panel' : 'Leader sign-in'} sub="For Rabbi Zevy and chapter leaders" onPress={() => setAdminOpen(true)} chevron rule />
+          {leader ? <Row icon="lock" color="orange" title="Leader panel" sub="Post, run challenges, send notifications" onPress={() => setAdminOpen(true)} chevron rule /> : null}
         </Card>
 
         {account ? (

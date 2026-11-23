@@ -292,7 +292,8 @@ function sanitize(doc, alert) {
       time: clean(e.time, 40), place: clean(e.place, 120), price: clean(e.price, 40), who: clean(e.who, 300), about: clean(e.about, 1200),
       signup: e.signup === 'link' ? 'link' : 'app', url: urlOk(e.url) ? e.url : '', payUrl: urlOk(e.payUrl) ? e.payUrl : '',
       gender: ['boys', 'girls'].includes(e.gender) ? e.gender : 'all', minAge: ageOk(e.minAge), maxAge: ageOk(e.maxAge),
-      poster: typeof e.poster === 'string' && /^https:\/\/\S{4,400}$/.test(e.poster) ? e.poster : '', showGoing: !!e.showGoing,
+      poster: typeof e.poster === 'string' && /^https:\/\/\S{4,400}$/.test(e.poster) ? e.poster : '',
+      cover: typeof e.cover === 'string' && /^https:\/\/\S{4,400}$/.test(e.cover) ? e.cover : '', showGoing: !!e.showGoing,
     })),
     challenges: list(doc.challenges, 20).filter((c) => idOk(c.id)).map((c) => ({
       id: c.id, title: clean(c.title, 60), icon: clean(c.icon, 20), color: color(c.color), every: c.every === 'week' ? 'week' : 'day',
@@ -332,7 +333,7 @@ function sanitize(doc, alert) {
 async function pushPhotoAlert(env, title, body, data, exceptDevice) {
   const all = (await env.CTEEN.get('push', 'json')) || {};
   const off = (await env.CTEEN.get('pushoff:photos', 'json')) || {};
-  const tokens = Object.entries(all).filter(([d]) => d !== exceptDevice && !off[d]).map(([, tok]) => tok);
+  const tokens = [...new Set(Object.entries(all).filter(([d]) => d !== exceptDevice && !off[d]).map(([, tok]) => tok))];
   for (let i = 0; i < tokens.length; i += 100) {
     const batch = tokens.slice(i, i + 100).map((to) => ({ to, title, body, sound: 'default', data: data || {} }));
     await fetch('https://exp.host/--/api/v2/push/send', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(batch) }).catch(() => null);
@@ -343,7 +344,7 @@ async function pushPhotoAlert(env, title, body, data, exceptDevice) {
 async function pushLeaders(env, title, body, data, exceptDevice) {
   const all = (await env.CTEEN.get('push', 'json')) || {};
   const leaders = (await env.CTEEN.get('pushadmins', 'json')) || {};
-  const tokens = Object.keys(leaders).filter((d) => d !== exceptDevice && all[d]).map((d) => all[d]);
+  const tokens = [...new Set(Object.keys(leaders).filter((d) => d !== exceptDevice && all[d]).map((d) => all[d]))];
   if (!tokens.length) return;
   await fetch('https://exp.host/--/api/v2/push/send', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(tokens.map((to) => ({ to, title, body, sound: 'default', data: data || {} }))) }).catch(() => null);
 }
@@ -356,7 +357,7 @@ async function logBroadcast(env, kind, title, text, target) {
 }
 
 async function pushAll(env, title, body, data, image) {
-  const tokens = Object.values((await env.CTEEN.get('push', 'json')) || {});
+  const tokens = [...new Set(Object.values((await env.CTEEN.get('push', 'json')) || {}))]; // dedupe: one phone can hold the same token under two device keys
   let sent = 0;
   for (let i = 0; i < tokens.length; i += 100) {
     const batch = tokens.slice(i, i + 100).map((to) => ({ to, title, body, sound: 'default', data: { ...(data || {}), image: image || undefined }, ...(image ? { richContent: { image }, mutableContent: true } : {}) }));

@@ -89,6 +89,7 @@ export function EventForm({ onDone, initial }: { onDone: (msg: string) => void; 
   const [showGoing, setShowGoing] = useState(false);
   const [alsoPost, setAlsoPost] = useState(!!initial?.post);
   const [poster, setPoster] = useState<Snap[]>([]);
+  const [cover, setCover] = useState<Snap[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const extraDay = !dayOpts.some((d) => d.v === day);
@@ -97,11 +98,13 @@ export function EventForm({ onDone, initial }: { onDone: (msg: string) => void; 
     setBusy(true); setErr(null);
     const urls = await publishPhotos(poster, uploadPhoto);
     if (typeof urls === 'string') { setBusy(false); return setErr(urls); }
+    const coverUrls = await publishPhotos(cover, uploadPhoto);
+    if (typeof coverUrls === 'string') { setBusy(false); return setErr(coverUrls); }
     const ev: EventItem = {
       id: 'e-' + Date.now().toString(36), title: title.trim(), icon: 'star', color: 'blue', scope: 'gn', start: day, end: day,
       time: time.trim(), place: place.trim(), price: price.trim(), who: initial?.who ?? '', about: about.trim(),
       signup: rsvp ? 'app' : 'link', url: '', payUrl: '', gender: who === 'Boys' ? 'boys' : who === 'Girls' ? 'girls' : 'all', minAge: null, maxAge: null,
-      poster: urls[0] || '', showGoing,
+      cover: coverUrls[0] || '', poster: urls[0] || '', showGoing,
     };
     const posts = alsoPost ? [{ id: 'p-' + Date.now().toString(36), kind: 'Events' as const, pinned: false, title: initial?.post?.title || title.trim(), body: initial?.post?.body || about.trim(), eventId: ev.id, challengeId: '', photos: urls, linkLabel: '', linkUrl: '', at: new Date().toISOString() }, ...content.posts] : content.posts;
     const e = await saveContent({ ...content, events: [...content.events, ev], posts });
@@ -136,6 +139,9 @@ export function EventForm({ onDone, initial }: { onDone: (msg: string) => void; 
       <Chips options={['Everyone', 'Boys', 'Girls'] as const} value={who} onChange={setWho} />
       <Field label="Details" value={about} onChange={setAbout} multiline placeholder="What's happening, what to bring" />
       <Field label="Price (optional)" value={price} onChange={setPrice} placeholder="Like: Free, or $20" />
+      <Text style={[u.fieldLabel, { marginTop: 14 }]}>Cover photo (shows on Home and the Events page)</Text>
+      <PhotoPicker photos={cover} onChange={(p) => setCover(p.slice(-1))} />
+      <Text style={[u.fieldLabel, { marginTop: 14 }]}>Poster (flyer for the pop-up, optional)</Text>
       <PhotoPicker photos={poster} onChange={(p) => setPoster(p.slice(-1))} />
       <Switch title="RSVP in the app" sub="Teens tap Going, you see the list" value={rsvp} onChange={setRsvp} />
       <Switch title="Show who's going" sub="Off: teens only see their own RSVP. On: they see first names and how many." value={showGoing} onChange={setShowGoing} />

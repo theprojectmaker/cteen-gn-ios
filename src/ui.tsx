@@ -80,8 +80,9 @@ export function ScopeBadge({ scope, style }: { scope: 'gn' | 'intl'; style?: Vie
 }
 
 // Event artwork: a bundled photo when there is one, otherwise a color block with a large icon.
-export function Cover({ e, style, iconSize = 56 }: { e: { id?: string; image?: string; poster?: string; icon: string; color: ColorKey }; style?: ViewStyle; iconSize?: number }) {
-  const img = e.poster ? { uri: e.poster } : e.image ? IMAGES[e.image] : undefined;
+export function Cover({ e, style, iconSize = 56 }: { e: { id?: string; image?: string; poster?: string; cover?: string; icon: string; color: ColorKey }; style?: ViewStyle; iconSize?: number }) {
+  // A wide cover photo wins for cards and the home hero; the portrait poster/flyer is the fallback.
+  const img = e.cover ? { uri: e.cover } : e.poster ? { uri: e.poster } : e.image ? IMAGES[e.image] : undefined;
   const hue = HUES[e.color] ?? HUES.blue;
   return (
     <View style={[{ backgroundColor: hue.solid, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, style]}>

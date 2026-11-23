@@ -161,7 +161,6 @@ export function AdminPanel() {
   const insets = useSafeAreaInsets();
   const store = useStore();
   const { adminOpen, setAdminOpen, leader, content, saveContent } = store;
-  const [code, setCode] = useState('');
   const [section, setSection] = useState<Section>('Posts');
   const [editing, setEditing] = useState<{ id: string | null; draft: Draft } | null>(null);
   const [live, setLive] = useState<Draft>({ title: '', text: '', target: '', hours: 'Today', push: true });
@@ -189,23 +188,16 @@ export function AdminPanel() {
     setNote(err ?? done);
     return !err;
   };
-  const login = async () => {
-    setBusy(true); setNote(null);
-    const err = await store.leaderLogin(code.trim());
-    setBusy(false); setCode(''); setNote(err);
-  };
 
   let body: React.ReactNode;
   if (!leader) {
+    // The leader panel is only for accounts Rabbi Zevy marked as leaders (from the dashboard).
+    // There is no passcode here anymore; the rabbi runs the website with the passcode.
     body = (
       <Card>
         <IconTile icon="lock" size={48} />
-        <Text style={[T.h2, { marginTop: 12 }]}>Leader sign-in</Text>
-        <Text style={[T.small, { marginTop: 4 }]}>For Rabbi Zevy and chapter leaders. Enter the leader passcode to post, run challenges and send notifications.</Text>
-        <Field label="Passcode" value={code} onChange={setCode} secure />
-        <View style={{ marginTop: 16 }}>
-          <Button label={busy ? 'Checking…' : 'Sign in'} disabled={busy || code.trim().length < 4} onPress={login} />
-        </View>
+        <Text style={[T.h2, { marginTop: 12 }]}>Leaders only</Text>
+        <Text style={[T.small, { marginTop: 4 }]}>This is for Rabbi Zevy and the chapter leaders. If you should have it, ask Rabbi Zevy to add you as a leader — then it shows up here on its own.</Text>
       </Card>
     );
   } else if (section === 'Live banner') {

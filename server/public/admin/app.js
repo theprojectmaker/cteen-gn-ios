@@ -281,17 +281,19 @@ async function editEvent(e, draft) {
     `<div class="grid g2">${field('ePrice', 'Price (optional)', e.price)}${select('eGender', 'Who it is for', [['all', 'Both'], ['boys', 'Boys'], ['girls', 'Girls']], e.gender)}</div>` +
     `<div class="grid g2">${field('eMin', 'Min age (optional)', e.minAge ?? '', 'number', 'min="10" max="25"')}${field('eMax', 'Max age (optional)', e.maxAge ?? '', 'number', 'min="10" max="25"')}</div>` +
     `<div class="grid g2">${select('eSignup', 'Sign-up', [['app', 'In the app'], ['link', 'On a website']], e.signup)}${field('eUrl', 'Website link', e.url, 'text', 'placeholder="https://"')}</div>` +
-    photoField('ePoster', 'Poster', e.poster) +
+    photoField('eCover', 'Cover photo (wide — shows on Home and the Events page)', e.cover) +
+    photoField('ePoster', 'Poster (tall flyer — the event pop-up; optional)', e.poster) +
     check('eShow', 'Let teens see who else is going (first names)', e.showGoing) +
     (isNew ? '<p class="small muted">Saving sends "New event: join now" to every phone.</p>' : ''),
-    { ok: isNew ? 'Create event' : 'Save', danger: isNew ? '' : 'Delete', after: () => wirePhoto('ePoster') },
+    { ok: isNew ? 'Create event' : 'Save', danger: isNew ? '' : 'Delete', after: () => { wirePhoto('eCover'); wirePhoto('ePoster'); } },
     async () => {
       if (val('eTitle').length < 2) throw new Error('Name the event.');
       if (!val('eStart')) throw new Error('Pick a date.');
       const url = val('eUrl'); if (url && !/^https:\/\//.test(url)) throw new Error('The link has to start with https://');
+      const cover = await photoValue('eCover');
       const poster = await photoValue('ePoster');
       const num = (v) => (v === '' ? null : Number(v));
-      const next = { ...e, title: val('eTitle'), start: val('eStart'), end: val('eEnd') && val('eEnd') >= val('eStart') ? val('eEnd') : val('eStart'), time: val('eTime'), place: val('ePlace'), about: val('eAbout'), price: val('ePrice'), gender: val('eGender'), minAge: num(val('eMin')), maxAge: num(val('eMax')), signup: val('eSignup'), url, poster, showGoing: val('eShow') };
+      const next = { ...e, title: val('eTitle'), start: val('eStart'), end: val('eEnd') && val('eEnd') >= val('eStart') ? val('eEnd') : val('eStart'), time: val('eTime'), place: val('ePlace'), about: val('eAbout'), price: val('ePrice'), gender: val('eGender'), minAge: num(val('eMin')), maxAge: num(val('eMax')), signup: val('eSignup'), url, cover, poster, showGoing: val('eShow') };
       await saveContent({ ...content, events: isNew ? [...content.events, next] : content.events.map((x) => (x.id === e.id ? next : x)) }, isNew ? 'Event created. Everyone gets a notification.' : 'Saved.');
     },
     async () => { if (!confirm('Delete this event? Its sign-up list goes away from the app.')) throw new Error('Not deleted.'); await saveContent({ ...content, events: content.events.filter((x) => x.id !== e.id) }, 'Deleted.'); });
