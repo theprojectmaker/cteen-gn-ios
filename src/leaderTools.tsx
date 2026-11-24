@@ -91,7 +91,7 @@ export function MinyanEditor({ onDone }: { onDone: (msg: string) => void }) {
   const [err, setErr] = useState<string | null>(null);
   const save = async () => {
     setBusy(true); setErr(null);
-    const e = await saveContent({ ...content, minyan: { weekday: fromText(weekday), shabbat: fromText(shabbat), note: note.trim() } });
+    const e = await saveContent({ ...content, minyan: { ...content.minyan, weekday: fromText(weekday), shabbat: fromText(shabbat), note: note.trim() } });
     setBusy(false);
     if (e) return setErr(e);
     onDone('Minyan times saved. They show in the Chapter tab.');

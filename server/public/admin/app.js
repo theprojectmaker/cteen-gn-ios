@@ -508,22 +508,42 @@ async function editInfo(i) {
 // ═════ Minyan ═════
 VIEWS.minyan = async (main) => {
   await loadContent();
-  const m = content.minyan || { weekday: [], shabbat: [], note: '' };
-  const rows = (k, list) => list.map((r, i) => `<div class="row" style="margin-top:8px"><input type="text" data-k="${k}" data-f="label" data-i="${i}" value="${esc(r.label)}" style="flex:2"><input type="text" data-k="${k}" data-f="time" data-i="${i}" value="${esc(r.time)}" style="flex:1"><button class="btn sec sm" type="button" data-rm="${k}:${i}">Remove</button></div>`).join('');
+  const m = content.minyan || { weekday: [], shabbat: [], sunday: [], overrides: [], note: '' };
+  m.sunday = m.sunday || []; m.overrides = m.overrides || [];
+  const rows = (k, list) => list.map((r, i) => `<div class="row" style="margin-top:8px"><input type="text" data-k="${k}" data-f="label" data-i="${i}" value="${esc(r.label)}" placeholder="Shacharit" style="flex:2"><input type="text" data-k="${k}" data-f="time" data-i="${i}" value="${esc(r.time)}" placeholder="7:30 AM" style="flex:1"><button class="btn sec sm" type="button" data-rm="${k}:${i}">Remove</button></div>`).join('');
+  const ovRows = (oi, list) => list.map((r, i) => `<div class="row" style="margin-top:6px"><input type="text" data-ov="${oi}" data-f="label" data-i="${i}" value="${esc(r.label)}" placeholder="Shacharit" style="flex:2"><input type="text" data-ov="${oi}" data-f="time" data-i="${i}" value="${esc(r.time)}" placeholder="8:00 AM" style="flex:1"><button class="btn sec sm" type="button" data-ovrm="${oi}:${i}">Remove</button></div>`).join('');
   const draw = () => {
-    main.innerHTML = head('Minyan times', 'Shown on the Chapter tab.', `<button class="btn sec" id="aiM">Read a pasted schedule</button>`) +
-      `<form class="card" id="mForm"><div class="grid g2"><div><h2>Shabbat</h2>${rows('shabbat', m.shabbat)}<button class="btn sec sm" type="button" data-add="shabbat" style="margin-top:10px">Add a time</button></div>
-      <div><h2>Weekdays</h2>${rows('weekday', m.weekday)}<button class="btn sec sm" type="button" data-add="weekday" style="margin-top:10px">Add a time</button></div></div>
-      ${field('mNote', 'Note', m.note, 'area', 'maxlength="300" style="min-height:60px"')}<div class="err" id="mErr"></div><button class="btn" style="margin-top:16px">Save times</button></form>`;
+    main.innerHTML = head('Minyan times', 'Weekly times, plus special one-off dates. Shown on the Chapter tab.', `<button class="btn sec" id="aiM">Read a pasted schedule</button>`) +
+      `<form class="card" id="mForm"><div class="grid g3">
+        <div><h3>Sunday</h3>${rows('sunday', m.sunday)}<button class="btn sec sm" type="button" data-add="sunday" style="margin-top:10px">Add a time</button></div>
+        <div><h3>Weekdays</h3>${rows('weekday', m.weekday)}<button class="btn sec sm" type="button" data-add="weekday" style="margin-top:10px">Add a time</button></div>
+        <div><h3>Shabbat (Saturday)</h3>${rows('shabbat', m.shabbat)}<button class="btn sec sm" type="button" data-add="shabbat" style="margin-top:10px">Add a time</button></div>
+      </div>
+      ${field('mNote', 'Note', m.note, 'area', 'maxlength="300" style="min-height:60px"')}
+      <div class="err" id="mErr"></div><button class="btn" style="margin-top:16px">Save times</button></form>
+      <div class="card" style="margin-top:14px"><div class="spread"><div><h2>Special dates</h2><p class="small muted" style="margin:4px 0 0">For a specific Sunday or Saturday that is different — a holiday or a seasonal time change. Teens see it highlighted that week. The weekly times above are used for every other week.</p></div><button class="btn sec" type="button" id="addOv">Add a date</button></div>
+        <div style="margin-top:12px">${m.overrides.map((o, oi) => `<div class="card" style="border-color:var(--orange);margin-bottom:10px"><div class="grid g2"><label class="f"><span>Date</span><input type="date" data-ovd="${oi}" value="${esc(o.date)}"></label><label class="f"><span>Label (optional)</span><input type="text" data-ovt="${oi}" value="${esc(o.title || '')}" placeholder="Thanksgiving weekend"></label></div>${ovRows(oi, o.rows)}<div class="row" style="margin-top:10px"><button class="btn sec sm" type="button" data-ovadd="${oi}">Add a time</button><button class="btn danger sm" type="button" data-ovdel="${oi}">Delete this date</button></div></div>`).join('') || '<div class="empty">No special dates yet.</div>'}</div></div>`;
     main.querySelectorAll('input[data-k]').forEach((el) => (el.oninput = () => { m[el.dataset.k][el.dataset.i][el.dataset.f] = el.value; }));
     main.querySelectorAll('[data-add]').forEach((b) => (b.onclick = () => { m.note = val('mNote'); m[b.dataset.add].push({ label: '', time: '' }); draw(); }));
     main.querySelectorAll('[data-rm]').forEach((b) => (b.onclick = () => { const [k, i] = b.dataset.rm.split(':'); m.note = val('mNote'); m[k].splice(Number(i), 1); draw(); }));
-    $('#mForm').onsubmit = async (e) => { e.preventDefault(); try { await saveContent({ ...content, minyan: { weekday: m.weekday.filter((r) => r.label), shabbat: m.shabbat.filter((r) => r.label), note: val('mNote') } }, 'Times saved.'); } catch (err) { $('#mErr').textContent = err.message; } };
+    main.querySelectorAll('[data-ovd]').forEach((el) => (el.oninput = () => { m.overrides[el.dataset.ovd].date = el.value; }));
+    main.querySelectorAll('[data-ovt]').forEach((el) => (el.oninput = () => { m.overrides[el.dataset.ovt].title = el.value; }));
+    main.querySelectorAll('input[data-ov]').forEach((el) => (el.oninput = () => { m.overrides[el.dataset.ov].rows[el.dataset.i][el.dataset.f] = el.value; }));
+    if ($('#addOv')) $('#addOv').onclick = () => { m.note = val('mNote'); m.overrides.push({ date: '', title: '', rows: [{ label: '', time: '' }] }); draw(); };
+    main.querySelectorAll('[data-ovadd]').forEach((b) => (b.onclick = () => { m.note = val('mNote'); m.overrides[b.dataset.ovadd].rows.push({ label: '', time: '' }); draw(); }));
+    main.querySelectorAll('[data-ovdel]').forEach((b) => (b.onclick = () => { m.note = val('mNote'); m.overrides.splice(Number(b.dataset.ovdel), 1); draw(); }));
+    main.querySelectorAll('[data-ovrm]').forEach((b) => (b.onclick = () => { const [oi, i] = b.dataset.ovrm.split(':'); m.note = val('mNote'); m.overrides[oi].rows.splice(Number(i), 1); draw(); }));
+    $('#mForm').onsubmit = async (e) => {
+      e.preventDefault();
+      const clean = (list) => list.map((r) => ({ label: (r.label || '').trim(), time: (r.time || '').trim() })).filter((r) => r.label);
+      const overrides = m.overrides.map((o) => ({ date: o.date, title: (o.title || '').trim(), rows: clean(o.rows) })).filter((o) => o.date && o.rows.length);
+      try { await saveContent({ ...content, minyan: { weekday: clean(m.weekday), shabbat: clean(m.shabbat), sunday: clean(m.sunday), overrides, note: val('mNote') } }, 'Times saved.'); } catch (err) { $('#mErr').textContent = err.message; }
+    };
     $('#aiM').onclick = async () => {
       let out = null;
-      const ok = await dialogLoop('Read a schedule', '<p class="muted">Paste the times from the shul email or website. The AI fills them in; check them, then save.</p>' + field('mText', 'Schedule', '', 'area', 'style="min-height:180px"'), { ok: 'Read it' },
+      const ok = await dialogLoop('Read a schedule', '<p class="muted">Paste the times from the shul email or website. The AI fills in the weekly times; check them, then save.</p>' + field('mText', 'Schedule', '', 'area', 'style="min-height:180px"'), { ok: 'Read it' },
         async () => { out = await api('/admin/minyan-from-text', { method: 'POST', body: { text: val('mText') } }); });
-      if (ok && out && out.minyan) { Object.assign(m, out.minyan); draw(); toast('Filled in. Check the times, then save.'); }
+      if (ok && out && out.minyan) { Object.assign(m, out.minyan); m.sunday = m.sunday || []; m.overrides = m.overrides || []; draw(); toast('Filled in. Check the times, then save.'); }
     };
   };
   draw();

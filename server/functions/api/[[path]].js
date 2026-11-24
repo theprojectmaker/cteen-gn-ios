@@ -278,6 +278,8 @@ const MINYAN_DEFAULT = {
     { label: 'Mincha', time: '' },
     { label: 'Maariv', time: '10 min after Shabbat ends' },
   ],
+  sunday: [],
+  overrides: [],
   note: 'A short 5 to 7 minute class follows the morning minyan. Shabbat morning has a junior congregation and Kiddush after services.',
 };
 
@@ -324,6 +326,11 @@ function sanitize(doc, alert) {
     minyan: doc.minyan && typeof doc.minyan === 'object' ? {
       weekday: list(doc.minyan.weekday, 12).map((r) => ({ label: clean(r.label, 50), time: clean(r.time, 40) })).filter((r) => r.label),
       shabbat: list(doc.minyan.shabbat, 12).map((r) => ({ label: clean(r.label, 50), time: clean(r.time, 40) })).filter((r) => r.label),
+      sunday: list(doc.minyan.sunday, 12).map((r) => ({ label: clean(r.label, 50), time: clean(r.time, 40) })).filter((r) => r.label),
+      overrides: list(doc.minyan.overrides, 200)
+        .map((o) => ({ date: dateOk(o && o.date) ? o.date : '', title: clean(o && o.title, 60), rows: list(o && o.rows, 12).map((r) => ({ label: clean(r.label, 50), time: clean(r.time, 40) })).filter((r) => r.label) }))
+        .filter((o) => o.date && o.rows.length)
+        .sort((a, b) => a.date.localeCompare(b.date)),
       note: clean(doc.minyan.note, 300),
     } : MINYAN_DEFAULT,
   };
@@ -430,7 +437,7 @@ async function minyanFromText(env, cur, text) {
     const time = n && typeof n.time === 'string' ? n.time.trim() : '';
     return time && TIME_OK.test(time) ? { label: r.label, time } : r;
   });
-  return { weekday: merge(cur.weekday, out.weekday), shabbat: merge(cur.shabbat, out.shabbat), note: cur.note };
+  return { ...cur, weekday: merge(cur.weekday, out.weekday), shabbat: merge(cur.shabbat, out.shabbat), note: cur.note };
 }
 
 // Short edge cache for GETs every phone makes on every open, so lots of users barely touch storage.

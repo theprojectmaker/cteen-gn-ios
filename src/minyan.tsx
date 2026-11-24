@@ -48,6 +48,10 @@ export function MinyanCard() {
   const teen = m.shabbat.find(isTeen) ?? m.weekday.find(isTeen);
   const teenDay = teen && m.shabbat.includes(teen) ? 'Shabbat morning' : 'Weekdays';
   const t = teen?.time ? minyanTime(teen.time, shab) : null;
+  // Special one-off times the rabbi set for specific upcoming dates (seasonal changes, holidays).
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+  const fmtDate = (d: string) => { try { return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); } catch { return d; } };
+  const specials = (m.overrides ?? []).filter((o) => o.date >= today).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 2);
   return (
     <View>
       {teen ? (
@@ -61,7 +65,21 @@ export function MinyanCard() {
           <Text style={st.teenTime}>{t ? t.time : 'Ask'}</Text>
         </View>
       ) : null}
-      <View style={[st.card, teen && { marginTop: 12 }]}>
+      {specials.map((o) => (
+        <View key={o.date} style={[st.special, teen && { marginTop: 12 }]}>
+          <Text style={st.specialEyebrow}>{(o.title || 'Special times').toUpperCase()} · {fmtDate(o.date)}</Text>
+          {o.rows.map((r, i) => {
+            const rt = r.time ? minyanTime(r.time, shab) : null;
+            return (
+              <View key={r.label + i} style={st.specialRow}>
+                <Text style={st.specialLabel}>{r.label}</Text>
+                <Text style={st.specialTime}>{rt ? rt.time : 'Call for times'}</Text>
+              </View>
+            );
+          })}
+        </View>
+      ))}
+      <View style={[st.card, (teen || specials.length > 0) && { marginTop: 12 }]}>
         {teen && !more ? (
           <Pressable onPress={() => setMore(true)} style={({ pressed }) => [st.moreRow, pressed && { opacity: 0.7 }]} accessibilityRole="button">
             <Text style={st.moreText}>Show the full shul schedule</Text>
@@ -69,7 +87,8 @@ export function MinyanCard() {
           </Pressable>
         ) : (
           <>
-            <Section title="Weekdays" rows={m.weekday.filter((r) => r !== teen)} sh={shab} />
+            {m.sunday && m.sunday.length ? <Section title="Sunday" rows={m.sunday.filter((r) => r !== teen)} sh={shab} /> : null}
+            <Section title="Weekdays" rows={m.weekday.filter((r) => r !== teen)} sh={shab} top={!!(m.sunday && m.sunday.length)} />
             <Section title={shab?.parsha ? `Shabbat · ${shab.parsha}` : 'Shabbat'} rows={m.shabbat.filter((r) => r !== teen)} sh={shab} top />
             {m.note ? <Text style={st.note}>{m.note}</Text> : null}
           </>
@@ -110,6 +129,11 @@ const st = StyleSheet.create({
   teenTitle: { fontSize: 20, fontFamily: F.display, color: '#FFFFFF', marginTop: 2 },
   teenWhere: { fontSize: 13, color: 'rgba(255,255,255,0.85)', marginTop: 1 },
   teenTime: { fontSize: 24, fontFamily: F.display, color: '#FFFFFF' },
+  special: { padding: 16, borderRadius: 22, backgroundColor: C.orangePale, borderWidth: 1, borderColor: C.orange },
+  specialEyebrow: { fontSize: 12, fontWeight: '800', letterSpacing: 0.6, color: C.orangeDeep, marginBottom: 6 },
+  specialRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingVertical: 4 },
+  specialLabel: { fontSize: 15, fontWeight: '700', color: C.ink, flex: 1 },
+  specialTime: { fontSize: 15, fontFamily: F.display, color: C.ink, textAlign: 'right' },
   moreRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   moreText: { fontSize: 15, fontWeight: '800', color: C.blue },
   card: { padding: 16, borderRadius: 22, backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
