@@ -4,7 +4,7 @@ import { C, F, R, T, HUES } from './theme';
 import { Icon } from './icons';
 import { Glass } from './glass';
 import { Cover } from './ui';
-import { countdown, dateLabel, tap, useStore, type EventItem } from './store';
+import { countdown, dateLabel, occurrencesInRange, tap, useStore, type EventItem } from './store';
 
 // A live month calendar of everything the chapter has coming up. The rabbi posts events from the
 // leader panel (or the dashboard); they show here the moment they save. The day picker is a glass
@@ -27,16 +27,15 @@ export function CalendarScreen() {
   const [cursor, setCursor] = useState({ y: t0.y, m: t0.m });
   const [selected, setSelected] = useState<string>(today);
 
-  // Every day in the visible month that has an event (multi-day events fill their whole span).
+  // Every day in the visible month that has an event: multi-day events fill their span, and
+  // weekly events land on each matching date. Computed over a window around the visible month.
   const byDay = useMemo(() => {
     const map: Record<string, EventItem[]> = {};
-    for (const e of events) {
-      const s = parse(e.start), en = parse(e.end || e.start);
-      const d = new Date(s.y, s.m, s.d), end = new Date(en.y, en.m, en.d);
-      for (let i = 0; i < 400 && d <= end; i++) { (map[ymd(d.getFullYear(), d.getMonth(), d.getDate())] ??= []).push(e); d.setDate(d.getDate() + 1); }
-    }
+    const from = ymd(cursor.y, cursor.m - 1, 1);
+    const to = ymd(cursor.y, cursor.m + 2, 0);
+    for (const e of events) for (const d of occurrencesInRange(e, from, to)) (map[d] ??= []).push(e);
     return map;
-  }, [events]);
+  }, [events, cursor.y, cursor.m]);
 
   const firstDow = new Date(cursor.y, cursor.m, 1).getDay();
   const daysInMonth = new Date(cursor.y, cursor.m + 1, 0).getDate();

@@ -20,6 +20,7 @@ export type EventItem = {
   signup: 'app' | 'link'; url?: string; payUrl?: string;
   gender?: 'all' | 'boys' | 'girls'; minAge?: number | null; maxAge?: number | null;
   poster?: string; cover?: string; showGoing?: boolean;
+  repeat?: 'none' | 'weekly'; repeatUntil?: string; priority?: boolean; fullPoster?: boolean;
 };
 export type Challenge = { id: string; title: string; icon: string; color: ColorKey; every: 'day' | 'week'; goal: number; about: string; active: boolean; photo?: boolean; starts?: string; rules?: string[]; image?: string; rewards: { at: number; prize: string }[] };
 export type Post = { id: string; kind: 'News' | 'Events' | 'Photos' | 'Rewards' | 'Food'; pinned?: boolean; title: string; body: string; eventId?: string; challengeId?: string; photos?: string[]; linkLabel?: string; linkUrl?: string; at: string };
@@ -709,8 +710,51 @@ export function countdown(e: EventItem) {
   if (n === 0) return 'Today';
   return daysUntil(e.end) >= 0 ? 'Happening now' : 'Past';
 }
-export function upcoming(events: EventItem[]) {
-  return events.filter((e) => daysUntil(e.end) >= 0).sort((a, b) => a.start.localeCompare(b.start));
+// The next date (YYYY-MM-DD) a weekly event lands on, today or later; '' once the series has ended.
+// Non-repeating events return their own start while they haven't passed.
+export function nextOccurrence(e: EventItem): string {
+  if (e.repeat !== 'weekly') return daysUntil(e.end) >= 0 ? e.start : '';
+  const start = day(e.start);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const cur = new Date(start);
+  if (cur < today) {
+    const weeks = Math.ceil((today.getTime() - cur.getTime()) / (7 * 86400000));
+    cur.setDate(start.getDate() + weeks * 7);
+    if (cur < today) cur.setDate(cur.getDate() + 7);
+  }
+  const until = e.repeatUntil && /^\d{4}-\d{2}-\d{2}$/.test(e.repeatUntil) ? day(e.repeatUntil) : new Date(today.getTime() + 190 * 86400000);
+  return cur <= until ? iso(cur) : '';
+}
+// Every date (YYYY-MM-DD) this event lands on inside [from, to] — one for a single event (its span),
+// weekly dates for a repeating one. Used by the calendar.
+export function occurrencesInRange(e: EventItem, from: string, to: string): string[] {
+  const out: string[] = [];
+  const lo = day(from), hi = day(to);
+  if (e.repeat === 'weekly') {
+    const start = day(e.start);
+    const until = e.repeatUntil && /^\d{4}-\d{2}-\d{2}$/.test(e.repeatUntil) ? day(e.repeatUntil) : hi;
+    const cur = new Date(start);
+    if (cur < lo) { const weeks = Math.floor((lo.getTime() - cur.getTime()) / (7 * 86400000)); cur.setDate(start.getDate() + weeks * 7); }
+    for (let i = 0; i < 60 && cur <= hi; i++) { if (cur >= lo && cur >= start && cur <= until) out.push(iso(cur)); cur.setDate(cur.getDate() + 7); }
+    return out;
+  }
+  const s = day(e.start), en = day(e.end || e.start);
+  const d = new Date(Math.max(s.getTime(), lo.getTime()));
+  const end = new Date(Math.min(en.getTime(), hi.getTime()));
+  for (let i = 0; i < 400 && d <= end; i++) { out.push(iso(d)); d.setDate(d.getDate() + 1); }
+  return out;
+}
+// Upcoming events, soonest first. A weekly event appears as a one-day event on its next date,
+// so its countdown and sort reflect the next time it actually happens.
+export function upcoming(events: EventItem[]): EventItem[] {
+  return events
+    .map((e) => {
+      if (e.repeat === 'weekly') { const d = nextOccurrence(e); return d ? { ...e, start: d, end: d } : null; }
+      return daysUntil(e.end) >= 0 ? e : null;
+    })
+    .filter((e): e is EventItem => !!e)
+    .sort((a, b) => a.start.localeCompare(b.start));
 }
 export function greeting() {
   const h = new Date().getHours();

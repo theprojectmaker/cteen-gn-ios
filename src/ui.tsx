@@ -134,7 +134,9 @@ export function EventCard({ e, width }: { e: EventItem; width?: number }) {
     <View style={{ width }}>
       <Pressable onPress={() => openEvent(e.id)} style={({ pressed }) => pressed && s.pressed} accessibilityRole="button" accessibilityLabel={e.title}>
         <View style={s.evImgWrap}>
-          <Cover e={e} style={s.fill} />
+          {e.fullPoster && e.cover
+            ? <View style={[s.fill, { backgroundColor: '#0B1520' }]}><Image source={{ uri: e.cover }} style={s.fill} resizeMode="contain" /></View>
+            : <Cover e={e} style={s.fill} />}
           <ScopeBadge scope={e.scope} style={s.tagPos} />
           <View style={s.badge}>
             <Text style={s.badgeText}>{countdown(e)}</Text>

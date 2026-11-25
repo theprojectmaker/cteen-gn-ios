@@ -3,7 +3,10 @@ import { router, useFocusEffect } from 'expo-router';
 import { Animated, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { C, R, T, F } from './theme';
 import { Icon } from './icons';
-import { CHAPTER, calendarUrl, challengeFits, countdown, dateLabel, open, sortPosts, tap, upcoming, useShabbat, useStore, type ColorKey, type EventItem, type Post } from './store';
+import { CHAPTER, calendarUrl, challengeFits, countdown, dateLabel, daysUntil, open, sortPosts, tap, upcoming, useShabbat, useStore, type ColorKey, type EventItem, type Post } from './store';
+
+const WKD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const parseDay = (s: string) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
 import { audienceLabel, Button, Card, Chips, Cover, Empty, EventCard, EventMeta, Field, IconTile, ScopeBadge, SectionHead, Sheet, s as u } from './ui';
 import { ChallengeBanner, NameGate } from './rewards';
 import { PostCard, timeAgo } from './feed';
@@ -12,21 +15,26 @@ import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Rect, Stop } fr
 import { MINYAN_FALLBACK, MinyanCard, minyanTime } from './minyan';
 import { greetingNow } from './shell';
 import { scheduleEventReminders } from './push';
+import { nextOccurrence } from './store';
 
-// Schedules a heads-up the evening before and the morning of each event the teen RSVP'd to.
+// Schedules a heads-up the evening before and the morning of: events the teen RSVP'd to, and the
+// next date of every weekly event they can see (so recurring events remind everyone to come).
 export function EventReminderSync() {
-  const { going, content, push, name } = useStore();
+  const { going, content, push, name, fits } = useStore();
   const todayNY = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
-  const mine = content.events.filter((e) => going.includes(e.id) && e.start >= todayNY);
-  const key = mine.map((e) => e.id + e.start + (e.time || '')).join('|') + push + name;
+  const rsvp = content.events.filter((e) => e.repeat !== 'weekly' && going.includes(e.id) && e.start >= todayNY).map((e) => ({ e, date: e.start }));
+  const weekly = content.events.filter((e) => e.repeat === 'weekly' && fits(e)).map((e) => ({ e, date: nextOccurrence(e) })).filter((x) => !!x.date);
+  const all = [...rsvp, ...weekly];
+  const key = all.map((x) => x.e.id + x.date + (x.e.time || '')).join('|') + push + name;
   useEffect(() => {
     if (push !== 'on') return;
     const first = name.trim().split(' ')[0];
     const times: { id: string; at: number; title: string; body: string; target: string }[] = [];
-    for (const e of mine.slice(0, 20)) {
-      const [y, m, d] = e.start.split('-').map(Number);
+    for (const { e, date } of all.slice(0, 20)) {
+      const [y, m, d] = date.split('-').map(Number);
+      const mine = e.repeat !== 'weekly';
       const eve = new Date(y, m - 1, d - 1, 18, 0, 0);
-      times.push({ id: `evr-${e.id}-eve`, at: eve.getTime(), title: `Tomorrow: ${e.title}`, body: `${first ? first + ", you're" : "You're"} going${e.time ? ` · ${e.time}` : ''}${e.place ? ` · ${e.place}` : ''}.`, target: e.id });
+      times.push({ id: `evr-${e.id}-eve`, at: eve.getTime(), title: `Tomorrow: ${e.title}`, body: `${mine ? (first ? first + ", you're" : "You're") + ' going' : 'Join us'}${e.time ? ` · ${e.time}` : ''}${e.place ? ` · ${e.place}` : ''}.`, target: e.id });
       const morn = new Date(y, m - 1, d, 9, 0, 0);
       times.push({ id: `evr-${e.id}-morn`, at: morn.getTime(), title: `Today: ${e.title}`, body: `See you there${e.time ? ` · ${e.time}` : ''}${e.place ? ` · ${e.place}` : ''}.`, target: e.id });
     }
@@ -41,7 +49,9 @@ export function EventReminderSync() {
 export function Home() {
   const { content, go, openEvent, name, push, turnOnPush, fits, gender, postMeta } = useStore();
   // The 3 soonest upcoming events, in date order (upcoming() already sorts by start date).
-  const coming = upcoming(content.events).filter(fits).slice(0, 3);
+  const up = upcoming(content.events).filter(fits);
+  const coming = up.slice(0, 3);
+  const thisWeek = up.filter((e) => daysUntil(e.start) >= 0 && daysUntil(e.start) <= 6).slice(0, 6);
   const live = content.challenges.filter((c) => c.active && challengeFits(c, gender));
   const posts = sortPosts(content.posts).filter((p) => p.kind !== 'Food');
   const food = [...content.posts].filter((p) => p.kind === 'Food' && Date.now() - new Date(p.at).getTime() < 4 * 864e5).sort((a, b) => b.at.localeCompare(a.at))[0];
@@ -67,6 +77,32 @@ export function Home() {
       ) : null}
 
       {coming.length ? <EventsCarousel events={coming} onOpen={openEvent} /> : null}
+
+      {thisWeek.length ? (
+        <>
+          <Text style={st.homeSection}>This week</Text>
+          <View style={st.weekList}>
+            {thisWeek.map((e, i) => {
+              const d = daysUntil(e.start);
+              const isToday = d === 0;
+              const dt = parseDay(e.start);
+              return (
+                <Pressable key={e.id} onPress={() => openEvent(e.id)} style={({ pressed }) => [st.weekRow, i > 0 && st.weekRule, isToday && st.weekRowToday, pressed && { backgroundColor: C.bg }]} accessibilityRole="button" accessibilityLabel={`${e.title}, ${isToday ? 'today' : countdown(e)}`}>
+                  <View style={[st.weekDay, isToday && { backgroundColor: C.orange }]}>
+                    <Text style={[st.weekDow, isToday && { color: 'rgba(255,255,255,0.9)' }]}>{WKD[dt.getDay()]}</Text>
+                    <Text style={[st.weekNum, isToday && { color: C.white }]}>{dt.getDate()}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={T.h3} numberOfLines={1}>{e.title}</Text>
+                    <Text style={T.small} numberOfLines={1}>{isToday ? 'Today' : d === 1 ? 'Tomorrow' : countdown(e)}{e.time ? ` · ${e.time}` : ''}{e.repeat === 'weekly' ? ' · Weekly' : ''}</Text>
+                  </View>
+                  {isToday ? <View style={st.todayPill}><Text style={st.todayPillText}>Today</Text></View> : <Icon name="right" size={16} color={C.faint} stroke={2.4} />}
+                </Pressable>
+              );
+            })}
+          </View>
+        </>
+      ) : null}
 
       {live.length ? (
         <>
@@ -350,24 +386,35 @@ function EventsCarousel({ events, onOpen }: { events: EventItem[]; onOpen: (id: 
         onScrollBeginDrag={() => { touching.current = true; }}
         onMomentumScrollEnd={(e) => { touching.current = false; if (w) setPage(Math.round(e.nativeEvent.contentOffset.x / w)); }}
         style={st.carousel}>
-        {events.map((ev, i) => (
-          <Pressable key={ev.id} onPress={() => onOpen(ev.id)} style={({ pressed }) => [st.hero, { width: w || 1 }, pressed && { opacity: 0.95 }]} accessibilityRole="button" accessibilityLabel={ev.title}>
-            <Cover e={ev} style={StyleSheet.absoluteFill} iconSize={150} />
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: ev.image ? 'rgba(13,60,110,0.42)' : 'rgba(19,32,44,0.18)' }]} />
-            <View style={st.heroTopRow}>
-              <View style={st.upNext}><Text style={st.upNextText}>{i === 0 ? 'Up next' : 'Coming up'}</Text></View>
-              <ScopeBadge scope={ev.scope} />
-            </View>
-            <Text style={st.heroKicker}>{countdown(ev)}</Text>
-            <Text style={st.heroTitle} numberOfLines={2}>{ev.title}</Text>
-            <Text style={st.heroDate}>{dateLabel(ev)}{ev.time ? ` · ${ev.time}` : ''}</Text>
-            {ev.place || ev.price ? <Text style={st.heroWhere} numberOfLines={1}>{[ev.place, ev.price].filter(Boolean).join(' · ')}</Text> : null}
-            <View style={st.heroBtn}>
-              <Text style={st.heroBtnText}>{ev.signup === 'app' ? 'RSVP' : 'View details'}</Text>
-              <Icon name="right" size={15} color={C.night} stroke={2.4} />
-            </View>
-          </Pressable>
-        ))}
+        {events.map((ev, i) => {
+          const poster = !!(ev.fullPoster && ev.cover);
+          if (poster) {
+            // A full poster speaks for itself: show it whole (no crop), no text over it.
+            return (
+              <Pressable key={ev.id} onPress={() => onOpen(ev.id)} style={({ pressed }) => [st.hero, st.heroPoster, { width: w || 1 }, pressed && { opacity: 0.95 }]} accessibilityRole="button" accessibilityLabel={ev.title}>
+                <Image source={{ uri: ev.cover }} style={StyleSheet.absoluteFill} resizeMode="contain" />
+              </Pressable>
+            );
+          }
+          return (
+            <Pressable key={ev.id} onPress={() => onOpen(ev.id)} style={({ pressed }) => [st.hero, { width: w || 1 }, pressed && { opacity: 0.95 }]} accessibilityRole="button" accessibilityLabel={ev.title}>
+              <Cover e={ev} style={StyleSheet.absoluteFill} iconSize={150} />
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: ev.image || ev.cover ? 'rgba(13,60,110,0.42)' : 'rgba(19,32,44,0.18)' }]} />
+              <View style={st.heroTopRow}>
+                <View style={st.upNext}><Text style={st.upNextText}>{i === 0 ? 'Up next' : 'Coming up'}</Text></View>
+                <ScopeBadge scope={ev.scope} />
+              </View>
+              <Text style={st.heroKicker}>{countdown(ev)}</Text>
+              <Text style={st.heroTitle} numberOfLines={2}>{ev.title}</Text>
+              <Text style={st.heroDate}>{dateLabel(ev)}{ev.time ? ` · ${ev.time}` : ''}</Text>
+              {ev.place || ev.price ? <Text style={st.heroWhere} numberOfLines={1}>{[ev.place, ev.price].filter(Boolean).join(' · ')}</Text> : null}
+              <View style={st.heroBtn}>
+                <Text style={st.heroBtnText}>{ev.signup === 'app' ? 'RSVP' : 'View details'}</Text>
+                <Icon name="right" size={15} color={C.night} stroke={2.4} />
+              </View>
+            </Pressable>
+          );
+        })}
       </ScrollView>
       {events.length > 1 ? (
         <View style={st.carDots}>{events.map((_, i) => <View key={i} style={[st.carDot, i === page && st.carDotOn]} />)}</View>
@@ -416,9 +463,11 @@ export function Chapter() {
   const shul = { weekday: m.weekday.filter((r) => r !== teen), shabbat: m.shabbat.filter((r) => r !== teen) };
   const clock = (ms?: number) => (ms ? new Date(ms).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }) : '');
   const next = upcoming(content.events).filter(fits).find((e) => e.scope === 'gn');
-  // days until Shabbat morning (0 on Shabbat)
-  const dow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })).getDay();
-  const toShabbat = (6 - dow + 7) % 7;
+  // days until Shabbat morning (0 on Shabbat). Get the NY weekday by name — parsing a
+  // toLocaleString() back into a Date returns Invalid Date on Hermes/JSC (→ "NaN days").
+  const dowName = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short' }).format(new Date());
+  const dow = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(dowName);
+  const toShabbat = dow < 0 ? 0 : (6 - dow + 7) % 7;
   return (
     <>
       <View style={st.pageHead}>
@@ -717,6 +766,15 @@ const st = StyleSheet.create({
   todayLine: { fontSize: 14, fontWeight: '700', color: C.sub, marginTop: -10, marginBottom: 18 },
   homeSection: { fontSize: 20, fontFamily: F.display, color: C.ink, letterSpacing: -0.3, marginTop: 32, marginBottom: 12 },
   homeHeadRow: { flexDirection: 'row', alignItems: 'center', marginTop: 32, marginBottom: 12 },
+  weekList: { borderRadius: 22, backgroundColor: C.card, borderWidth: 1, borderColor: C.line, overflow: 'hidden' },
+  weekRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 14, paddingVertical: 12 },
+  weekRule: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line },
+  weekRowToday: { backgroundColor: C.orangePale },
+  weekDay: { width: 46, height: 48, borderRadius: 14, backgroundColor: C.bluePale, alignItems: 'center', justifyContent: 'center' },
+  weekDow: { fontSize: 11, fontWeight: '800', letterSpacing: 0.4, color: C.blueDeep, textTransform: 'uppercase' },
+  weekNum: { fontSize: 20, fontFamily: F.display, color: C.ink, marginTop: -1 },
+  todayPill: { backgroundColor: C.orange, borderRadius: R.pill, paddingHorizontal: 10, paddingVertical: 4 },
+  todayPillText: { color: C.white, fontSize: 12, fontWeight: '800' },
   latest: { borderRadius: 22, backgroundColor: C.card, borderWidth: 1, borderColor: C.line, overflow: 'hidden' },
   latestThumb: { width: 52, height: 52, borderRadius: 12, backgroundColor: C.line },
   latestMeta: { fontSize: 12, fontWeight: '600', color: C.faint, marginTop: 4 },
@@ -753,6 +811,7 @@ const st = StyleSheet.create({
   section: { fontSize: 20, fontFamily: F.display, color: C.ink, letterSpacing: -0.2, marginTop: 38, marginBottom: 14 },
   quickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   hero: { marginTop: 0, borderRadius: 28, overflow: 'hidden', minHeight: 280, justifyContent: 'flex-end', padding: 20, backgroundColor: C.blueDeep },
+  heroPoster: { padding: 0, backgroundColor: '#0B1520' },
   heroKicker: { color: 'rgba(255,255,255,0.92)', fontSize: 13, fontWeight: '800' },
   heroTitle: { color: C.white, fontSize: 28, lineHeight: 32, fontFamily: F.display, letterSpacing: -0.4, marginTop: 4 },
   heroDate: { color: C.white, fontSize: 14, fontWeight: '700', marginTop: 6 },

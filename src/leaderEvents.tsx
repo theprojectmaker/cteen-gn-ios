@@ -90,6 +90,8 @@ export function EventForm({ onDone, initial }: { onDone: (msg: string) => void; 
   const [alsoPost, setAlsoPost] = useState(!!initial?.post);
   const [poster, setPoster] = useState<Snap[]>([]);
   const [cover, setCover] = useState<Snap[]>([]);
+  const [repeat, setRepeat] = useState<'Once' | 'Every week'>('Once');
+  const [fullPoster, setFullPoster] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const extraDay = !dayOpts.some((d) => d.v === day);
@@ -105,6 +107,7 @@ export function EventForm({ onDone, initial }: { onDone: (msg: string) => void; 
       time: time.trim(), place: place.trim(), price: price.trim(), who: initial?.who ?? '', about: about.trim(),
       signup: rsvp ? 'app' : 'link', url: '', payUrl: '', gender: who === 'Boys' ? 'boys' : who === 'Girls' ? 'girls' : 'all', minAge: null, maxAge: null,
       cover: coverUrls[0] || '', poster: urls[0] || '', showGoing,
+      repeat: repeat === 'Every week' ? 'weekly' : 'none', repeatUntil: '', fullPoster,
     };
     const posts = alsoPost ? [{ id: 'p-' + Date.now().toString(36), kind: 'Events' as const, pinned: false, title: initial?.post?.title || title.trim(), body: initial?.post?.body || about.trim(), eventId: ev.id, challengeId: '', photos: urls, linkLabel: '', linkUrl: '', at: new Date().toISOString() }, ...content.posts] : content.posts;
     const e = await saveContent({ ...content, events: [...content.events, ev], posts });
@@ -125,6 +128,9 @@ export function EventForm({ onDone, initial }: { onDone: (msg: string) => void; 
           </Pressable>
         ))}
       </ScrollView>
+      <Text style={[u.fieldLabel, { marginTop: 14 }]}>Repeats</Text>
+      <Chips options={['Once', 'Every week'] as const} value={repeat} onChange={setRepeat} />
+      {repeat === 'Every week' ? <Text style={[T.small, { marginTop: 6 }]}>Happens every {new Date(day + 'T12:00:00').toLocaleDateString([], { weekday: 'long' })}. Shows in "This week" on Home and on the Calendar.</Text> : null}
       <Text style={[u.fieldLabel, { marginTop: 14 }]}>Time</Text>
       <View style={u.chipsFlow}>
         {TIMES.map((x) => (
@@ -141,6 +147,7 @@ export function EventForm({ onDone, initial }: { onDone: (msg: string) => void; 
       <Field label="Price (optional)" value={price} onChange={setPrice} placeholder="Like: Free, or $20" />
       <Text style={[u.fieldLabel, { marginTop: 14 }]}>Cover photo (shows on Home and the Events page)</Text>
       <PhotoPicker photos={cover} onChange={(p) => setCover(p.slice(-1))} />
+      {cover.length ? <Switch title="This cover is a full poster" sub="Show the whole poster, fit (not cropped), with no title or date over it." value={fullPoster} onChange={setFullPoster} /> : null}
       <Text style={[u.fieldLabel, { marginTop: 14 }]}>Poster (flyer for the pop-up, optional)</Text>
       <PhotoPicker photos={poster} onChange={(p) => setPoster(p.slice(-1))} />
       <Switch title="RSVP in the app" sub="Teens tap Going, you see the list" value={rsvp} onChange={setRsvp} />

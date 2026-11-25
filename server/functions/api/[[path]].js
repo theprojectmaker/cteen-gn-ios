@@ -296,6 +296,7 @@ function sanitize(doc, alert) {
       gender: ['boys', 'girls'].includes(e.gender) ? e.gender : 'all', minAge: ageOk(e.minAge), maxAge: ageOk(e.maxAge),
       poster: typeof e.poster === 'string' && /^https:\/\/\S{4,400}$/.test(e.poster) ? e.poster : '',
       cover: typeof e.cover === 'string' && /^https:\/\/\S{4,400}$/.test(e.cover) ? e.cover : '', showGoing: !!e.showGoing,
+      repeat: e.repeat === 'weekly' ? 'weekly' : 'none', repeatUntil: dateOk(e.repeatUntil) ? e.repeatUntil : '', priority: !!e.priority, fullPoster: !!e.fullPoster,
     })),
     challenges: list(doc.challenges, 20).filter((c) => idOk(c.id)).map((c) => ({
       id: c.id, title: clean(c.title, 60), icon: clean(c.icon, 20), color: color(c.color), every: c.every === 'week' ? 'week' : 'day',
