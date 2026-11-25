@@ -31,6 +31,7 @@ export function PopupEditor({ onDone }: { onDone: (msg: string) => void }) {
     const [type, id] = target.split(':');
     const changed = !cur || cur.title !== title.trim() || cur.body !== body.trim();
     const popup: Popup = {
+      ...(cur ?? {}),
       on, title: title.trim(), body: body.trim(), button: button.trim(),
       id: changed || !cur?.id ? 'p' + Date.now().toString(36) : cur.id,
       target: type ? { type: type as 'event' | 'challenge' | 'post', id } : null,
@@ -48,13 +49,19 @@ export function PopupEditor({ onDone }: { onDone: (msg: string) => void }) {
         <Text style={[T.h3, { flex: 1 }]}>Show the pop-up</Text>
         <Toggle value={on} onChange={setOn} label="Show the pop-up" />
       </View>
+      {cur?.image ? (
+        <View style={{ marginTop: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <Image source={{ uri: cur.image }} style={{ width: 64, height: 86, borderRadius: 10, backgroundColor: C.line }} resizeMode="cover" />
+          <Text style={[T.small, { flex: 1 }]}>{cur.on ? 'This poster is showing every time the app opens. Turn the switch off and save to stop it.' : 'This poster is saved but not showing.'}</Text>
+        </View>
+      ) : null}
       <Field label="Title" value={title} onChange={setTitle} placeholder="Like: Tefillin Challenge is live" />
       <Field label="Message" value={body} onChange={setBody} placeholder="A sentence or two" multiline />
       <Field label="Button text (optional)" value={button} onChange={setButton} placeholder="Like: Join now" />
       <Text style={[st.label, { marginTop: 14 }]}>The button opens</Text>
       <Chips wrap options={opts.map((o) => o.l)} value={opts.find((o) => o.v === target)?.l ?? 'Nothing'} onChange={(l) => setTarget(opts.find((o) => o.l === l)?.v ?? '')} />
       <View style={{ marginTop: 20 }}>
-        <Button label={busy ? 'Saving…' : 'Save'} disabled={busy || (on && title.trim().length < 2)} onPress={save} />
+        <Button label={busy ? 'Saving…' : on ? 'Save' : 'Save (pop-up off)'} disabled={busy || (on && title.trim().length < 2 && !cur?.image)} onPress={save} />
       </View>
       {err ? <Text style={st.err}>{err}</Text> : null}
     </View>

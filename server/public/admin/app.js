@@ -388,7 +388,7 @@ VIEWS.broadcast = async (main) => {
     const image = await photoValue('puImg');
     const changed = val('puTitle') !== p.title || val('puBody') !== p.body || image !== (p.image || '');
     const popup = { on: val('puOn'), id: changed || !p.id ? newId('pop') : p.id, title: val('puTitle'), body: val('puBody'), more: val('puMore'), button: val('puBtn'), image, target: tgt(val('puTarget')) };
-    if (popup.on && popup.title.length < 2) throw new Error('Add a title.');
+    if (popup.on && popup.title.length < 2 && !popup.image) throw new Error('Add a title or a poster.');
     await saveContent({ ...content, popup }, 'Pop-up saved.'); show('broadcast');
   });
 };

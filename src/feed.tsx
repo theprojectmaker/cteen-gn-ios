@@ -3,7 +3,7 @@ import { Animated, Image, Platform, Pressable, ScrollView, StyleSheet, Text, Tex
 import { router } from 'expo-router';
 import { C, F, T } from './theme';
 import { Icon } from './icons';
-import { CHAPTER, open, sortPosts, tap, useStore, type Post, type PostComment } from './store';
+import { CHAPTER, countdown, daysUntil, open, sortPosts, tap, upcoming, useStore, type Post, type PostComment } from './store';
 import { Button, Cover, Empty, EventMeta, s as u } from './ui';
 
 // The Feed, Instagram style: one clean card per post with big photos, a heart and comments.
@@ -20,9 +20,11 @@ export function timeAgo(iso: string) {
 }
 
 export function Feed() {
-  const { content, leader, setComposerOpen, markFeedSeen } = useStore();
+  const { content, leader, setComposerOpen, markFeedSeen, fits, openEvent } = useStore();
   useEffect(() => { markFeedSeen(); }, []);
   const list = sortPosts(content.posts);
+  // Events in the next 3 days are pinned to the top of the Feed on their own (weekly ones too).
+  const soon = upcoming(content.events).filter(fits).filter((e) => daysUntil(e.start) <= 3).slice(0, 4);
   return (
     <>
       <View style={st.feedHead}>
@@ -36,6 +38,24 @@ export function Feed() {
           </Pressable>
         ) : null}
       </View>
+      {soon.length ? (
+        <View style={st.soonBox}>
+          <Text style={st.soonHead}>Happening soon</Text>
+          {soon.map((e, i) => {
+            const today = daysUntil(e.start) <= 0;
+            return (
+              <Pressable key={e.id} onPress={() => openEvent(e.id)} style={({ pressed }) => [st.soonRow, i > 0 && st.soonRule, pressed && { opacity: 0.7 }]} accessibilityRole="button" accessibilityLabel={e.title}>
+                <View style={[st.soonDot, today && { backgroundColor: C.orange }]} />
+                <View style={{ flex: 1 }}>
+                  <Text style={st.soonTitle} numberOfLines={1}>{e.title}</Text>
+                  <Text style={st.soonSub} numberOfLines={1}>{countdown(e)}{e.time ? ` · ${e.time}` : ''}{e.place ? ` · ${e.place}` : ''}</Text>
+                </View>
+                <Text style={[st.soonGo, today && { color: C.orange }]}>{e.signup === 'app' ? 'RSVP' : 'Details'}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
       <View style={{ gap: 16, marginTop: 18 }}>
         {list.map((p) => <PostCard key={p.id} post={p} />)}
       </View>
@@ -280,6 +300,14 @@ const st = StyleSheet.create({
   mediaShade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '45%', backgroundColor: 'rgba(8,20,32,0.35)' },
   mediaChip: { position: 'absolute', left: 12, right: 12, bottom: 12, padding: 12, borderRadius: 16, backgroundColor: C.card },
   mediaGoing: { color: C.sub, fontSize: 12, fontWeight: '700', marginTop: 3 },
+  soonBox: { marginTop: 16, borderRadius: 20, backgroundColor: C.card, borderWidth: 1, borderColor: C.line, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 6 },
+  soonHead: { fontSize: 12, fontWeight: '800', letterSpacing: 0.7, textTransform: 'uppercase', color: C.sub, marginBottom: 4 },
+  soonRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11 },
+  soonRule: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line },
+  soonDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: C.blue },
+  soonTitle: { fontSize: 15, fontWeight: '800', color: C.ink },
+  soonSub: { fontSize: 13, color: C.sub, marginTop: 1 },
+  soonGo: { fontSize: 13, fontWeight: '800', color: C.blue },
   mediaChipTitle: { fontSize: 16, fontWeight: '800', color: C.ink },
   bigHeart: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   dots: { position: 'absolute', bottom: 12, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 6 },

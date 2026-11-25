@@ -414,7 +414,7 @@ function Home({ onCreate, onManage, onMinyan, onCompose }: { onCreate: (t: Task)
   const { content, sendAlert, saveContent, leader } = useStore();
   const [busy, setBusy] = useState<string | null>(null);
   const alertOn = content.alert?.on && (!content.alert.until || content.alert.until > new Date().toISOString()) ? content.alert : null;
-  const popupOn = content.popup?.on && content.popup.title ? content.popup : null;
+  const popupOn = content.popup?.on && (content.popup.title || content.popup.image) ? content.popup : null;
   const create: { k: Task | 'compose'; icon: string; color: TileColor; title: string }[] = [
     { k: 'compose', icon: 'camera', color: 'blue', title: 'New post' },
     { k: 'event', icon: 'calendar', color: 'orange', title: 'Event' },
@@ -455,7 +455,7 @@ function Home({ onCreate, onManage, onMinyan, onCompose }: { onCreate: (t: Task)
           {popupOn ? (
             <View style={st.liveRow}>
               <View style={[st.liveDot, { backgroundColor: '#7C5CFC' }]} />
-              <Text style={st.liveRowText} numberOfLines={1}>Pop-up: {popupOn.title}</Text>
+              <Text style={st.liveRowText} numberOfLines={1}>Pop-up: {popupOn.title || 'Poster'}</Text>
               <Pressable disabled={busy === 'popup'} onPress={async () => { setBusy('popup'); await saveContent({ ...content, popup: { ...popupOn, on: false } }); setBusy(null); }} hitSlop={8} accessibilityRole="button"><Text style={st.turnOff}>{busy === 'popup' ? '…' : 'Turn off'}</Text></Pressable>
             </View>
           ) : null}

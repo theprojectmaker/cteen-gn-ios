@@ -50,7 +50,7 @@ export function Home() {
   const { content, go, openEvent, name, push, turnOnPush, fits, gender, postMeta } = useStore();
   // The 3 soonest upcoming events, in date order (upcoming() already sorts by start date).
   const up = upcoming(content.events).filter(fits);
-  const coming = up.slice(0, 3);
+  const coming = [...up].sort((a, b) => (b.priority ? 1 : 0) - (a.priority ? 1 : 0)).slice(0, 3); // featured first, then soonest
   const thisWeek = up.filter((e) => daysUntil(e.start) >= 0 && daysUntil(e.start) <= 6).slice(0, 6);
   const live = content.challenges.filter((c) => c.active && challengeFits(c, gender));
   const posts = sortPosts(content.posts).filter((p) => p.kind !== 'Food');
@@ -194,7 +194,8 @@ export function Events() {
   const notForMe = content.challenges.filter((c) => c.active && !challengeFits(c, gender));
   useFocusEffect(useCallback(() => { markEventsSeen(); }, [markEventsSeen]));
   const [f, setF] = useState<(typeof EVENT_FILTERS)[number]>('All');
-  const list = upcoming(content.events).filter(fits).filter((e) => (f === 'All' ? true : f === 'Saved' ? saved.includes(e.id) : f === 'Great Neck' ? e.scope === 'gn' : e.scope === 'intl'));
+  // Featured (priority) events first, then by date.
+  const list = upcoming(content.events).filter(fits).filter((e) => (f === 'All' ? true : f === 'Saved' ? saved.includes(e.id) : f === 'Great Neck' ? e.scope === 'gn' : e.scope === 'intl')).sort((a, b) => (b.priority ? 1 : 0) - (a.priority ? 1 : 0));
   return (
     <>
       <Text style={T.h1}>Events</Text>
@@ -401,7 +402,7 @@ function EventsCarousel({ events, onOpen }: { events: EventItem[]; onOpen: (id: 
               <Cover e={ev} style={StyleSheet.absoluteFill} iconSize={150} />
               <View style={[StyleSheet.absoluteFill, { backgroundColor: ev.image || ev.cover ? 'rgba(13,60,110,0.42)' : 'rgba(19,32,44,0.18)' }]} />
               <View style={st.heroTopRow}>
-                <View style={st.upNext}><Text style={st.upNextText}>{i === 0 ? 'Up next' : 'Coming up'}</Text></View>
+                <View style={st.upNext}><Text style={st.upNextText}>{ev.priority ? 'Featured' : i === 0 ? 'Up next' : 'Coming up'}</Text></View>
                 <ScopeBadge scope={ev.scope} />
               </View>
               <Text style={st.heroKicker}>{countdown(ev)}</Text>

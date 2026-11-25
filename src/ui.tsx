@@ -137,7 +137,7 @@ export function EventCard({ e, width }: { e: EventItem; width?: number }) {
           {e.fullPoster && e.cover
             ? <View style={[s.fill, { backgroundColor: '#0B1520' }]}><Image source={{ uri: e.cover }} style={s.fill} resizeMode="contain" /></View>
             : <Cover e={e} style={s.fill} />}
-          <ScopeBadge scope={e.scope} style={s.tagPos} />
+          {e.priority ? <View style={s.featured}><Icon name="star" size={12} color={C.white} fill={C.white} /><Text style={s.featuredText}>Featured</Text></View> : <ScopeBadge scope={e.scope} style={s.tagPos} />}
           <View style={s.badge}>
             <Text style={s.badgeText}>{countdown(e)}</Text>
           </View>
@@ -234,6 +234,8 @@ export const s = StyleSheet.create({
   badge: { position: 'absolute', left: 10, bottom: 10, backgroundColor: 'rgba(19,32,44,0.78)', borderRadius: R.pill, paddingHorizontal: 11, paddingVertical: 6 },
   badgeText: { color: C.white, fontSize: 12, fontWeight: '800' },
   tagPos: { position: 'absolute', left: 10, top: 10 },
+  featured: { position: 'absolute', left: 10, top: 10, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: C.orange, borderRadius: R.pill, paddingHorizontal: 10, paddingVertical: 5 },
+  featuredText: { color: C.white, fontSize: 12, fontWeight: '800' },
   sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 30, marginBottom: 12 },
   sectionAction: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   link: { color: C.blue, fontWeight: '800', fontSize: 14 },
