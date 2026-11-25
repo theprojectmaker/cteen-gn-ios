@@ -3,7 +3,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { Animated, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { C, R, T, F } from './theme';
 import { Icon } from './icons';
-import { CHAPTER, calendarUrl, challengeFits, countdown, dateLabel, daysUntil, open, sortPosts, tap, upcoming, useShabbat, useStore, type ColorKey, type EventItem, type Post } from './store';
+import { CHAPTER, calendarUrl, challengeFits, countdown, dateLabel, daysUntil, open, repeatLabel, sortPosts, tap, upcoming, useShabbat, useStore, type ColorKey, type EventItem, type Post } from './store';
 
 const WKD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const parseDay = (s: string) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
@@ -238,11 +238,11 @@ export function EventDetails({ e }: { e: EventItem }) {
       </View>
       <View style={{ padding: 18, paddingBottom: 28 }}>
         <Card style={{ padding: 0 }}>
-          <Row icon="calendar" label="When" value={dateLabel(e) + (e.time ? ` · ${e.time}` : '')} first />
+          <Row icon="calendar" label="When" value={(repeatLabel(e) || dateLabel(e)) + (e.time ? ` · ${e.time}` : '')} first />
           {audienceLabel(e) ? <Row icon="users" label="For" value={audienceLabel(e)} /> : null}
           {e.place ? <Row icon="pin" label="Where" value={e.place} /> : null}
           {e.price ? <Row icon="ticket" label="Price" value={e.price} /> : null}
-          <Row icon="clock" label="Starts" value={countdown(e)} />
+          <Row icon="clock" label={e.repeat === 'weekly' ? 'Next' : 'Starts'} value={e.repeat === 'weekly' ? `${dateLabel(e)} · ${countdown(e)}` : countdown(e)} />
         </Card>
         {e.who ? <Para title="Who it's for" body={e.who} /> : null}
         {e.about ? <Para title="About" body={e.about} /> : null}

@@ -364,8 +364,9 @@ async function logBroadcast(env, kind, title, text, target) {
   await env.CTEEN.put('broadcasts', JSON.stringify(list.slice(0, 100)));
 }
 
-async function pushAll(env, title, body, data, image) {
-  const tokens = [...new Set(Object.values((await env.CTEEN.get('push', 'json')) || {}))]; // dedupe: one phone can hold the same token under two device keys
+async function pushAll(env, title, body, data, image, only) {
+  // dedupe: one phone can hold the same token under two device keys. `only` (a Set of device keys) narrows the audience.
+  const tokens = [...new Set(Object.entries((await env.CTEEN.get('push', 'json')) || {}).filter(([d]) => !only || only.has(d)).map(([, t]) => t))];
   let sent = 0;
   for (let i = 0; i < tokens.length; i += 100) {
     const batch = tokens.slice(i, i + 100).map((to) => ({ to, title, body, sound: 'default', data: { ...(data || {}), image: image || undefined }, ...(image ? { richContent: { image }, mutableContent: true } : {}) }));
@@ -668,6 +669,7 @@ export async function onRequest({ request, env, params, waitUntil }) {
       }
       const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//CTeen GN//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'BEGIN:VEVENT',
         'UID:' + ev.id + '@cteen-gn', 'DTSTAMP:' + new Date().toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z', when,
+        ev.repeat === 'weekly' ? 'RRULE:FREQ=WEEKLY' + (ev.repeatUntil ? ';UNTIL=' + d(ev.repeatUntil) + 'T235959Z' : '') : '',
         'SUMMARY:' + esc(ev.title + ' (CTeen Great Neck)'), ev.place ? 'LOCATION:' + esc(ev.place) : '', ev.about ? 'DESCRIPTION:' + esc(ev.about) : '',
         'END:VEVENT', 'END:VCALENDAR'].filter(Boolean).join('\r\n');
       return new Response(ics, { headers: { 'Content-Type': 'text/calendar; charset=utf-8', 'Content-Disposition': 'inline; filename="' + ev.id + '.ics"', ...CORS } });
@@ -857,6 +859,11 @@ export async function onRequest({ request, env, params, waitUntil }) {
       if (!all[device] && Object.keys(all).length >= 5000) return bad('Full.', 409);
       all[device] = token;
       await env.CTEEN.put('push', JSON.stringify(all));
+      // Remember whose phone this is, so a challenge reminder can go only to people in that challenge.
+      if (idOk(body.account)) {
+        const who = (await env.CTEEN.get('pushwho', 'json')) || {};
+        if (who[device] !== body.account) { who[device] = body.account; await env.CTEEN.put('pushwho', JSON.stringify(who)); }
+      }
       return json({ ok: true });
     }
 
@@ -901,11 +908,15 @@ export async function onRequest({ request, env, params, waitUntil }) {
         const newPosts = next.posts.filter((p) => !oldPosts.has(p.id));
         const fresh = [
           ...next.events.filter((e) => !oldEvents.has(e.id) && !newPosts.some((p) => p.eventId === e.id)).map((e) => ({ title: 'New event: ' + e.title, body: 'Join now. ' + [when(e), e.time, e.place].filter(Boolean).join(' · '), target: { type: 'event', id: e.id } })),
-          ...(await Promise.all(newPosts.map(async (p) => ({
-            title: p.kind === 'Food' ? 'On the menu: ' + p.title : p.eventId ? 'New event: ' + p.title : 'New announcement: ' + p.title,
-            body: p.eventId ? 'Join now. ' + (await summary(p)) : await summary(p),
-            target: p.eventId ? { type: 'event', id: p.eventId } : { type: 'post', id: p.id },
-          })))),
+          ...(await Promise.all(newPosts.map(async (p) => {
+            // A post linked to an event that already existed is a reminder: its own words, opening the event.
+            const brandNew = !!p.eventId && !oldEvents.has(p.eventId);
+            return {
+              title: p.kind === 'Food' ? 'On the menu: ' + p.title : p.eventId ? (brandNew ? 'New event: ' + p.title : p.title) : 'New announcement: ' + p.title,
+              body: p.eventId ? (brandNew ? 'Join now. ' : '') + (await summary(p)) : await summary(p),
+              target: p.eventId ? { type: 'event', id: p.eventId } : { type: 'post', id: p.id },
+            };
+          }))),
         ].slice(0, 3);
         for (const n of fresh) { await pushAll(env, n.title, n.body, { target: n.target }); await logBroadcast(env, n.target && n.target.type === 'event' ? 'event' : 'post', n.title, n.body, n.target); }
         if (next.popup && next.popup.on && next.popup.title && (!current.popup || current.popup.id !== next.popup.id)) await logBroadcast(env, 'popup', next.popup.title, next.popup.body, next.popup.target);
@@ -937,9 +948,19 @@ export async function onRequest({ request, env, params, waitUntil }) {
         if (title.length < 2) return bad('Add a title.');
         const target = targetOk(body.target);
         const image = typeof body.image === 'string' && /^https:\/\/\S{4,400}$/.test(body.image) ? body.image : '';
-        const push = await pushAll(env, title, text, { target }, image);
-        await logBroadcast(env, 'notification', title, text, target);
-        return json({ push });
+        // audience "challenge:<id>": only the phones of people who joined that challenge, and not everyone's Inbox.
+        const aud = typeof body.audience === 'string' ? /^challenge:([a-z0-9-]{1,40})$/.exec(body.audience) : null;
+        let only = null, memberCount;
+        if (aud) {
+          const members = (await env.CTEEN.get('members:' + aud[1], 'json')) || {};
+          memberCount = Object.keys(members).length;
+          const who = (await env.CTEEN.get('pushwho', 'json')) || {};
+          const all = (await env.CTEEN.get('push', 'json')) || {};
+          only = new Set(Object.keys(all).filter((d) => members[d] || (who[d] && members[who[d]])));
+        }
+        const push = await pushAll(env, title, text, { target }, image, only);
+        if (!aud) await logBroadcast(env, 'notification', title, text, target);
+        return json({ push, audience: aud ? 'challenge' : 'all', members: memberCount });
       }
       if (path === 'admin/signups' && method === 'GET') {
         const content = await getContent(env);

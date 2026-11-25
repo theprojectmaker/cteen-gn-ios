@@ -169,7 +169,7 @@ type Ctx = Local & {
   aiDraft: (text: string) => Promise<AiDraft | { error: string }>;
   minyanFromText: (text: string) => Promise<Minyan | { error: string }>;
   sendAlert: (a: { title: string; text: string; target: Target; hours: number; push: boolean } | null) => Promise<string>;
-  sendPush: (title: string, text: string, target: Target, image?: string) => Promise<string>;
+  sendPush: (title: string, text: string, target: Target, image?: string, audience?: string) => Promise<string>;
   aiEvent: (prompt: string, info: string, keep: boolean) => Promise<AiEvent | { error: string }>;
   goingNames: Record<string, string[]>;
   loadSignups: () => Promise<{ signups: Record<string, SignupRow[]>; phones: number } | null>;
@@ -258,7 +258,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
   }, [keep]);
 
-  const registerToken = useCallback((token: string) => api('/push/register', { method: 'POST', body: { token, device: ref.current.device } }).then(() => {}), []);
+  const registerToken = useCallback((token: string) => api('/push/register', { method: 'POST', body: { token, device: ref.current.device, account: ref.current.account?.id } }).then(() => {}), []);
 
   useEffect(() => {
     (async () => {
@@ -663,9 +663,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       try { return await api<AiEvent>('/admin/ai-event', { method: 'POST', body: { prompt, info, keep }, leader }); } catch (e) { return { error: msg(e) }; }
     },
     goingNames,
-    sendPush: async (title, text, target, image) => {
+    sendPush: async (title, text, target, image, audience) => {
       try {
-        const r = await api<{ push: { phones: number; sent: number } }>('/admin/push', { method: 'POST', body: { title, text, target, image }, leader });
+        const r = await api<{ push: { phones: number; sent: number }; members?: number }>('/admin/push', { method: 'POST', body: { title, text, target, image, audience }, leader });
+        if (audience) {
+          // challenge-only: say how many of the people in the challenge it reached
+          if (!r.push.phones) return 'Nobody in the challenge could be reached yet. Phones show up here after they open the updated app once. Turn off "Only people in the challenge" to send it to everyone.';
+          return `Reminder sent to ${r.push.sent} phone${r.push.sent === 1 ? '' : 's'} in the challenge${r.members && r.members > r.push.sent ? ` (${r.members} people joined; the rest get it after they open the updated app once)` : ''}.`;
+        }
         return pushNote(r.push).trim();
       } catch (e) {
         return msg(e);
@@ -744,6 +749,17 @@ export function occurrencesInRange(e: EventItem, from: string, to: string): stri
   const end = new Date(Math.min(en.getTime(), hi.getTime()));
   for (let i = 0; i < 400 && d <= end; i++) { out.push(iso(d)); d.setDate(d.getDate() + 1); }
   return out;
+}
+// A weekly event as it should be shown right now: on its next date. Anything else is returned as is.
+export function withNextDate(e: EventItem): EventItem {
+  if (e.repeat !== 'weekly') return e;
+  const d = nextOccurrence(e);
+  return d ? { ...e, start: d, end: d } : e;
+}
+// "Every Sunday" for a weekly event, '' for a one-time event.
+export function repeatLabel(e: EventItem): string {
+  if (e.repeat !== 'weekly') return '';
+  return 'Every ' + ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][day(e.start).getDay()];
 }
 // Upcoming events, soonest first. A weekly event appears as a one-day event on its next date,
 // so its countdown and sort reflect the next time it actually happens.

@@ -8,6 +8,10 @@ const newId = (p) => p + '-' + Date.now().toString(36) + Math.random().toString(
 const fmtDay = (d) => { try { return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); } catch { return d; } };
 const fmtAt = (s) => { try { return new Date(s).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); } catch { return s; } };
 const KINDS = ['News', 'Events', 'Photos', 'Rewards', 'Food'];
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+// A weekly event stays "upcoming" until its series ends; a one-time event until its last day.
+const isUp = (e, t = today()) => (e.repeat === 'weekly' ? !e.repeatUntil || e.repeatUntil >= t : e.end >= t);
+const whenText = (e) => (e.repeat === 'weekly' ? 'Every ' + WEEKDAYS[new Date(e.start + 'T12:00:00').getDay()] : fmtDay(e.start) + (e.end !== e.start ? ' \u2013 ' + fmtDay(e.end) : ''));
 
 let pass = '';
 try { pass = sessionStorage.getItem('cteen-pass') || ''; } catch {}
@@ -136,7 +140,7 @@ VIEWS.overview = async (main) => {
     api('/admin/inbox').catch(() => ({ inbox: [] })), api('/broadcasts').catch(() => ({ items: [] })),
   ]);
   const t = today();
-  const upcoming = content.events.filter((e) => e.end >= t).sort((a, b) => a.start.localeCompare(b.start));
+  const upcoming = content.events.filter((e) => isUp(e, t)).sort((a, b) => a.start.localeCompare(b.start));
   const week = people.people.filter((p) => p.created && Date.now() - new Date(p.created) < 7 * 864e5).length;
   const acts = [
     ['post', 'New post', 'Share to the Feed'],
@@ -156,7 +160,7 @@ VIEWS.overview = async (main) => {
     </div>
     <div class="grid g2" style="margin-top:14px">
       <div class="card"><div class="spread"><h2>Coming up</h2><button class="btn sec sm" data-go="events">All events</button></div>
-        <div class="list" style="margin-top:12px">${upcoming.slice(0, 5).map((e) => { const n = (signups.signups[e.id] || []).length; return `<div class="item"><div style="flex:1"><b>${esc(e.title)}</b><div class="small muted">${fmtDay(e.start)}${e.time ? ' · ' + esc(e.time) : ''}${e.place ? ' · ' + esc(e.place) : ''}</div></div><span class="tag ${n ? 'cy' : ''}">${e.signup === 'app' ? n + ' going' : 'CTeen site'}</span></div>`; }).join('') || '<div class="empty">No upcoming events.</div>'}</div></div>
+        <div class="list" style="margin-top:12px">${upcoming.slice(0, 5).map((e) => { const n = (signups.signups[e.id] || []).length; return `<div class="item"><div style="flex:1"><b>${esc(e.title)}</b><div class="small muted">${whenText(e)}${e.time ? ' · ' + esc(e.time) : ''}${e.place ? ' · ' + esc(e.place) : ''}</div></div><span class="tag ${n ? 'cy' : ''}">${e.signup === 'app' ? n + ' going' : 'CTeen site'}</span></div>`; }).join('') || '<div class="empty">No upcoming events.</div>'}</div></div>
       <div class="card"><div class="spread"><h2>Recently sent</h2></div>
         <div class="list" style="margin-top:12px">${(bc.items || []).slice(0, 6).map((b) => `<div class="item"><div style="flex:1"><b>${esc(b.title)}</b><div class="small muted">${esc((b.body || '').slice(0, 110))}</div></div><span class="small faint">${esc(fmtAt(b.at))}</span></div>`).join('') || '<div class="empty">Nothing sent yet.</div>'}</div></div>
     </div>`;
@@ -252,11 +256,11 @@ VIEWS.events = async (main) => {
   const s = await api('/admin/signups').catch(() => ({ signups: {} }));
   const t = today();
   const evs = [...content.events].sort((a, b) => a.start.localeCompare(b.start));
-  const row = (e) => { const list = s.signups[e.id] || []; return `<tr><td><b>${esc(e.title)}</b>${e.scope === 'intl' ? ' <span class="tag cy">International</span>' : ''}<div class="small muted">${esc([e.time, e.place].filter(Boolean).join(' · '))}</div></td>
-    <td>${fmtDay(e.start)}${e.end !== e.start ? ' – ' + fmtDay(e.end) : ''}</td><td>${e.gender === 'all' ? 'Both' : e.gender === 'boys' ? 'Boys' : 'Girls'}</td>
+  const row = (e) => { const list = s.signups[e.id] || []; return `<tr><td><b>${esc(e.title)}</b>${e.scope === 'intl' ? ' <span class="tag cy">International</span>' : ''}${e.repeat === 'weekly' ? ' <span class="tag">Weekly</span>' : ''}${e.priority ? ' <span class="tag or">Featured</span>' : ''}<div class="small muted">${esc([e.time, e.place].filter(Boolean).join(' · '))}</div></td>
+    <td>${whenText(e)}</td><td>${e.gender === 'all' ? 'Both' : e.gender === 'boys' ? 'Boys' : 'Girls'}</td>
     <td>${e.signup === 'app' ? `<a href="#" data-going="${esc(e.id)}">${list.length} going</a>` : '<span class="muted">CTeen site</span>'}</td>
     <td style="text-align:right;white-space:nowrap"><button class="btn sec sm" data-dup="${esc(e.id)}">Copy</button> <button class="btn sec sm" data-edit="${esc(e.id)}">Edit</button></td></tr>`; };
-  const up = evs.filter((e) => e.end >= t), past = evs.filter((e) => e.end < t).reverse();
+  const up = evs.filter((e) => isUp(e, t)), past = evs.filter((e) => !isUp(e, t)).reverse();
   main.innerHTML = head('Events', 'New events notify every phone. Sign-ups show here as they come in.', `<button class="btn sec" id="aiBtn">Plan with AI</button><button class="btn" id="newEv">New event</button>`) +
     `<div class="card"><table><thead><tr><th>Event</th><th>When</th><th>For</th><th>Sign-ups</th><th></th></tr></thead><tbody>${up.map(row).join('') || '<tr><td colspan="5" class="empty">No upcoming events.</td></tr>'}</tbody></table></div>` +
     (past.length ? `<h2 style="margin:28px 0 12px">Past</h2><div class="card"><table><tbody>${past.slice(0, 15).map(row).join('')}</tbody></table></div>` : '');
@@ -329,7 +333,7 @@ VIEWS.invites = async (main) => {
   main.querySelectorAll('[data-del]').forEach((b) => (b.onclick = async () => { if (!confirm('Delete this invitation?')) return; await saveContent({ ...content, invites: inv.filter((v) => v.id !== b.dataset.del) }, 'Deleted.'); show('invites'); }));
 };
 async function newInvite() {
-  const evOpts = [['', 'No event'], ...content.events.filter((e) => e.end >= today()).map((e) => [e.id, e.title])];
+  const evOpts = [['', 'No event'], ...content.events.filter((e) => isUp(e)).map((e) => [e.id, e.title])];
   const ok = await dialogLoop('New invitation',
     select('iEvent', 'For an event (optional)', evOpts, '') + field('iTitle', 'What it is for', '', 'text', 'placeholder="Bake shop night"') +
     field('iMsg', 'Your message', "Hey {name}, we'd love to see you there. It won't be the same without you!", 'area') + '<p class="small muted" style="margin:4px 0 0">{name} turns into each teen\'s first name.</p>' +
@@ -341,7 +345,7 @@ async function newInvite() {
       if (val('iTitle').length < 2) throw new Error('What are you inviting them to?');
       const ev = content.events.find((e) => e.id === val('iEvent'));
       const end = new Date(); end.setDate(end.getDate() + Number(val('iDays')));
-      let until = end.toLocaleDateString('en-CA'); if (ev && ev.end < until) until = ev.end;
+      let until = end.toLocaleDateString('en-CA'); if (ev && ev.repeat !== 'weekly' && ev.end < until) until = ev.end;
       const image = (await photoValue('iPhoto')) || (ev && ev.poster) || '';
       const v = { id: newId('i'), on: true, title: val('iTitle'), message: val('iMsg'), details: val('iDetails'), eventId: val('iEvent'), image, audience: val('iWho'), until, remind: val('iRemind'), at: new Date().toISOString() };
       await saveContent({ ...content, invites: [v, ...(content.invites || [])] }, 'Invitation sent.');
@@ -353,7 +357,7 @@ async function newInvite() {
 VIEWS.broadcast = async (main) => {
   await loadContent();
   const a = content.alert || {}, p = content.popup || {};
-  const targets = [['', 'Just open the app'], ...content.events.filter((e) => e.end >= today()).map((e) => ['event:' + e.id, 'Event: ' + e.title]), ...content.challenges.map((c) => ['challenge:' + c.id, 'Challenge: ' + c.title]), ...content.posts.slice(0, 15).map((x) => ['post:' + x.id, 'Post: ' + x.title])];
+  const targets = [['', 'Just open the app'], ...content.events.filter((e) => isUp(e)).map((e) => ['event:' + e.id, 'Event: ' + e.title]), ...content.challenges.map((c) => ['challenge:' + c.id, 'Challenge: ' + c.title]), ...content.posts.slice(0, 15).map((x) => ['post:' + x.id, 'Post: ' + x.title])];
   const tgt = (v) => { if (!v) return null; const [type, id] = v.split(':'); return { type, id }; };
   const tgtVal = (t) => (t ? t.type + ':' + t.id : '');
   main.innerHTML = head('Notify and banners', 'Reach everyone right now.') + `<div class="grid g2">

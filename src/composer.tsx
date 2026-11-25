@@ -3,7 +3,7 @@ import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, F, T } from './theme';
 import { Icon } from './icons';
-import { tap, useStore, type Post } from './store';
+import { tap, upcoming, useStore, type Post } from './store';
 import { pickPhotos, type Snap } from './photo';
 import { publishPhotos } from './leaderTools';
 
@@ -24,10 +24,12 @@ export function Composer() {
   const [title, setTitle] = useState('');
   const [caption, setCaption] = useState('');
   const [kind, setKind] = useState<Post['kind']>('News');
+  const [eventId, setEventId] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   if (!leader) return null;
-  const reset = () => { setPhotos([]); setMain(0); setTitle(''); setCaption(''); setKind('News'); setErr(null); };
+  const reset = () => { setPhotos([]); setMain(0); setTitle(''); setCaption(''); setKind('News'); setEventId(''); setErr(null); };
+  const linkable = upcoming(content.events);
   const close = () => { if (!busy) { setComposerOpen(false); reset(); } };
   const add = async () => {
     setErr(null);
@@ -43,7 +45,7 @@ export function Composer() {
     setBusy(true); setErr(null);
     const urls = await publishPhotos(photos, uploadPhoto);
     if (typeof urls === 'string') { setBusy(false); return setErr(urls); }
-    const p: Post = { id: 'p-' + Date.now().toString(36), kind, pinned: false, title: head, body: title.trim() ? caption.trim() : caption.trim().slice(head.length).replace(/^[.!?\s]+/, ''), eventId: '', challengeId: '', photos: urls, linkLabel: '', linkUrl: '', at: new Date().toISOString() };
+    const p: Post = { id: 'p-' + Date.now().toString(36), kind, pinned: false, title: head, body: title.trim() ? caption.trim() : caption.trim().slice(head.length).replace(/^[.!?\s]+/, ''), eventId, challengeId: '', photos: urls, linkLabel: '', linkUrl: '', at: new Date().toISOString() };
     const e = await saveContent({ ...content, posts: [p, ...content.posts] });
     setBusy(false);
     if (e) return setErr(e);
@@ -97,6 +99,19 @@ export function Composer() {
                 </Pressable>
               ))}
             </View>
+            {linkable.length ? (
+              <View style={{ marginTop: 18 }}>
+                <Text style={st.linkLabel}>Tapping the post opens</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                  {[{ id: '', title: 'Nothing' }, ...linkable].map((e) => (
+                    <Pressable key={e.id || 'none'} onPress={() => setEventId(e.id)} style={[st.kind, eventId === e.id && st.kindOn]} accessibilityRole="button" accessibilityState={{ selected: eventId === e.id }}>
+                      <Text style={[st.kindText, eventId === e.id && st.kindTextOn]} numberOfLines={1}>{e.title}</Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+                {eventId ? <Text style={[T.small, { marginTop: 8 }]}>A reminder for an event: teens tap the post (or the notification) and land on the event to RSVP.</Text> : null}
+              </View>
+            ) : null}
             <View style={st.note}>
               <Icon name="bell" size={15} color={C.blueDeep} stroke={2.2} />
               <Text style={st.noteText}>Everyone gets a notification with a short summary.</Text>
@@ -112,6 +127,7 @@ export function Composer() {
 const st = StyleSheet.create({
   bar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.line },
   barTitle: { fontSize: 17, fontWeight: '800', color: C.ink },
+  linkLabel: { fontSize: 13, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase', color: C.sub, marginBottom: 10 },
   cancel: { fontSize: 16, color: C.ink },
   share: { fontSize: 16, fontWeight: '800', color: C.blue },
   preview: { width: '100%', aspectRatio: 1, backgroundColor: C.line },

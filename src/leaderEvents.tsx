@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { C, F, T } from './theme';
 import { Icon } from './icons';
-import { useStore, type AiEvent, type EventItem, type Popup } from './store';
+import { upcoming, useStore, type AiEvent, type EventItem, type Popup } from './store';
 import { Button, Chips, Field, Toggle, s as u } from './ui';
 import { PhotoPicker, publishPhotos } from './leaderTools';
 import type { Snap } from './photo';
@@ -212,7 +212,7 @@ export function AiPlanner({ onDone }: { onDone: (msg: string) => void }) {
 // ── Personal invitation: a card on everyone's Home until they answer, reminders twice a day ──
 export function InviteForm({ onDone }: { onDone: (msg: string) => void }) {
   const { content, saveContent, uploadPhoto, loadInviteResponses } = useStore();
-  const upcomingEvents = content.events.filter((e) => e.end >= iso(new Date()));
+  const upcomingEvents = upcoming(content.events);
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState("Hey {name}, we'd love to see you there. It won't be the same without you!");
   const [details, setDetails] = useState('');
@@ -236,7 +236,7 @@ export function InviteForm({ onDone }: { onDone: (msg: string) => void }) {
     setBusy(true); setErr(null);
     const urls = await publishPhotos(poster, uploadPhoto);
     if (typeof urls === 'string') { setBusy(false); return setErr(urls); }
-    const ev = content.events.find((e) => e.id === eventId);
+    const ev = upcomingEvents.find((e) => e.id === eventId);
     const end = new Date(); end.setDate(end.getDate() + (days === '3 days' ? 3 : days === '1 week' ? 7 : 14));
     const until = ev && ev.end < iso(end) ? ev.end : iso(end);
     const invite = { id: 'i-' + Date.now().toString(36), on: true, title: title.trim(), message: message.trim(), details: details.trim(), eventId, image: urls[0] || ev?.poster || '', audience: (who === 'Boys' ? 'boys' : who === 'Girls' ? 'girls' : 'all') as 'all' | 'boys' | 'girls', until, remind, at: new Date().toISOString() };

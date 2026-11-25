@@ -4,7 +4,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, T } from '../../src/theme';
 import { Icon } from '../../src/icons';
-import { useStore } from '../../src/store';
+import { useStore, withNextDate } from '../../src/store';
 import { EventDetails } from '../../src/screens';
 
 // Opens as Apple's slide-up sheet (see app/_layout.tsx): the system draws the grab pill on
@@ -13,7 +13,8 @@ export default function EventRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { content } = useStore();
   const insets = useSafeAreaInsets();
-  const e = content.events.find((x) => x.id === id);
+  const raw = content.events.find((x) => x.id === id);
+  const e = raw ? withNextDate(raw) : undefined;
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" contentContainerStyle={{ paddingBottom: insets.bottom + 30 }} showsVerticalScrollIndicator={false}>

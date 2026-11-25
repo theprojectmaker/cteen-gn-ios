@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AiPlanner, EventForm, InviteForm, PosterForm } from './leaderEvents';
 import { ChallengeEditor, FoodForm, MinyanEditor, PhotoPicker, PopupEditor, WhatsAppImport, publishPhotos } from './leaderTools';
@@ -6,7 +6,7 @@ import type { Snap } from './photo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, T, F } from './theme';
 import { EVENT_ICONS, Icon } from './icons';
-import { dateLabel, todayIso, useStore, type Content, type Person, type PhotoRow, type Question, type SignupRow, type Target } from './store';
+import { dateLabel, todayIso, upcoming, useStore, type Content, type Person, type PhotoRow, type Question, type SignupRow, type Target } from './store';
 import { Button, Card, Chips, Field, IconTile, Toggle, s as u } from './ui';
 
 // ───────── form description ─────────
@@ -49,6 +49,7 @@ function specs(key: ListKey, c: Content, isNew: boolean): Spec[] {
     { k: 'payUrl', label: 'Ticket / payment link (optional)', t: 'text', ph: 'https://…', show: (d) => d.signup === 'app' },
     { k: 'start', label: 'Start date', t: 'text', ph: '2026-12-10', hint: 'Year-month-day, like 2026-12-10.' },
     { k: 'end', label: 'End date', t: 'text', ph: 'Same as start for a one-day event' },
+    { k: 'repeat', label: 'Repeats', t: 'pick', opts: [{ v: 'none', l: 'Once' }, { v: 'weekly', l: 'Every week' }], hint: 'Every week: it comes back on the same weekday as the start date.' },
     { k: 'time', label: 'Time (optional)', t: 'text', ph: '7:00 PM' },
     { k: 'place', label: 'Where (optional)', t: 'text', ph: 'Chabad of Great Neck' },
     { k: 'price', label: 'Price (optional)', t: 'text', ph: 'Free' },
@@ -59,6 +60,7 @@ function specs(key: ListKey, c: Content, isNew: boolean): Spec[] {
     { k: 'maxAge', label: 'Oldest age (optional)', t: 'text', ph: '18' },
     { k: 'who', label: "Who it's for (optional)", t: 'text' },
     { k: 'about', label: 'Details', t: 'long' },
+    { k: 'priority', label: 'Featured event (shows first and stands out)', t: 'bool' },
   ];
   if (key === 'challenges') return [
     { k: 'title', label: 'Challenge name', t: 'text', ph: 'Tefillin Challenge' },
@@ -81,7 +83,7 @@ function specs(key: ListKey, c: Content, isNew: boolean): Spec[] {
 
 const BLANK: Record<ListKey, Draft> = {
   posts: { title: '', body: '', kind: 'News', pinned: false, eventId: '', challengeId: '', photos: '', linkLabel: '', linkUrl: '', _notify: false },
-  events: { title: '', scope: 'gn', signup: 'app', url: '', payUrl: '', start: '', end: '', time: '', place: '', price: '', icon: 'star', color: 'blue', who: '', about: '', image: '', gender: 'all', minAge: '', maxAge: '', _notify: false },
+  events: { title: '', scope: 'gn', signup: 'app', url: '', payUrl: '', start: '', end: '', time: '', place: '', price: '', icon: 'star', color: 'blue', who: '', about: '', image: '', gender: 'all', minAge: '', maxAge: '', repeat: 'none', repeatUntil: '', priority: false, fullPoster: false, cover: '', poster: '', _notify: false },
   challenges: { title: '', icon: 'trophy', color: 'purple', every: 'day', goal: '30', about: '', rewards: '', active: true, photo: false, _notify: false },
   info: { icon: 'star', title: '', body: '' },
 };
@@ -170,8 +172,13 @@ export function AdminPanel() {
   const [confirmDel, setConfirmDel] = useState(false);
   const [signups, setSignups] = useState<{ signups: Record<string, SignupRow[]>; phones: number } | null>(null);
   const [inbox, setInbox] = useState<Question[] | null>(null);
+  const [coverPick, setCoverPick] = useState<Snap[]>([]);
 
   useEffect(() => { setEditing(null); setNote(null); setConfirmDel(false); }, [inSection, task, adminOpen]);
+  useEffect(() => { setCoverPick([]); }, [editing?.id, inSection, adminOpen]);
+  // Every task opens at its top, not wherever the list was scrolled to.
+  const scroller = useRef<ScrollView>(null);
+  useEffect(() => { scroller.current?.scrollTo({ y: 0, animated: false }); }, [task, inSection, editing?.id]);
   useEffect(() => {
     if (!leader || !adminOpen) return;
     if (inSection === 'Sign-ups') { setSignups(null); store.loadSignups().then((r) => setSignups(r ?? { signups: {}, phones: 0 })); }
@@ -207,6 +214,7 @@ export function AdminPanel() {
       case 'popup': return <PopupEditor onDone={done} />;
       case 'minyan': return <MinyanEditor onDone={done} />;
       case 'post': case 'alert': case 'notify': return <SimpleForm kind={t} onDone={done} />;
+      case 'remind': return <SimpleForm kind="notify" link={'challenge:' + (content.challenges.find((c) => c.active)?.id ?? '')} onDone={done} />;
       default: return null;
     }
   };
@@ -306,7 +314,15 @@ export function AdminPanel() {
       const submit = async () => {
         const p = problem(cfg.key, d);
         if (p) return setNote(p);
-        const item = fromDraft(cfg.key, { ...d, id: editing.id ?? cfg.prefix + '-' + Date.now().toString(36) });
+        let cover = String(d.cover || '');
+        if (cfg.key === 'events' && coverPick.length) {
+          setBusy(true);
+          const urls = await publishPhotos(coverPick, store.uploadPhoto);
+          setBusy(false);
+          if (typeof urls === 'string') return setNote(urls);
+          cover = urls[0] || cover;
+        }
+        const item = fromDraft(cfg.key, { ...d, ...(cfg.key === 'events' ? { cover } : {}), id: editing.id ?? cfg.prefix + '-' + Date.now().toString(36) });
         const nextList = editing.id ? items.map((x) => (x.id === editing.id ? item : x)) : [item, ...items];
         const auto = !editing.id && (cfg.key === 'posts' || cfg.key === 'events');
         if (!(await save({ ...content, [cfg.key]: nextList }, editing.id ? 'Saved.' : auto ? 'Live for everyone. Every phone got a notification.' : 'Live for everyone.'))) return;
@@ -321,6 +337,24 @@ export function AdminPanel() {
         <Card>
           <Text style={T.h2}>{editing.id ? `Edit ${cfg.one}` : `New ${cfg.one}`}</Text>
           <Form list={specs(cfg.key, content, !editing.id)} draft={d} set={(draft) => setEditing({ ...editing, draft })} />
+          {cfg.key === 'events' ? (
+            <View style={{ marginTop: 16 }}>
+              <Text style={u.fieldLabel}>Cover photo (shows on Home and the Events page)</Text>
+              {d.cover && !coverPick.length ? (
+                <View style={st.coverRow}>
+                  <Image source={{ uri: String(d.cover) }} style={st.coverThumb} resizeMode="cover" />
+                  <Pressable onPress={() => setEditing({ ...editing, draft: { ...d, cover: '', fullPoster: false } })} hitSlop={8} accessibilityRole="button"><Text style={st.turnOff}>Remove photo</Text></Pressable>
+                </View>
+              ) : null}
+              <PhotoPicker photos={coverPick} onChange={(p) => setCoverPick(p.slice(-1))} />
+              {d.cover || coverPick.length ? (
+                <View style={st.toggle}>
+                  <Text style={[T.h3, { flex: 1, fontSize: 16 }]}>This cover is a full poster (show it whole, no text over it)</Text>
+                  <Toggle value={!!d.fullPoster} onChange={(x) => setEditing({ ...editing, draft: { ...d, fullPoster: x } })} label="Cover is a full poster" />
+                </View>
+              ) : null}
+            </View>
+          ) : null}
           <View style={{ marginTop: 18, gap: 10 }}>
             <Button label={busy ? 'Saving…' : editing.id ? 'Save changes' : cfg.key === 'posts' ? 'Post it' : `Add ${cfg.one}`} disabled={busy} onPress={submit} />
             <Button kind="ghost" label="Cancel" onPress={() => setEditing(null)} />
@@ -373,7 +407,7 @@ export function AdminPanel() {
             </Pressable>
           </View>
         </View>
-        <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" style={{ flex: 1 }} contentContainerStyle={{ paddingVertical: 16, paddingBottom: insets.bottom + 40 }} keyboardShouldPersistTaps="handled">
+        <ScrollView ref={scroller} automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" style={{ flex: 1 }} contentContainerStyle={{ paddingVertical: 16, paddingBottom: insets.bottom + 40 }} keyboardShouldPersistTaps="handled">
           <View style={st.col}>
             {note ? <Text style={st.note} accessibilityLiveRegion="polite">{note}</Text> : null}
             {!leader ? (
@@ -407,7 +441,7 @@ export function AdminPanel() {
 }
 
 // ───────── the panel home ─────────
-type Task = 'post' | 'notify' | 'poster' | 'ai' | 'invite' | 'whatsapp' | 'food' | 'event' | 'alert' | 'popup' | 'minyan';
+type Task = 'post' | 'notify' | 'remind' | 'poster' | 'ai' | 'invite' | 'whatsapp' | 'food' | 'event' | 'alert' | 'popup' | 'minyan';
 type TileColor = 'blue' | 'orange' | 'purple' | 'green' | 'pink' | 'yellow';
 
 function Home({ onCreate, onManage, onMinyan, onCompose }: { onCreate: (t: Task) => void; onManage: (s: Section) => void; onMinyan: () => void; onCompose: () => void }) {
@@ -422,6 +456,7 @@ function Home({ onCreate, onManage, onMinyan, onCompose }: { onCreate: (t: Task)
     { k: 'poster', icon: 'ticket', color: 'pink', title: 'Poster' },
     { k: 'notify', icon: 'bell', color: 'blue', title: 'Notification' },
     { k: 'alert', icon: 'megaphone', color: 'pink', title: 'Live banner' },
+    ...(content.challenges.some((c) => c.active) ? [{ k: 'remind' as const, icon: 'clock', color: 'green' as const, title: 'Challenge reminder' }] : []),
     { k: 'food', icon: 'food', color: 'yellow', title: 'Food' },
     { k: 'popup', icon: 'star', color: 'purple', title: 'Pop-up' },
     { k: 'ai', icon: 'star', color: 'purple', title: 'AI planner' },
@@ -499,7 +534,13 @@ function nextDays() {
 }
 
 // Three plain forms: only the fields the rabbi needs, big text, one button.
-function SimpleForm({ kind, onDone }: { kind: 'post' | 'event' | 'alert' | 'notify'; onDone: (msg: string) => void }) {
+const REMINDERS: { title: string; text: string }[] = [
+  { title: '30 minutes left to wrap', text: 'Sunset is close. Wrap now and snap your photo.' },
+  { title: 'Last hour to wrap today', text: 'Keep your streak alive. Snap your photo before sunset.' },
+  { title: "Don't forget to wrap today", text: 'One photo keeps your streak going.' },
+];
+
+function SimpleForm({ kind, onDone, link }: { kind: 'post' | 'event' | 'alert' | 'notify'; onDone: (msg: string) => void; link?: string }) {
   const { content, saveContent, sendPush, sendAlert } = useStore();
   const [title, setTitle] = useState('');
   const [text, setText] = useState('');
@@ -510,9 +551,15 @@ function SimpleForm({ kind, onDone }: { kind: 'post' | 'event' | 'alert' | 'noti
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [photos, setPhotos] = useState<Snap[]>([]);
-  const [linkTo, setLinkTo] = useState('');
-  const linkOpts = [{ v: '', l: 'Nothing' }, ...content.events.filter((e) => e.end >= iso(new Date())).map((e) => ({ v: e.id, l: e.title }))];
-  const linkTarget = linkTo ? { type: 'event' as const, id: linkTo } : null;
+  const [linkTo, setLinkTo] = useState(link ?? '');
+  const [onlyMembers, setOnlyMembers] = useState(true);
+  const linkOpts = [
+    { v: '', l: 'Nothing' },
+    ...upcoming(content.events).map((e) => ({ v: 'event:' + e.id, l: e.title })),
+    ...content.challenges.filter((c) => c.active).map((c) => ({ v: 'challenge:' + c.id, l: c.title })),
+  ];
+  const linkTarget = toTarget(linkTo);
+  const linkedChallenge = linkTo.startsWith('challenge:') ? content.challenges.find((c) => c.id === linkTo.slice(10)) : undefined;
   const { uploadPhoto } = useStore();
   const days = nextDays();
   const go = async () => {
@@ -522,7 +569,7 @@ function SimpleForm({ kind, onDone }: { kind: 'post' | 'event' | 'alert' | 'noti
     if (kind === 'post') {
       const urls = await publishPhotos(photos, uploadPhoto);
       if (typeof urls === 'string') { setBusy(false); return setErr(urls); }
-      const post = { id: 'p-' + Date.now().toString(36), kind: (urls.length && !text.trim() ? 'Photos' : 'News') as 'Photos' | 'News', pinned: false, title: title.trim(), body: text.trim(), eventId: '', challengeId: '', photos: urls, linkLabel: '', linkUrl: '', at: new Date().toISOString() };
+      const post = { id: 'p-' + Date.now().toString(36), kind: (urls.length && !text.trim() ? 'Photos' : 'News') as 'Photos' | 'News', pinned: false, title: title.trim(), body: text.trim(), eventId: linkTo.startsWith('event:') ? linkTo.slice(6) : '', challengeId: linkTo.startsWith('challenge:') ? linkTo.slice(10) : '', photos: urls, linkLabel: '', linkUrl: '', at: new Date().toISOString() };
       const e = await saveContent({ ...content, posts: [post, ...content.posts] });
       if (e) { setBusy(false); return setErr(e); }
       msg = 'Posted to the Feed. Every phone got a notification.';
@@ -532,18 +579,18 @@ function SimpleForm({ kind, onDone }: { kind: 'post' | 'event' | 'alert' | 'noti
       if (e) { setBusy(false); return setErr(e); }
       msg = 'Event added. Every phone got a notification, and teens can sign up in the app.';
     } else if (kind === 'notify') {
-      msg = await sendPush(title.trim(), text.trim(), linkTarget);
+      msg = await sendPush(title.trim(), text.trim(), linkTarget, undefined, linkedChallenge && onlyMembers ? 'challenge:' + linkedChallenge.id : undefined);
     } else {
       msg = await sendAlert({ title: title.trim(), text: text.trim(), target: linkTarget, hours: 24, push: notify });
     }
     setBusy(false);
     onDone(msg.trim());
   };
-  const heading = kind === 'post' ? 'Post an update' : kind === 'event' ? 'Add an event' : kind === 'notify' ? 'Send a notification' : 'Live banner';
+  const heading = kind === 'post' ? 'Post an update' : kind === 'event' ? 'Add an event' : kind === 'notify' ? (link ? 'Challenge reminder' : 'Send a notification') : 'Live banner';
   return (
     <Card style={{ padding: 20 }}>
       <Text style={st.simpleHello}>{heading}</Text>
-      {kind === 'notify' ? <Text style={[T.small, { marginTop: 4 }]}>Goes straight to every phone. No banner, no post.</Text> : kind === 'alert' ? <Text style={[T.small, { marginTop: 4 }]}>A banner at the top of the app for 24 hours. Link it to an event to promote it.</Text> : null}
+      {kind === 'notify' ? <Text style={[T.small, { marginTop: 4 }]}>{link ? 'A nudge for the people in the challenge. Tapping it opens the challenge.' : 'Goes straight to every phone. No banner, no post.'}</Text> : kind === 'alert' ? <Text style={[T.small, { marginTop: 4 }]}>A banner at the top of the app for 24 hours. Link it to an event to promote it.</Text> : null}
       <Field label={kind === 'event' ? 'Event name' : kind === 'notify' ? 'Title' : 'Headline'} value={title} onChange={setTitle} placeholder={kind === 'event' ? 'Pizza and Torah night' : kind === 'alert' ? 'Tonight is moved to 8 PM' : kind === 'notify' ? 'See you at 7 tonight' : 'Great turnout at the Shabbaton'} />
       {kind === 'event' ? (
         <>
@@ -562,10 +609,28 @@ function SimpleForm({ kind, onDone }: { kind: 'post' | 'event' | 'alert' | 'noti
         </>
       ) : null}
       <Field label={kind === 'event' ? 'Details (optional)' : kind === 'alert' || kind === 'notify' ? 'More detail (optional)' : 'Message'} value={text} onChange={setText} multiline />
-      {kind === 'alert' || kind === 'notify' ? (
+      {kind === 'notify' && linkedChallenge ? (
         <View style={{ marginTop: 14 }}>
-          <Text style={u.fieldLabel}>Links to</Text>
+          <Text style={u.fieldLabel}>Quick reminders</Text>
+          <View style={u.chipsFlow}>
+            {REMINDERS.map((r) => (
+              <Pressable key={r.title} onPress={() => { setTitle(r.title); setText(r.text); }} style={[u.chip, title === r.title && u.chipOn]} accessibilityRole="button">
+                <Text style={[u.chipText, title === r.title && u.chipTextOn]}>{r.title}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      ) : null}
+      {kind === 'alert' || kind === 'notify' || kind === 'post' ? (
+        <View style={{ marginTop: 14 }}>
+          <Text style={u.fieldLabel}>{kind === 'post' ? 'Tapping the post opens' : 'Links to'}</Text>
           <Chips wrap options={linkOpts.map((o) => o.l)} value={linkOpts.find((o) => o.v === linkTo)?.l ?? 'Nothing'} onChange={(l) => setLinkTo(linkOpts.find((o) => o.l === l)?.v ?? '')} />
+        </View>
+      ) : null}
+      {kind === 'notify' && linkedChallenge ? (
+        <View style={st.toggle}>
+          <Text style={[T.h3, { flex: 1, fontSize: 16 }]}>Only people in {linkedChallenge.title}</Text>
+          <Toggle value={onlyMembers} onChange={setOnlyMembers} label="Only people in the challenge" />
         </View>
       ) : null}
       {kind === 'post' ? <PhotoPicker photos={photos} onChange={setPhotos} /> : null}
@@ -582,7 +647,7 @@ function SimpleForm({ kind, onDone }: { kind: 'post' | 'event' | 'alert' | 'noti
       )}
       {err ? <Text style={{ color: '#C0303F', fontWeight: '700', marginTop: 12 }}>{err}</Text> : null}
       <View style={{ marginTop: 20 }}>
-        <Button label={busy ? 'Sending…' : kind === 'post' ? 'Post it' : kind === 'event' ? 'Add the event' : kind === 'notify' ? 'Send to everyone' : 'Put the banner up'} disabled={busy} onPress={go} />
+        <Button label={busy ? 'Sending…' : kind === 'post' ? 'Post it' : kind === 'event' ? 'Add the event' : kind === 'notify' ? (linkedChallenge && onlyMembers ? 'Send to the challenge' : 'Send to everyone') : 'Put the banner up'} disabled={busy} onPress={go} />
       </View>
     </Card>
   );
@@ -718,6 +783,8 @@ const st = StyleSheet.create({
   close: { width: 40, height: 40, borderRadius: 20, backgroundColor: C.card, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.line },
   note: { backgroundColor: C.inverse, color: C.onInverse, fontWeight: '700', fontSize: 14, lineHeight: 19, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 12, overflow: 'hidden' },
   toggle: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 16, minHeight: 44 },
+  coverRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 10 },
+  coverThumb: { width: 96, height: 64, borderRadius: 10, backgroundColor: C.line },
   item: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 },
   itemMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
   signRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderTopWidth: 1, borderTopColor: C.line, marginTop: 10 },

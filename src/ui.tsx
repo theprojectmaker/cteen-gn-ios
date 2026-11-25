@@ -3,7 +3,7 @@ import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
 import { C, HUES, R, T, shadow } from './theme';
 import { Icon, challengeIcon } from './icons';
 import { Glass } from './glass';
-import { IMAGES, countdown, dateLabel, useStore, type ColorKey, type EventItem } from './store';
+import { IMAGES, countdown, dateLabel, repeatLabel, useStore, type ColorKey, type EventItem } from './store';
 
 export function Card({ children, style, onPress, label }: { children: React.ReactNode; style?: ViewStyle | ViewStyle[]; onPress?: () => void; label?: string }) {
   if (!onPress) return <View style={[s.card, style]}>{children}</View>;
@@ -120,7 +120,7 @@ export function EventMeta({ e }: { e: EventItem }) {
   const mine = going.includes(e.id);
   return (
     <Text style={s.meta} numberOfLines={1}>
-      <Text style={{ color: mine ? C.green : C.sub }}>{mine ? "You're signed up" : dateLabel(e)}</Text>
+      <Text style={{ color: mine ? C.green : C.sub }}>{mine ? "You're signed up" : repeatLabel(e) || dateLabel(e)}</Text>
       {e.price ? <Text style={{ color: C.ink }}> · {e.price}</Text> : null}
       {audienceLabel(e) ? <Text style={{ color: C.blueDeep }}> · {audienceLabel(e)}</Text> : null}
     </Text>

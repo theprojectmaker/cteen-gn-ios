@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, R, T, F } from './theme';
 import { Icon } from './icons';
 import { router } from 'expo-router';
-import { dateLabel, streak, useStore, type Gender } from './store';
+import { dateLabel, repeatLabel, streak, upcoming, useStore, type Gender } from './store';
 import { Button, Card, Field, s as u } from './ui';
 import { pickAvatar } from './photo';
 
@@ -139,9 +139,9 @@ function ActivityRow({ icon, title, sub, onPress, first }: { icon: string; title
 
 function YourCteen() {
   const { going, saved, joined, content, counts, checks, openEvent, openChallenge } = useStore();
-  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
-  const myEvents = content.events.filter((e) => going.includes(e.id) && e.end >= today).sort((a, b) => a.start.localeCompare(b.start));
-  const savedEvents = content.events.filter((e) => saved.includes(e.id) && e.end >= today && !going.includes(e.id)).sort((a, b) => a.start.localeCompare(b.start));
+  const up = upcoming(content.events);
+  const myEvents = up.filter((e) => going.includes(e.id));
+  const savedEvents = up.filter((e) => saved.includes(e.id) && !going.includes(e.id));
   const myChallenges = content.challenges.filter((c) => joined.includes(c.id) && c.active);
   if (!myEvents.length && !savedEvents.length && !myChallenges.length) return null;
   return (
@@ -153,10 +153,10 @@ function YourCteen() {
           return <ActivityRow key={c.id} first={i === 0} icon="flame" title={c.title} sub={s > 0 ? `${s} ${c.every === 'week' ? 'week' : 'day'}${s === 1 ? '' : 's'} in a row · ${n} of ${c.goal}` : `${n} of ${c.goal} done — keep it going`} onPress={() => openChallenge(c.id)} />;
         })}
         {myEvents.map((e, i) => (
-          <ActivityRow key={e.id} first={i === 0 && !myChallenges.length} icon="check" title={e.title} sub={`Going · ${dateLabel(e)}`} onPress={() => openEvent(e.id)} />
+          <ActivityRow key={e.id} first={i === 0 && !myChallenges.length} icon="check" title={e.title} sub={`Going · ${repeatLabel(e) || dateLabel(e)}`} onPress={() => openEvent(e.id)} />
         ))}
         {savedEvents.map((e) => (
-          <ActivityRow key={e.id} icon="heart" title={e.title} sub={`Saved · ${dateLabel(e)}`} onPress={() => openEvent(e.id)} />
+          <ActivityRow key={e.id} icon="heart" title={e.title} sub={`Saved · ${repeatLabel(e) || dateLabel(e)}`} onPress={() => openEvent(e.id)} />
         ))}
       </Card>
     </>
