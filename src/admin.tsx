@@ -161,7 +161,8 @@ export function AdminPanel() {
   const insets = useSafeAreaInsets();
   const store = useStore();
   const { adminOpen, setAdminOpen, leader, content, saveContent } = store;
-  const [section, setSection] = useState<Section>('Posts');
+  const [task, setTask] = useState<Task | null>(null);
+  const [inSection, setInSection] = useState<Section | null>(null);
   const [editing, setEditing] = useState<{ id: string | null; draft: Draft } | null>(null);
   const [live, setLive] = useState<Draft>({ title: '', text: '', target: '', hours: 'Today', push: true });
   const [busy, setBusy] = useState(false);
@@ -169,111 +170,121 @@ export function AdminPanel() {
   const [confirmDel, setConfirmDel] = useState(false);
   const [signups, setSignups] = useState<{ signups: Record<string, SignupRow[]>; phones: number } | null>(null);
   const [inbox, setInbox] = useState<Question[] | null>(null);
-  const [mode, setMode] = useState<'simple' | 'expert'>('simple');
-  const [task, setTask] = useState<Task | null>(null);
 
-  useEffect(() => { setEditing(null); setNote(null); setConfirmDel(false); }, [section, adminOpen, mode]);
+  useEffect(() => { setEditing(null); setNote(null); setConfirmDel(false); }, [inSection, task, adminOpen]);
   useEffect(() => {
     if (!leader || !adminOpen) return;
-    if (section === 'Sign-ups') { setSignups(null); store.loadSignups().then((r) => setSignups(r ?? { signups: {}, phones: 0 })); }
-    if (section === 'Inbox') { setInbox(null); store.loadInbox().then((r) => setInbox(r ?? [])); }
-  }, [section, leader, adminOpen]);
+    if (inSection === 'Sign-ups') { setSignups(null); store.loadSignups().then((r) => setSignups(r ?? { signups: {}, phones: 0 })); }
+    if (inSection === 'Inbox') { setInbox(null); store.loadInbox().then((r) => setInbox(r ?? [])); }
+  }, [inSection, leader, adminOpen]);
 
   if (!adminOpen) return null;
 
-  const save = async (next: Content, done: string) => {
+  const home = () => { setTask(null); setInSection(null); setEditing(null); setConfirmDel(false); };
+  const done = (msg: string) => { home(); setNote(msg); };
+  const save = async (next: Content, doneMsg: string) => {
     setBusy(true); setNote(null);
     const err = await saveContent(next);
     setBusy(false);
-    setNote(err ?? done);
+    setNote(err ?? doneMsg);
     return !err;
   };
+  const back = () => (
+    <Pressable onPress={home} style={st.backRow} hitSlop={8} accessibilityRole="button">
+      <View style={{ transform: [{ scaleX: -1 }] }}><Icon name="right" size={18} color={C.blueDeep} stroke={2.4} /></View>
+      <Text style={st.backText}>All tasks</Text>
+    </Pressable>
+  );
 
-  let body: React.ReactNode;
-  if (!leader) {
-    // The leader panel is only for accounts Rabbi Zevy marked as leaders (from the dashboard).
-    // There is no passcode here anymore; the rabbi runs the website with the passcode.
-    body = (
-      <Card>
-        <IconTile icon="lock" size={48} />
-        <Text style={[T.h2, { marginTop: 12 }]}>Leaders only</Text>
-        <Text style={[T.small, { marginTop: 4 }]}>This is for Rabbi Zevy and the chapter leaders. If you should have it, ask Rabbi Zevy to add you as a leader — then it shows up here on its own.</Text>
-      </Card>
-    );
-  } else if (section === 'Live banner') {
-    const a = content.alert;
-    const on = a.on && (!a.until || a.until > new Date().toISOString());
-    body = (
-      <View style={{ gap: 12 }}>
-        <Card>
-          <Text style={T.eyebrow}>{on ? 'Live right now' : 'No banner showing'}</Text>
-          {on ? (
-            <>
-              <Text style={[T.h2, { marginTop: 6 }]}>{a.title}</Text>
-              {a.text ? <Text style={[T.small, { marginTop: 2 }]}>{a.text}</Text> : null}
-              <Text style={[T.small, { marginTop: 6 }]}>{a.until ? `Ends ${new Date(a.until).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}` : 'Stays up until you turn it off'}</Text>
-              <View style={{ marginTop: 12, alignSelf: 'flex-start' }}>
-                <Button small kind="danger" label={busy ? 'Turning off…' : 'Turn off banner'} disabled={busy} onPress={async () => { setBusy(true); setNote(await store.sendAlert(null)); setBusy(false); }} />
-              </View>
-            </>
-          ) : <Text style={[T.small, { marginTop: 6 }]}>Send one below. It appears at the top of every screen in the app within about 30 seconds.</Text>}
-        </Card>
-        <Card>
-          <Text style={T.h2}>Send a live banner</Text>
-          <Field label="Title" value={String(live.title)} onChange={(x) => setLive({ ...live, title: x })} placeholder="Pizza night moved to 8 PM" />
-          <Field label="More detail (optional)" value={String(live.text)} onChange={(x) => setLive({ ...live, text: x })} placeholder="Same place. Bring a friend." />
-          <View style={{ marginTop: 14 }}>
-            <Text style={u.fieldLabel}>Tapping it opens</Text>
-            <Chips wrap options={targetOpts(content).map((o) => o.l)} value={targetOpts(content).find((o) => o.v === live.target)?.l ?? 'Nothing'} onChange={(l) => setLive({ ...live, target: targetOpts(content).find((o) => o.l === l)!.v })} />
-          </View>
-          <View style={{ marginTop: 14 }}>
-            <Text style={u.fieldLabel}>Show it for</Text>
-            <Chips wrap options={DURATIONS.map((d) => d.l)} value={String(live.hours)} onChange={(l) => setLive({ ...live, hours: l })} />
-          </View>
-          <View style={st.toggle}>
-            <Text style={[T.h3, { flex: 1 }]}>Also send as a notification to every phone</Text>
-            <Toggle value={!!live.push} onChange={(x) => setLive({ ...live, push: x })} label="Also send as a notification" />
-          </View>
-          <View style={{ marginTop: 18 }}>
-            <Button icon="megaphone" label={busy ? 'Sending…' : 'Send to everyone'} disabled={busy || String(live.title).trim().length < 2} onPress={async () => {
-              setBusy(true);
-              setNote(await store.sendAlert({ title: String(live.title), text: String(live.text), target: toTarget(String(live.target)), hours: DURATIONS.find((d) => d.l === live.hours)?.h ?? 12, push: !!live.push }));
-              setBusy(false);
-              setLive({ ...live, title: '', text: '' });
-            }} />
-          </View>
-        </Card>
-      </View>
-    );
-  } else if (section === 'Sign-ups') {
-    const evs = content.events.filter((e) => e.signup === 'app');
-    body = (
-      <View style={{ gap: 12 }}>
-        {signups === null ? <Text style={T.small}>Loading sign-ups…</Text> : <Text style={T.small}>{signups.phones} phone{signups.phones === 1 ? ' has' : 's have'} notifications turned on.</Text>}
-        {signups && evs.length === 0 ? <Text style={T.small}>No Great Neck events take in-app sign-ups yet.</Text> : null}
-        {signups ? evs.map((e) => {
-          const rows = signups.signups[e.id] ?? [];
-          return (
-            <Card key={e.id}>
-              <Text style={T.h2}>{e.title}</Text>
-              <Text style={[T.small, { marginTop: 2 }]}>{dateLabel(e)} · {rows.length} signed up</Text>
-              {rows.map((r, i) => (
-                <View key={i} style={st.signRow}>
-                  <Text style={[T.h3, { flex: 1 }]}>{r.name}</Text>
-                  <Text style={T.small}>{[r.grade ? `Grade ${r.grade}` : '', r.age ? `Age ${r.age}` : '', r.gender === 'girl' ? 'Girl' : r.gender === 'boy' ? 'Boy' : ''].filter(Boolean).join(' · ')}</Text>
+  const form = (t: Task): React.ReactNode => {
+    switch (t) {
+      case 'event': return <EventForm onDone={done} />;
+      case 'invite': return <InviteForm onDone={done} />;
+      case 'poster': return <PosterForm onDone={done} />;
+      case 'ai': return <AiPlanner onDone={done} />;
+      case 'food': return <FoodForm onDone={done} />;
+      case 'whatsapp': return <WhatsAppImport onDone={done} />;
+      case 'popup': return <PopupEditor onDone={done} />;
+      case 'minyan': return <MinyanEditor onDone={done} />;
+      case 'post': case 'alert': case 'notify': return <SimpleForm kind={t} onDone={done} />;
+      default: return null;
+    }
+  };
+
+  // The Manage section views (who's coming, photos, people, questions) and the full list editors.
+  const sectionBody = (): React.ReactNode => {
+    if (inSection === 'Live banner') {
+      const a = content.alert;
+      const on = a.on && (!a.until || a.until > new Date().toISOString());
+      return (
+        <View style={{ gap: 12 }}>
+          <Card>
+            <Text style={T.eyebrow}>{on ? 'Live right now' : 'No banner showing'}</Text>
+            {on ? (
+              <>
+                <Text style={[T.h2, { marginTop: 6 }]}>{a.title}</Text>
+                {a.text ? <Text style={[T.small, { marginTop: 2 }]}>{a.text}</Text> : null}
+                <View style={{ marginTop: 12, alignSelf: 'flex-start' }}>
+                  <Button small kind="danger" label={busy ? 'Turning off…' : 'Turn off banner'} disabled={busy} onPress={async () => { setBusy(true); setNote(await store.sendAlert(null)); setBusy(false); }} />
                 </View>
-              ))}
-            </Card>
-          );
-        }) : null}
-      </View>
-    );
-  } else if (section === 'People') {
-    body = <PeopleView />;
-  } else if (section === 'Photos') {
-    body = <PhotoReview />;
-  } else if (section === 'Inbox') {
-    body = (
+              </>
+            ) : <Text style={[T.small, { marginTop: 6 }]}>Send one below. It appears at the top of every screen within about 30 seconds.</Text>}
+          </Card>
+          <Card>
+            <Text style={T.h2}>Send a live banner</Text>
+            <Field label="Title" value={String(live.title)} onChange={(x) => setLive({ ...live, title: x })} placeholder="Pizza night moved to 8 PM" />
+            <Field label="More detail (optional)" value={String(live.text)} onChange={(x) => setLive({ ...live, text: x })} placeholder="Same place. Bring a friend." />
+            <View style={{ marginTop: 14 }}>
+              <Text style={u.fieldLabel}>Tapping it opens</Text>
+              <Chips wrap options={targetOpts(content).map((o) => o.l)} value={targetOpts(content).find((o) => o.v === live.target)?.l ?? 'Nothing'} onChange={(l) => setLive({ ...live, target: targetOpts(content).find((o) => o.l === l)!.v })} />
+            </View>
+            <View style={{ marginTop: 14 }}>
+              <Text style={u.fieldLabel}>Show it for</Text>
+              <Chips wrap options={DURATIONS.map((d) => d.l)} value={String(live.hours)} onChange={(l) => setLive({ ...live, hours: l })} />
+            </View>
+            <View style={st.toggle}>
+              <Text style={[T.h3, { flex: 1 }]}>Also send as a notification to every phone</Text>
+              <Toggle value={!!live.push} onChange={(x) => setLive({ ...live, push: x })} label="Also send as a notification" />
+            </View>
+            <View style={{ marginTop: 18 }}>
+              <Button icon="megaphone" label={busy ? 'Sending…' : 'Send to everyone'} disabled={busy || String(live.title).trim().length < 2} onPress={async () => {
+                setBusy(true);
+                setNote(await store.sendAlert({ title: String(live.title), text: String(live.text), target: toTarget(String(live.target)), hours: DURATIONS.find((d) => d.l === live.hours)?.h ?? 12, push: !!live.push }));
+                setBusy(false);
+                setLive({ ...live, title: '', text: '' });
+              }} />
+            </View>
+          </Card>
+        </View>
+      );
+    }
+    if (inSection === 'Sign-ups') {
+      const evs = content.events.filter((e) => e.signup === 'app');
+      return (
+        <View style={{ gap: 12 }}>
+          {signups === null ? <Text style={T.small}>Loading sign-ups…</Text> : <Text style={T.small}>{signups.phones} phone{signups.phones === 1 ? ' has' : 's have'} notifications turned on.</Text>}
+          {signups && evs.length === 0 ? <Text style={T.small}>No Great Neck events take in-app sign-ups yet.</Text> : null}
+          {signups ? evs.map((e) => {
+            const rows = signups.signups[e.id] ?? [];
+            return (
+              <Card key={e.id}>
+                <Text style={T.h2}>{e.title}</Text>
+                <Text style={[T.small, { marginTop: 2 }]}>{dateLabel(e)} · {rows.length} signed up</Text>
+                {rows.map((r, i) => (
+                  <View key={i} style={st.signRow}>
+                    <Text style={[T.h3, { flex: 1 }]}>{r.name}</Text>
+                    <Text style={T.small}>{[r.grade ? `Grade ${r.grade}` : '', r.age ? `Age ${r.age}` : '', r.gender === 'girl' ? 'Girl' : r.gender === 'boy' ? 'Boy' : ''].filter(Boolean).join(' · ')}</Text>
+                  </View>
+                ))}
+              </Card>
+            );
+          }) : null}
+        </View>
+      );
+    }
+    if (inSection === 'People') return <PeopleView />;
+    if (inSection === 'Photos') return <PhotoReview />;
+    if (inSection === 'Inbox') return (
       <View style={{ gap: 12 }}>
         {inbox === null ? <Text style={T.small}>Loading questions…</Text> : inbox.length === 0 ? <Text style={T.small}>No questions yet. Teens send them from "Ask the rabbi" in the Chapter tab.</Text> : null}
         {(inbox ?? []).map((q) => (
@@ -287,8 +298,8 @@ export function AdminPanel() {
         ))}
       </View>
     );
-  } else {
-    const cfg = LISTS[section];
+    // list editors: Posts / Events / Challenges / Info
+    const cfg = LISTS[inSection as 'Posts' | 'Events' | 'Challenges' | 'Info'];
     const items = content[cfg.key] as any[];
     if (editing) {
       const d = editing.draft;
@@ -299,7 +310,6 @@ export function AdminPanel() {
         const nextList = editing.id ? items.map((x) => (x.id === editing.id ? item : x)) : [item, ...items];
         const auto = !editing.id && (cfg.key === 'posts' || cfg.key === 'events');
         if (!(await save({ ...content, [cfg.key]: nextList }, editing.id ? 'Saved.' : auto ? 'Live for everyone. Every phone got a notification.' : 'Live for everyone.'))) return;
-        // New posts and events notify automatically (server); challenges only when asked.
         if (!editing.id && d._notify && cfg.key === 'challenges') {
           const target: Target = { type: 'challenge', id: item.id };
           const sent = await store.sendPush(`New challenge: ${item.title}`, 'Open CTeen GN to join.', target);
@@ -307,7 +317,7 @@ export function AdminPanel() {
         }
         setEditing(null);
       };
-      body = (
+      return (
         <Card>
           <Text style={T.h2}>{editing.id ? `Edit ${cfg.one}` : `New ${cfg.one}`}</Text>
           <Form list={specs(cfg.key, content, !editing.id)} draft={d} set={(draft) => setEditing({ ...editing, draft })} />
@@ -323,32 +333,31 @@ export function AdminPanel() {
           </View>
         </Card>
       );
-    } else {
-      body = (
-        <View style={{ gap: 10 }}>
-          <Button icon="plus" label={`New ${cfg.one}`} onPress={() => { setNote(null); setConfirmDel(false); setEditing({ id: null, draft: { ...BLANK[cfg.key] } }); }} />
-          {cfg.key === 'challenges' ? <Text style={T.small}>Flip a switch to turn a challenge on. Every live challenge shows as a banner on Home.</Text> : null}
-          {items.map((x) => (
-            <Card key={x.id} style={st.item}>
-              <Pressable style={st.itemMain} onPress={() => { setNote(null); setConfirmDel(false); setEditing({ id: x.id, draft: toDraft(cfg.key, x) }); }} accessibilityRole="button" accessibilityLabel={`Edit ${x.title}`}>
-                <IconTile icon={x.icon || (cfg.key === 'posts' ? (x.pinned ? 'pinned' : 'chat') : 'star')} color={x.color} size={40} />
-                <View style={{ flex: 1 }}>
-                  <Text style={T.h3} numberOfLines={1}>{x.title}</Text>
-                  <Text style={T.small} numberOfLines={1}>
-                    {cfg.key === 'events' ? `${x.scope === 'gn' ? 'Great Neck' : 'International'} · ${dateLabel(x)}` : cfg.key === 'challenges' ? `${x.active ? 'Live' : 'Off'} · goal ${x.goal} · tap to edit` : cfg.key === 'posts' ? `${x.kind} · ${x.at}` : x.body}
-                  </Text>
-                </View>
-              </Pressable>
-              {cfg.key === 'challenges' ? (
-                <Toggle value={!!x.active} label={`${x.title} is live`} onChange={(v) => save({ ...content, challenges: content.challenges.map((c) => (c.id === x.id ? { ...c, active: v } : c)) }, v ? `${x.title} is live. Teens see the banner on Home.` : `${x.title} is off.`)} />
-              ) : <Icon name="right" size={17} color={C.faint} stroke={2.4} />}
-            </Card>
-          ))}
-          {items.length === 0 ? <Text style={[T.small, { textAlign: 'center', marginTop: 10 }]}>Nothing here yet.</Text> : null}
-        </View>
-      );
     }
-  }
+    return (
+      <View style={{ gap: 10 }}>
+        <Button icon="plus" label={`New ${cfg.one}`} onPress={() => { setNote(null); setConfirmDel(false); setEditing({ id: null, draft: { ...BLANK[cfg.key] } }); }} />
+        {cfg.key === 'challenges' ? <Text style={T.small}>Flip a switch to turn a challenge on. Every live challenge shows as a banner on Home.</Text> : null}
+        {items.map((x) => (
+          <Card key={x.id} style={st.item}>
+            <Pressable style={st.itemMain} onPress={() => { setNote(null); setConfirmDel(false); setEditing({ id: x.id, draft: toDraft(cfg.key, x) }); }} accessibilityRole="button" accessibilityLabel={`Edit ${x.title}`}>
+              <IconTile icon={x.icon || (cfg.key === 'posts' ? (x.pinned ? 'pinned' : 'chat') : 'star')} color={x.color} size={40} />
+              <View style={{ flex: 1 }}>
+                <Text style={T.h3} numberOfLines={1}>{x.title}</Text>
+                <Text style={T.small} numberOfLines={1}>
+                  {cfg.key === 'events' ? `${x.scope === 'gn' ? 'Great Neck' : 'International'} · ${dateLabel(x)}` : cfg.key === 'challenges' ? `${x.active ? 'Live' : 'Off'} · goal ${x.goal} · tap to edit` : cfg.key === 'posts' ? `${x.kind} · ${x.at}` : x.body}
+                </Text>
+              </View>
+            </Pressable>
+            {cfg.key === 'challenges' ? (
+              <Toggle value={!!x.active} label={`${x.title} is live`} onChange={(v) => save({ ...content, challenges: content.challenges.map((c) => (c.id === x.id ? { ...c, active: v } : c)) }, v ? `${x.title} is live. Teens see the banner on Home.` : `${x.title} is off.`)} />
+            ) : <Icon name="right" size={17} color={C.faint} stroke={2.4} />}
+          </Card>
+        ))}
+        {items.length === 0 ? <Text style={[T.small, { textAlign: 'center', marginTop: 10 }]}>Nothing here yet.</Text> : null}
+      </View>
+    );
+  };
 
   return (
     <Modal visible animationType="slide" onRequestClose={() => setAdminOpen(false)}>
@@ -363,42 +372,29 @@ export function AdminPanel() {
               <Icon name="x" size={18} color={C.ink} stroke={2.4} />
             </Pressable>
           </View>
-          {leader ? (
-            <View style={st.modeRow}>
-              {(['simple', 'expert'] as const).map((m) => (
-                <Pressable key={m} onPress={() => { setMode(m); setTask(null); }} style={[st.modeBtn, mode === m && st.modeOn]} accessibilityRole="button" accessibilityState={{ selected: mode === m }}>
-                  <Text style={[st.modeText, mode === m && { color: C.onInverse }]}>{m === 'simple' ? 'Simple' : 'Expert'}</Text>
-                </Pressable>
-              ))}
-            </View>
-          ) : null}
-          {leader && mode === 'expert' ? <Chips options={SECTIONS} value={section} onChange={setSection} /> : null}
         </View>
         <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" style={{ flex: 1 }} contentContainerStyle={{ paddingVertical: 16, paddingBottom: insets.bottom + 40 }} keyboardShouldPersistTaps="handled">
           <View style={st.col}>
             {note ? <Text style={st.note} accessibilityLiveRegion="polite">{note}</Text> : null}
-            {leader && mode === 'simple' ? (
-              task === null ? <SimpleHome onPick={(k) => { setNote(null); setTask(k); const s = TASK_SECTION[k]; if (s) setSection(s); }} /> : (
-                <View>
-                  <Pressable onPress={() => setTask(null)} style={st.backRow} hitSlop={8} accessibilityRole="button">
-                    <View style={{ transform: [{ scaleX: -1 }] }}><Icon name="right" size={18} color={C.blueDeep} stroke={2.4} /></View>
-                    <Text style={st.backText}>Back</Text>
-                  </Pressable>
-                  {task === 'event' ? <EventForm onDone={(msg) => { setNote(msg); setTask(null); }} />
-                    : task === 'invite' ? <InviteForm onDone={(msg) => { setNote(msg); setTask(null); }} />
-                    : task === 'poster' ? <PosterForm onDone={(msg) => { setNote(msg); setTask(null); }} />
-                    : task === 'ai' ? <AiPlanner onDone={(msg) => { setNote(msg); setTask(null); }} />
-                    : task === 'post' || task === 'alert' || task === 'notify' ? <SimpleForm kind={task} onDone={(msg) => { setNote(msg); setTask(null); }} />
-                    : task === 'challenge' ? <ChallengeEditor onDone={(msg) => { setNote(msg); setTask(null); }} />
-                    : task === 'food' ? <FoodForm onDone={(msg) => { setNote(msg); setTask(null); }} />
-                    : task === 'whatsapp' ? <WhatsAppImport onDone={(msg) => { setNote(msg); setTask(null); }} />
-                    : task === 'popup' ? <PopupEditor onDone={(msg) => { setNote(msg); setTask(null); }} />
-                    : task === 'minyan' ? <MinyanEditor onDone={(msg) => { setNote(msg); setTask(null); }} />
-                    : body}
-                </View>
-              )
-            ) : body}
-            {leader && !editing ? (
+            {!leader ? (
+              <Card>
+                <IconTile icon="lock" size={48} />
+                <Text style={[T.h2, { marginTop: 12 }]}>Leaders only</Text>
+                <Text style={[T.small, { marginTop: 4 }]}>This is for Rabbi Zevy and the chapter leaders. If you should have it, ask Rabbi Zevy to add you as a leader — then it shows up here on its own.</Text>
+              </Card>
+            ) : task ? (
+              <View>{back()}{form(task)}</View>
+            ) : inSection ? (
+              <View>{back()}{sectionBody()}</View>
+            ) : (
+              <Home
+                onCreate={(t) => { setNote(null); setTask(t); }}
+                onManage={(s) => { setNote(null); setInSection(s); }}
+                onMinyan={() => { setNote(null); setTask('minyan'); }}
+                onCompose={() => { setAdminOpen(false); setTimeout(() => store.setComposerOpen(true), 450); }}
+              />
+            )}
+            {leader && !task && !inSection ? (
               <Pressable onPress={store.leaderLogout} style={{ alignSelf: 'center', marginTop: 24 }} hitSlop={8} accessibilityRole="button">
                 <Text style={[T.small, { textDecorationLine: 'underline' }]}>Sign out of the leader panel</Text>
               </Pressable>
@@ -410,51 +406,38 @@ export function AdminPanel() {
   );
 }
 
-// ───────── Simple mode ─────────
-type Task = 'post' | 'notify' | 'challenge' | 'poster' | 'ai' | 'invite' | 'whatsapp' | 'food' | 'event' | 'alert' | 'popup' | 'minyan' | 'signups' | 'photos' | 'people' | 'inbox';
-const TASK_SECTION: Partial<Record<Task, Section>> = { signups: 'Sign-ups', photos: 'Photos', people: 'People', inbox: 'Inbox' };
-const TASKS: { k: Task; icon: string; color: 'blue' | 'orange' | 'purple' | 'green' | 'pink' | 'yellow'; title: string; sub: string }[] = [
-  { k: 'post', icon: 'chat', color: 'blue', title: 'Post an update', sub: 'Write something, add photos' },
-  { k: 'whatsapp', icon: 'send', color: 'green', title: 'Import from WhatsApp', sub: 'Paste an announcement, AI turns it into a post' },
-  { k: 'food', icon: 'food', color: 'orange', title: 'Announce the food', sub: "What's being served. Shows on Home" },
-  { k: 'event', icon: 'calendar', color: 'orange', title: 'Add an event', sub: 'Name, day, time and place' },
-  { k: 'alert', icon: 'megaphone', color: 'pink', title: 'Send a quick alert', sub: 'A banner on every phone, plus a notification' },
-  { k: 'popup', icon: 'bell', color: 'purple', title: 'Pop-up message', sub: 'Shows every time someone opens the app' },
-  { k: 'minyan', icon: 'clock', color: 'green', title: 'Minyan times', sub: 'Weekday and Shabbat times in the Chapter tab' },
-  { k: 'signups', icon: 'users', color: 'green', title: "See who's coming", sub: 'Sign-ups for each event' },
-  { k: 'photos', icon: 'camera', color: 'purple', title: 'Check Tefillin photos', sub: "Look over today's photos" },
-  { k: 'people', icon: 'user', color: 'blue', title: 'People & leaders', sub: 'Everyone who signed up. Make someone a leader.' },
-  { k: 'inbox', icon: 'question', color: 'yellow', title: 'Questions from teens', sub: 'What teens asked you' },
-];
+// ───────── the panel home ─────────
+type Task = 'post' | 'notify' | 'poster' | 'ai' | 'invite' | 'whatsapp' | 'food' | 'event' | 'alert' | 'popup' | 'minyan';
+type TileColor = 'blue' | 'orange' | 'purple' | 'green' | 'pink' | 'yellow';
 
-function SimpleHome({ onPick }: { onPick: (k: Task) => void }) {
-  const { content, sendAlert, saveContent, setComposerOpen, setAdminOpen, leader } = useStore();
+function Home({ onCreate, onManage, onMinyan, onCompose }: { onCreate: (t: Task) => void; onManage: (s: Section) => void; onMinyan: () => void; onCompose: () => void }) {
+  const { content, sendAlert, saveContent, leader } = useStore();
   const [busy, setBusy] = useState<string | null>(null);
-  const alertOn = content.alert?.on ? content.alert : null;
+  const alertOn = content.alert?.on && (!content.alert.until || content.alert.until > new Date().toISOString()) ? content.alert : null;
   const popupOn = content.popup?.on && content.popup.title ? content.popup : null;
-  const share: { k: Task | 'compose'; icon: string; color: 'blue' | 'orange' | 'purple' | 'green' | 'pink' | 'yellow'; title: string }[] = [
+  const create: { k: Task | 'compose'; icon: string; color: TileColor; title: string }[] = [
     { k: 'compose', icon: 'camera', color: 'blue', title: 'New post' },
-    { k: 'poster', icon: 'ticket', color: 'pink', title: 'Poster' },
     { k: 'event', icon: 'calendar', color: 'orange', title: 'Event' },
     { k: 'invite', icon: 'send', color: 'orange', title: 'Invitation' },
-    { k: 'ai', icon: 'star', color: 'purple', title: 'AI planner' },
+    { k: 'poster', icon: 'ticket', color: 'pink', title: 'Poster' },
     { k: 'notify', icon: 'bell', color: 'blue', title: 'Notification' },
     { k: 'alert', icon: 'megaphone', color: 'pink', title: 'Live banner' },
     { k: 'food', icon: 'food', color: 'yellow', title: 'Food' },
+    { k: 'popup', icon: 'star', color: 'purple', title: 'Pop-up' },
+    { k: 'ai', icon: 'star', color: 'purple', title: 'AI planner' },
     { k: 'whatsapp', icon: 'send', color: 'green', title: 'From WhatsApp' },
   ];
-  const manage: { k: Task; icon: string; title: string }[] = [
-    { k: 'signups', icon: 'users', title: "Who's coming" },
-    { k: 'photos', icon: 'camera', title: 'Tefillin photos' },
-    { k: 'people', icon: 'user', title: 'People & leaders' },
-    { k: 'inbox', icon: 'question', title: 'Questions from teens' },
-    { k: 'challenge', icon: 'tefillin', title: 'Challenges and rules' },
-    { k: 'minyan', icon: 'clock', title: 'Minyan times' },
+  const manage: { icon: string; title: string; go: () => void }[] = [
+    { icon: 'users', title: "Who's coming", go: () => onManage('Sign-ups') },
+    { icon: 'camera', title: 'Tefillin photos', go: () => onManage('Photos') },
+    { icon: 'chat', title: 'Feed posts', go: () => onManage('Posts') },
+    { icon: 'calendar', title: 'Events', go: () => onManage('Events') },
+    { icon: 'tefillin', title: 'Challenges & rules', go: () => onManage('Challenges') },
+    { icon: 'compass', title: 'Chapter info', go: () => onManage('Info') },
+    { icon: 'clock', title: 'Minyan times', go: onMinyan },
+    { icon: 'question', title: 'Questions from teens', go: () => onManage('Inbox') },
+    { icon: 'user', title: 'People & leaders', go: () => onManage('People') },
   ];
-  const pick = (k: Task | 'compose') => {
-    if (k === 'compose') { setAdminOpen(false); setTimeout(() => setComposerOpen(true), 450); return; }
-    onPick(k);
-  };
   return (
     <View>
       <Text style={st.hiLine}>Hi{leader && !leader.startsWith('acct:') ? ' Rabbi Zevy' : ''}. What do you want to share?</Text>
@@ -479,10 +462,10 @@ function SimpleHome({ onPick }: { onPick: (k: Task) => void }) {
         </View>
       ) : null}
 
-      <Text style={st.groupHead}>Share</Text>
+      <Text style={st.groupHead}>Create</Text>
       <View style={st.grid}>
-        {share.map((x) => (
-          <Pressable key={x.k} onPress={() => pick(x.k)} style={({ pressed }) => [st.tile, pressed && { transform: [{ scale: 0.97 }], opacity: 0.9 }]} accessibilityRole="button" accessibilityLabel={x.title}>
+        {create.map((x) => (
+          <Pressable key={x.k} onPress={() => (x.k === 'compose' ? onCompose() : onCreate(x.k))} style={({ pressed }) => [st.tile, pressed && { transform: [{ scale: 0.97 }], opacity: 0.9 }]} accessibilityRole="button" accessibilityLabel={x.title}>
             <View style={st.tileCard}>
               <IconTile icon={x.icon} color={x.color} size={40} />
               <Text style={st.tileTitle}>{x.title}</Text>
@@ -494,14 +477,13 @@ function SimpleHome({ onPick }: { onPick: (k: Task) => void }) {
       <Text style={st.groupHead}>Manage</Text>
       <View style={st.manage}>
         {manage.map((x, i) => (
-          <Pressable key={x.k} onPress={() => onPick(x.k)} style={({ pressed }) => [st.manageRow, i > 0 && st.manageRule, pressed && { backgroundColor: C.bg }]} accessibilityRole="button">
+          <Pressable key={x.title} onPress={x.go} style={({ pressed }) => [st.manageRow, i > 0 && st.manageRule, pressed && { backgroundColor: C.bg }]} accessibilityRole="button">
             <Icon name={x.icon} size={19} color={C.sub} stroke={2} />
             <Text style={st.manageText}>{x.title}</Text>
             <Icon name="right" size={16} color={C.faint} stroke={2.4} />
           </Pressable>
         ))}
       </View>
-      <Text style={[T.small, { marginTop: 18, textAlign: 'center' }]}>Need colors, age limits or challenges? Switch to Expert at the top.</Text>
     </View>
   );
 }
