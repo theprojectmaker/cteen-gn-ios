@@ -5,14 +5,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, F, PREFS, R, SH, SP, T, display, numeral } from './theme';
 import { Icon } from './icons';
 import { challengeFits, sortPosts, upcoming, useShabbat, useStore, type Challenge, type EventItem } from './store';
-import { audienceLabel } from './ui';
 import { Band, BrushTag, Hairline, Label, Row, SectionHead, Slab, Stat, Ticks, eventPicture, hebrewDate, heroType, useAspect } from './look';
 import { useChallengeCard } from './rewards';
-import { timeAgo } from './feed';
 import { InviteCards, useMyInvites } from './invites';
 import { MINYAN_FALLBACK, minyanTime } from './minyan';
-import { LASTS_MS, clockOf, clockText, dateRange, dayAndTime, daysAway, isOver, parseDay, prettyTime, spotlight, startsAt, whenWords } from './when';
-import { nyDate, nyTime, untilText } from './zmanim';
+import { audienceLabel } from './ui';
+import { clockOf, clockText, prettyTime, dateRange, dayAndTime, isOver, parseDay, spotlight, startsAt, whenWords } from './when';
+import { nyDate, nyTime } from './zmanim';
 
 // ───────────────────────── Home ─────────────────────────
 // The first screen is a full-screen carousel: one event per page, a flyer each, swiped sideways.
@@ -38,7 +37,7 @@ export function Home() {
   const live = content.challenges.filter((c) => c.active && challengeFits(c, gender));
   const main = live.find((c) => c.id === 'tefillin') ?? live[0];
   const others = live.filter((c) => c !== main);
-  const invites = useMyInvites().filter((v) => !pages.length || v.eventId !== pages[0].id);
+  const invites = useMyInvites();
   // How tall the first screen is: from under the header bar to above the tab bar (an invitation
   // band above it takes its own height out of that).
   const [bandH, setBandH] = useState(0);
@@ -65,7 +64,7 @@ export function Home() {
       <View onLayout={(e) => {
         const h = Math.ceil(e.nativeEvent.layout.height); if (h !== bandH) setBandH(h);
               }}>
-        <InviteCards skipEventId={pages[0]?.id} style={st.invites} />
+        <InviteCards style={st.invites} />
       </View>
       <View ref={wrap} style={st.dateRow}>
         <DateLine now={now} />
@@ -150,7 +149,7 @@ function Carousel({ pages, spotTag, spotId, now, width, height, scroller, index,
       <ScrollView key={pages[0]?.id ?? "none"} ref={scroller} horizontal pagingEnabled showsHorizontalScrollIndicator={false} decelerationRate="fast" scrollEventThrottle={16} onScroll={onScroll}
         style={st.pagerScroll} contentContainerStyle={{ width: width * count }} scrollEnabled={count > 1}>
         {pages.length ? pages.map((e, i) => (
-          <EventPage key={e.id} e={e} first={i === 0} tag={i === 0 && e.id === spotId && spotTag ? spotTag : whenWords(e, now)} now={now} width={width} height={height} />
+          <EventPage key={e.id} e={e} tag={i === 0 && e.id === spotId && spotTag ? spotTag : whenWords(e, now)} now={now} width={width} height={height} />
         )) : <EmptyPage width={width} height={height} />}
       </ScrollView>
     </View>
@@ -170,9 +169,9 @@ function Marker({ index, count, onNext }: { index: number; count: number; onNext
   );
 }
 
-// One event, one flyer: the tag, the title, the picture whole beside the facts, the about line and the buttons.
-function EventPage({ e, first, tag, now, width, height }: { e: EventItem; first: boolean; tag: string; now: number; width: number; height: number }) {
-  const { openEvent } = useStore();
+// One event, one calm flyer: the tag, the picture large and whole, the title, one short line, one button.
+function EventPage({ e, tag, now, width, height }: { e: EventItem; tag: string; now: number; width: number; height: number }) {
+  const { openEvent, goingCount } = useStore();
   const picture = eventPicture(e);
   const ratio = useAspect(picture?.source, 0.77);
   const col = width - SP.gutter * 2;
@@ -181,52 +180,55 @@ function EventPage({ e, first, tag, now, width, height }: { e: EventItem; first:
     const { width: w, height: h } = ev.nativeEvent.layout;
     if (Math.abs(w - zone.w) > 0.5 || Math.abs(h - zone.h) > 0.5) setZone({ w, h });
   };
-  const wide = !!picture && ratio > 1.05;
-  // the picture is always shown whole at its own shape, as large as the room allows
+  // the picture is always shown whole at its own shape, as large as the room allows, centered
   let box: { w: number; h: number } | null = null;
   if (zone.w > 0) {
-    const room = wide && picture ? { w: zone.w - 8, h: zone.h - 104 } : { w: Math.min(zone.w * 0.56, zone.w - 150), h: zone.h - 16 };
     const r = picture ? ratio : 0.77;
-    const w = Math.max(60, Math.min(room.w, room.h * r));
+    const w = Math.max(60, Math.min(zone.w - 24, (zone.h - 20) * r, picture ? 9999 : 230));
     box = { w: Math.round(w), h: Math.round(w / r) };
   }
   const open = () => openEvent(e.id);
+  const typed = (e.time || '').trim();
+  const clock = clockOf(typed);
+  const extraTime = typed && (!clock || prettyTime(typed) !== clockText(clock)) ? typed : ''; // the tag already says a plain start time
+  const line = [e.place, e.price].filter(Boolean).join(' · ');
+  const count = e.showGoing ? goingCount[e.id] ?? 0 : 0;
+  const small = [extraTime, audienceLabel(e), count > 0 ? `${count} going` : ''].filter(Boolean).join(' · ');
+  const manyDays = !!e.end && e.end !== e.start;
+  const lineText = line || (manyDays ? dateRange(e) : '');
+  const titleStyle = e.title.length > 34 ? { ...T.hero, fontSize: 30, lineHeight: 30, paddingRight: 4 } : { ...T.hero, fontSize: 34, lineHeight: 34, paddingRight: 4 };
   return (
     <View style={[st.page, { width, height }]}>
-      <Pressable onPress={open} accessible={false} style={({ pressed }) => pressed && st.dim}>
-        <BrushTag label={tag} style={st.tag} />
-        <Text style={[heroType(e.title, col), st.title]} numberOfLines={3} accessibilityRole="button" accessibilityLabel={`${e.title}. ${tag.toLowerCase()}.`} accessibilityHint="Opens the event">
-          {e.title}
-        </Text>
-      </Pressable>
+      <BrushTag label={tag} style={st.tag} />
       <View style={st.zone} onLayout={onZone}>
-        {zone.w > 0 ? (
-          <View style={wide ? st.zoneCol : st.zoneRow}>
-            {box && picture ? (
-              <Pressable onPress={open} accessibilityRole="button" accessibilityLabel={`${e.title} poster. Opens the event`}
-                style={({ pressed }) => [st.print, SH.print, { width: box!.w, height: box!.h }, wide && { alignSelf: 'center' }, pressed && st.dim]}>
-                <View style={st.printClip}><Image source={picture.source} style={st.printImg} resizeMode="cover" /></View>
-                <View pointerEvents="none" style={st.printEdge} />
-              </Pressable>
-            ) : box && !picture ? (
-              <Pressable onPress={open} accessibilityRole="button" accessibilityLabel={`${e.title}, ${dayAndTime(e, now).day.toLowerCase()}. Opens the event`}
-                style={({ pressed }) => [st.print, st.typePrint, SH.print, { width: box!.w, height: box!.h }, pressed && st.dim]}>
-                <DateBig date={e.start} size={Math.round(box.w * 0.68)} />
-                <View style={st.typeBar} />
-                <View pointerEvents="none" style={st.printEdge} />
-              </Pressable>
-            ) : null}
-            <View style={wide ? st.factsWide : st.facts}><Facts e={e} first={first} now={now} /></View>
-          </View>
+        {box ? (
+          picture ? (
+            <Pressable onPress={open} accessibilityRole="button" accessibilityLabel={`${e.title} poster. Opens the event`}
+              style={({ pressed }) => [st.print, SH.print, { width: box!.w, height: box!.h }, pressed && st.dim]}>
+              <View style={st.printClip}><Image source={picture.source} style={st.printImg} resizeMode="cover" /></View>
+              <View pointerEvents="none" style={st.printEdge} />
+            </Pressable>
+          ) : (
+            <Pressable onPress={open} accessibilityRole="button" accessibilityLabel={`${e.title}, ${dayAndTime(e, now).day.toLowerCase()}. Opens the event`}
+              style={({ pressed }) => [st.print, st.typePrint, SH.print, { width: box!.w, height: box!.h }, pressed && st.dim]}>
+              <DateBig date={e.start} size={Math.round(box.w * 0.68)} />
+              <View style={st.typeBar} />
+              <View pointerEvents="none" style={st.printEdge} />
+            </Pressable>
+          )
         ) : null}
       </View>
-      {e.about ? <Text style={st.about} numberOfLines={2}>{e.about}</Text> : null}
-      <Actions e={e} />
+      <Pressable onPress={open} accessible={false} style={({ pressed }) => pressed && st.dim}>
+        <Text style={[titleStyle, st.title]} numberOfLines={2} accessibilityRole="button" accessibilityLabel={`${e.title}. ${tag.toLowerCase()}.`} accessibilityHint="Opens the event">{e.title}</Text>
+        {lineText ? <Text style={st.line} numberOfLines={1}>{lineText}</Text> : null}
+        {small ? <Label size={11} tone="blue" numberOfLines={1} style={st.small}>{small}</Label> : null}
+      </Pressable>
+      <Action e={e} />
     </View>
   );
 }
 
-// No picture: the date stands where a poster would, as big as a flyer's.
+// No picture: the date stands where a poster would.
 function DateBig({ date, size }: { date: string; size: number }) {
   const d = parseDay(date);
   const weekday = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][d.getDay()];
@@ -240,89 +242,31 @@ function DateBig({ date, size }: { date: string; size: number }) {
   );
 }
 
-// Where, how much, who for, and what the clock says: only what the event has.
-function Facts({ e, first, now }: { e: EventItem; first: boolean; now: number }) {
-  const invite = useMyInvites(true).find((v) => v.eventId === e.id);
-  const clock = clockOf(e.time);
-  const typed = (e.time || '').trim();
-  const manyDays = !!e.end && e.end !== e.start;
-  const range = manyDays ? dateRange(e).replace(/[A-Z]{3}/g, (m) => m[0] + m.slice(1).toLowerCase()) : ''; // "Dec 10 – 11"
-  // the tag carries the start time; a time it could not carry whole (a range, or words) joins the small line
-  const extraTime = typed && (!clock || prettyTime(typed) !== clockText(clock)) ? typed : '';
-  const lead = e.place || range;
-  const meta = [e.place ? range : '', extraTime, e.price, audienceLabel(e)].filter(Boolean).join(' · ');
-  const weekly = e.repeat === 'weekly' ? dayAndTime(e, now).day : '';
-  return (
-    <>
-      {invite && first ? <Label tone="blue" onPress={() => router.push(`/invite/${invite.id}`)} accessibilityLabel={`Your invitation: ${invite.title}`} style={st.invited}>You're invited</Label> : null}
-      {lead ? <Text style={st.place} numberOfLines={3}>{lead}</Text> : null}
-      {meta ? <Text style={st.meta} numberOfLines={3}>{meta}</Text> : null}
-      {weekly ? <Label size={11} tone="blue" style={st.factLabel}>{weekly}</Label> : null}
-      <StartsIn e={e} />
-    </>
-  );
-}
-
-// "STARTS IN 1H 45M": on the day itself, once the start is under six hours away. It keeps its own
-// clock so it turns over on the minute by itself.
-function StartsIn({ e }: { e: EventItem }) {
-  const now = useNow();
-  const at = startsAt(e);
-  if (at === null || daysAway(e.start, now) !== 0) return null;
-  const clock = clockOf(e.time);
-  const left = at - now;
-  const text = left > 0
-    ? left < 6 * 3600000 ? `Starts in ${untilText(left)}` : ''
-    : clock && now < at + LASTS_MS ? `Started at ${clockText(clock)}` : '';
-  return text ? <Label size={12} tone="orange" style={st.factLabel}>{text}</Label> : null;
-}
-
-// The buttons of a flyer, wired to the same sign-up the event page uses: I'M IN / YOU'RE IN with a
-// small DETAILS beside it, and under them how many are going or the way out ("Can't make it").
-function Actions({ e }: { e: EventItem }) {
-  const { going, name, signup, goingCount, openEvent, invites: answers, respondInvite } = useStore();
+// The one button, wired to the same sign-up the event page uses. Cancelling happens on the event page.
+function Action({ e }: { e: EventItem }) {
+  const { going, name, signup, openEvent, invites: answers, respondInvite } = useStore();
   const invite = useMyInvites(true).find((v) => v.eventId === e.id);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => { setErr(null); }, [e.id]);
-  if (e.signup !== 'app') {
-    return (
-      <View>
-        <Slab label="Details" onPress={() => openEvent(e.id)} accessibilityLabel={`Details: ${e.title}`} />
-        <View style={st.quiet} />
-      </View>
-    );
-  }
-  const mine = going.includes(e.id);
-  const count = e.showGoing ? goingCount[e.id] ?? 0 : 0;
-  const run = async (on: boolean) => {
+  if (e.signup !== 'app') return <Slab label="Details" onPress={() => openEvent(e.id)} style={st.btn} accessibilityLabel={`Details: ${e.title}`} />;
+  const run = async () => {
     setBusy(true); setErr(null);
-    const failed = await signup(e.id, on);
+    const failed = await signup(e.id, true);
     // I'M IN is also the answer to an invitation to this event that is still waiting
-    if (on && !failed && invite && !(answers || {})[invite.id]) await respondInvite(invite.id, 'yes');
+    if (!failed && invite && !(answers || {})[invite.id]) await respondInvite(invite.id, 'yes');
     setErr(failed);
     setBusy(false);
   };
   return (
-    <View>
-      <View style={st.btnRow}>
-        {mine ? (
-          <Slab kind="outline" icon="tick" label="You're in" style={st.main} accessibilityLabel={`You're in: signed up for ${e.title}`} />
-        ) : (
-          // no name on the profile yet: the event page asks for it first
-          <Slab label="I'm in" disabled={busy} onPress={() => (name ? run(true) : openEvent(e.id))} style={st.main} accessibilityLabel={`I'm in: sign up for ${e.title}`} />
-        )}
-        <Slab kind="ghost" label="Details" onPress={() => openEvent(e.id)} style={st.details} accessibilityLabel={`Details: ${e.title}`} />
-      </View>
-      <View style={st.quiet}>
-        {mine ? (
-          <Pressable onPress={() => run(false)} disabled={busy} hitSlop={{ top: 8, bottom: 8, left: 24, right: 24 }} style={({ pressed }) => [(pressed || busy) && st.dim]}
-            accessibilityRole="button" accessibilityLabel={`Can't make it: cancel my sign-up for ${e.title}`}>
-            <Text style={st.cant}>Can't make it{count > 0 ? ` · ${count} going` : ''}</Text>
-          </Pressable>
-        ) : count > 0 ? <Label>{count} going</Label> : null}
-        {err ? <Text style={st.err} accessibilityLiveRegion="polite">{err}</Text> : null}
-      </View>
+    <View style={st.btn}>
+      {going.includes(e.id) ? (
+        <Slab kind="outline" icon="tick" label="You're in" onPress={() => openEvent(e.id)} accessibilityLabel={`You're in: signed up for ${e.title}. Opens the event`} />
+      ) : (
+        // no name on the profile yet: the event page asks for it first
+        <Slab label="I'm in" disabled={busy} onPress={() => (name ? run() : openEvent(e.id))} accessibilityLabel={`I'm in: sign up for ${e.title}`} />
+      )}
+      {err ? <Text style={st.err} accessibilityLiveRegion="polite">{err}</Text> : null}
     </View>
   );
 }
@@ -343,8 +287,7 @@ function EmptyPage({ width, height }: { width: number; height: number }) {
 function MoreBelow() {
   return (
     <View style={st.more} accessible accessibilityLabel="More below">
-      <Label size={11} tone="faint">More below</Label>
-      <View style={st.moreIcon}><Icon name="right" size={14} color={C.faint} stroke={2.6} /></View>
+      <View style={st.moreIcon}><Icon name="right" size={16} color={C.faint} stroke={2.2} /></View>
     </View>
   );
 }
@@ -489,7 +432,7 @@ const OnTheMenu = React.memo(function OnTheMenu() {
   return (
     <View style={st.menu}>
       <Hairline />
-      <Row kicker="On the menu" title={food.title} meta={food.body || undefined} metaLines={2} thumb={photo} chevron={!photo}
+      <Row kicker="On the menu" title={food.title} meta={food.body || undefined} metaLines={1} thumb={photo} chevron={!photo}
         onPress={() => router.push(`/post/${food.id}`)} accessibilityLabel={`On the menu: ${food.title}`} />
     </View>
   );
@@ -497,17 +440,15 @@ const OnTheMenu = React.memo(function OnTheMenu() {
 
 // The three newest posts (pinned first), as rows.
 const FromRabbi = React.memo(function FromRabbi({ afterBand }: { afterBand?: boolean }) {
-  const { content, go, postMeta } = useStore();
+  const { content, go } = useStore();
   const posts = sortPosts(content.posts).filter((p) => p.kind !== 'Food').slice(0, 3);
   if (!posts.length) return null;
   return (
     <>
       <SectionHead title="From Rabbi Zevy" action="See all" onAction={() => go('Feed')} top={afterBand ? 20 : SP.section} />
       {posts.map((p, i) => {
-        const comments = postMeta?.[p.id]?.comments ?? 0;
         return (
-          <Row key={p.id} title={p.title} meta={p.body || undefined} metaLines={2} thumb={p.photos?.[0]} last={i === posts.length - 1}
-            foot={`${p.pinned ? 'Pinned · ' : ''}${p.kind} · ${timeAgo(p.at)}${comments ? ` · ${comments} ${comments === 1 ? 'comment' : 'comments'}` : ''}`}
+          <Row key={p.id} title={p.title} meta={p.body || undefined} metaLines={1} thumb={p.photos?.[0]} last={i === posts.length - 1}
             onPress={() => router.push(`/post/${p.id}`)} accessibilityLabel={p.title} />
         );
       })}
@@ -550,35 +491,24 @@ const st = StyleSheet.create({
   pagerScroll: { flex: 1 },
   marker: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   bars: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  bar: { width: 14, height: 9, borderRadius: 1.5, backgroundColor: C.tick, transform: [{ skewX: '-16deg' }] },
-  barOn: { width: 26, backgroundColor: C.blue },
-  markNum: { fontFamily: F.bold, fontSize: 11, lineHeight: 14, letterSpacing: 1.8, color: C.sub, minWidth: 24 },
+  bar: { width: 10, height: 6, borderRadius: 1.5, backgroundColor: C.tick, transform: [{ skewX: '-16deg' }] },
+  barOn: { width: 18, backgroundColor: C.sub },
+  markNum: { fontFamily: F.bold, fontSize: 11, lineHeight: 14, letterSpacing: 1.8, color: C.faint, minWidth: 24 },
   // a flyer
-  page: { paddingHorizontal: SP.gutter, paddingTop: 10 },
-  tag: { marginTop: 4, marginLeft: 6 },
-  title: { marginTop: 12 },
-  zone: { flex: 1, marginTop: 14, marginBottom: 8 },
-  zoneRow: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 20 },
-  zoneCol: { flex: 1, justifyContent: 'center' },
-  print: { borderRadius: R.print, backgroundColor: C.card, marginLeft: 4, marginTop: 4, transform: [{ rotate: '-2.2deg' }] },
+  page: { paddingHorizontal: SP.gutter, paddingTop: 12 },
+  tag: { marginTop: 2, marginLeft: 6, alignSelf: 'flex-start' },
+  title: { marginTop: 4 },
+  line: { fontSize: 15, lineHeight: 20, fontWeight: '500', color: C.sub, marginTop: 6 },
+  small: { marginTop: 7 },
+  btn: { marginTop: 18, marginBottom: 8 },
+  zone: { flex: 1, marginTop: 14, marginBottom: 18, alignItems: 'center', justifyContent: 'center' },
+  print: { borderRadius: R.print, backgroundColor: C.card, transform: [{ rotate: '-1.6deg' }] },
   printClip: { flex: 1, borderRadius: R.print, overflow: 'hidden' },
   printImg: { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' },
   printEdge: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, borderRadius: R.print, borderWidth: 1, borderColor: C.printEdge },
   typeBar: { width: 28, height: 5, borderRadius: 1.5, backgroundColor: C.blue, transform: [{ skewX: '-16deg' }] },
   typePrint: { backgroundColor: C.raised, paddingHorizontal: 14, paddingTop: 14, paddingBottom: 14, justifyContent: 'space-between' },
   dateNum: { ...numeral(132), marginTop: 2, marginLeft: -3, paddingRight: 16 },
-  facts: { flex: 1, minWidth: 0, paddingTop: 6 },
-  factsWide: { marginTop: 14, minHeight: 74 },
-  invited: { marginBottom: 6, alignSelf: 'flex-start' },
-  place: { fontSize: 17, lineHeight: 21, fontWeight: '600', color: C.ink },
-  meta: { fontSize: 14, lineHeight: 19, fontWeight: '500', color: C.sub, marginTop: 4 },
-  factLabel: { marginTop: 8 },
-  about: { fontSize: 14.5, lineHeight: 20, color: C.sub, marginBottom: 14 },
-  btnRow: { flexDirection: 'row', gap: 10 },
-  main: { flex: 1 },
-  details: { minWidth: 118 },
-  quiet: { height: 34, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
-  cant: { fontSize: 13, lineHeight: 18, fontWeight: '600', color: C.sub },
   err: { fontSize: 13, lineHeight: 17, fontWeight: '700', color: C.red, textAlign: 'center' },
   emptyPage: { justifyContent: 'center', paddingBottom: 40 },
   emptyText: { ...T.body, color: C.sub, marginTop: 14 },
