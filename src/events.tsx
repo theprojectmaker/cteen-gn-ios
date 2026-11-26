@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { C, R, SP, T } from './theme';
+import { Image, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { C, R, SP, T, display, numeral } from './theme';
 import { Icon } from './icons';
 import { calendarUrl, challengeFits, countdown, dateLabel, open, repeatLabel, upcoming, useStore, type EventItem } from './store';
-import { audienceLabel, Button, Card, Chips, Empty, EventCard } from './ui';
-import { Hairline, Label, Photo, Slab, PosterStage, eventPicture } from './look';
+import { parseDay } from './when';
+import { audienceLabel, Card, Chips, Empty, EventCard, SaveHeart } from './ui';
+import { BrushTag, Hairline, Label, Photo, Slab, eventPicture, useAspect, whenTag } from './look';
 import { NameGate } from './rewards';
 import { InviteCards } from './invites';
 
@@ -57,38 +58,74 @@ export function Events() {
   );
 }
 
-// Event details, shown in a slide-up sheet (app/event/[id].tsx).
+// Event details, shown in a slide-up sheet (app/event/[id].tsx). One column on the 18 pt gutter:
+// the picture whole, when it is, what it is, the facts, how to join, about, and the extras.
 export function EventDetails({ e }: { e: EventItem }) {
-  const picture = eventPicture(e);
+  const when = (repeatLabel(e) || dateLabel(e)) + (e.time ? ` · ${e.time}` : '');
+  const facts: { label: string; value: string }[] = [
+    { label: 'When', value: when },
+    ...(e.place ? [{ label: 'Where', value: e.place }] : []),
+    ...(e.price ? [{ label: 'Price', value: e.price }] : []),
+    ...(audienceLabel(e) ? [{ label: 'For', value: audienceLabel(e) }] : []),
+    { label: e.repeat === 'weekly' ? 'Next' : 'Starts', value: e.repeat === 'weekly' ? `${dateLabel(e)} · ${countdown(e)}` : countdown(e) },
+  ];
   return (
-    <>
-      {/* the picture whole, with no text over it: a poster on its stage, a photograph edge to edge */}
-      {picture ? (picture.kind === 'poster' ? <PosterStage source={picture.source} maxHeight={440} radius={0} accessibilityLabel={e.title} /> : <Photo source={picture.source} radius={0} accessibilityLabel={e.title} />) : <View style={{ height: 52 }} />}
-      <View style={{ paddingHorizontal: SP.gutter, paddingTop: 18, paddingBottom: 28 }}>
-        <Label tone="blue">{e.scope === 'gn' ? 'Great Neck' : 'International'}</Label>
-        <Text style={[T.h1, { marginTop: 6, marginBottom: 16 }]}>{e.title}</Text>
-        <Card style={{ padding: 0 }}>
-          <Row icon="calendar" label="When" value={(repeatLabel(e) || dateLabel(e)) + (e.time ? ` · ${e.time}` : '')} first />
-          {audienceLabel(e) ? <Row icon="users" label="For" value={audienceLabel(e)} /> : null}
-          {e.place ? <Row icon="pin" label="Where" value={e.place} /> : null}
-          {e.price ? <Row icon="ticket" label="Price" value={e.price} /> : null}
-          <Row icon="clock" label={e.repeat === 'weekly' ? 'Next' : 'Starts'} value={e.repeat === 'weekly' ? `${dateLabel(e)} · ${countdown(e)}` : countdown(e)} />
-        </Card>
-        {e.who ? <Para title="Who it's for" body={e.who} /> : null}
-        {e.about ? <Para title="About" body={e.about} /> : null}
-        <View style={{ marginTop: 20 }}>
-          {e.signup === 'app' ? <InAppSignup e={e} /> : <WebsiteSignup e={e} />}
-        </View>
-        <View style={{ marginTop: 10 }}>
-          <Button kind="ghost" icon="calendar" label="Add to Apple Calendar" onPress={() => open(calendarUrl(e))} />
-        </View>
-        {e.place ? (
-          <View style={{ marginTop: 10 }}>
-            <Button kind="ghost" icon="pin" label="Get directions" onPress={() => open('https://maps.apple.com/?q=' + encodeURIComponent(e.place!))} />
-          </View>
-        ) : null}
+    <View style={st.page}>
+      <EventPicture e={e} />
+      <View style={st.tagRow}>
+        <BrushTag label={whenTag(e)} style={st.tag} />
+        <SaveHeart id={e.id} />
       </View>
-    </>
+      <Text style={st.title} accessibilityRole="header">{e.title}</Text>
+      <Text style={st.scope}>{e.scope === 'gn' ? 'Great Neck' : 'International'}</Text>
+
+      <View style={st.facts}>
+        {facts.map((f, i) => (
+          <View key={f.label} style={[st.fact, i < facts.length - 1 && st.rule]}>
+            <Text style={st.factLabel}>{f.label}</Text>
+            <Text style={st.factValue}>{f.value}</Text>
+          </View>
+        ))}
+      </View>
+
+      <View style={st.block}>{e.signup === 'app' ? <InAppSignup e={e} /> : <WebsiteSignup e={e} />}</View>
+
+      {e.who ? <Para title="Who it's for" body={e.who} /> : null}
+      {e.about ? <Para title="About" body={e.about} /> : null}
+
+      <View style={st.block}>
+        <Action icon="calendar" label="Add to Apple Calendar" onPress={() => open(calendarUrl(e))} />
+        {e.place ? <Action icon="pin" label="Get directions" onPress={() => open('https://maps.apple.com/?q=' + encodeURIComponent(e.place!))} last={!(e.signup === 'app' && e.payUrl)} /> : null}
+        {e.signup === 'app' && e.payUrl ? <TicketAction e={e} /> : null}
+      </View>
+    </View>
+  );
+}
+
+// The picture, whole, on a flat panel: a poster at its own shape, a photograph full width, or (no picture) the date.
+function EventPicture({ e }: { e: EventItem }) {
+  const win = useWindowDimensions();
+  const picture = eventPicture(e);
+  const ratio = useAspect(picture?.source, 0.77);
+  const col = Math.min(win.width, 600) - SP.gutter * 2;
+  if (picture && picture.kind === 'photo') return <Photo source={picture.source} accessibilityLabel={e.title} />;
+  if (picture) {
+    const maxH = Math.min(440, Math.round(win.height * 0.52));
+    const w = Math.min(col - 32, (maxH - 32) * ratio);
+    const bare = w > col * 0.9;
+    const pw = bare ? col : Math.round(w), ph = Math.round(pw / ratio);
+    return (
+      <View style={[st.panel, bare ? st.panelBare : { height: ph + 32 }]}>
+        <Image source={picture.source} style={{ width: pw, height: ph }} resizeMode="contain" accessibilityLabel={e.title} />
+      </View>
+    );
+  }
+  const d = parseDay(e.start);
+  return (
+    <View style={[st.panel, st.dateBox]} accessible accessibilityLabel={dateLabel(e)}>
+      <Label tone="blue" size={13}>{['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][d.getDay()]} · {['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'][d.getMonth()]}</Label>
+      <Text style={st.dateNum}>{d.getDate()}</Text>
+    </View>
   );
 }
 
@@ -111,47 +148,25 @@ function InAppSignup({ e }: { e: EventItem }) {
   useEffect(() => { setAsk(false); setErr(null); setDeclined(false); }, [e.id]);
   if (ask) return <Card><NameGate title="Who's going?" cta="I'm going" onDone={() => { setAsk(false); run(true); }} /></Card>;
   const others = Math.max(0, count - (mine ? 1 : 0));
+  const note = !e.showGoing
+    ? (mine ? 'Rabbi Zevy has you on the list. We’ll remind you before it starts.' : 'Tap I’m in and Rabbi Zevy saves you a spot.')
+    : mine ? `Rabbi Zevy has you on the list.${others > 0 ? ` You and ${others} other${others === 1 ? '' : 's'} are going.` : ''}`
+    : declined ? 'Maybe next time.' : count > 0 ? `${count} from Great Neck ${count === 1 ? 'is' : 'are'} going so far.` : 'Be the first to RSVP.';
   return (
     <View>
-      <View style={st.rsvp}>
-        <View style={st.rsvpHead}>
-          <Text style={[T.h2, { flex: 1 }]}>{mine ? "You're going" : declined ? 'Maybe next time' : 'Are you going?'}</Text>
-          {count > 0 ? (
-            <View style={st.goingPill}>
-              <Icon name="users" size={14} color={C.blueDeep} stroke={2.2} />
-              <Text style={st.goingPillText}>{count} going</Text>
-            </View>
-          ) : null}
-        </View>
-        <View style={st.rsvpRow}>
-          <Pressable
-            onPress={() => { if (mine) return; setDeclined(false); name ? run(true) : setAsk(true); }}
-            disabled={busy}
-            style={({ pressed }) => [st.rsvpBtn, mine && st.rsvpYes, pressed && { transform: [{ scale: 0.97 }] }]}
-            accessibilityRole="button" accessibilityState={{ selected: mine }}>
-            <Icon name={mine ? 'tick' : 'check'} size={18} color={mine ? C.onBlue : C.ink} stroke={2.4} />
-            <Text style={[st.rsvpText, mine && { color: C.onBlue }]}>{busy && !mine ? 'Saving…' : 'Going'}</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => { setDeclined(true); if (mine) run(false); }}
-            disabled={busy}
-            style={({ pressed }) => [st.rsvpBtn, declined && !mine && st.rsvpNo, pressed && { transform: [{ scale: 0.97 }] }]}
-            accessibilityRole="button" accessibilityState={{ selected: declined && !mine }}>
-            <Icon name="x" size={17} color={declined && !mine ? C.onInverse : C.ink} stroke={2.4} />
-            <Text style={[st.rsvpText, declined && !mine && { color: C.onInverse }]}>Can't go</Text>
-          </Pressable>
-        </View>
-        {names.length ? <Text style={st.goingNames} numberOfLines={2}>{names.slice(0, 4).join(', ')}{names.length > 4 ? ` and ${names.length - 4} more` : ''}</Text> : null}
-        <Text style={st.rsvpNote}>
-          {!e.showGoing ? (mine ? 'Rabbi Zevy has you on the list. We’ll remind you before it starts.' : 'Tap Going and Rabbi Zevy saves you a spot.') : mine ? `Rabbi Zevy has you on the list. We’ll remind you before it starts.${others > 0 ? ` You and ${others} other${others === 1 ? '' : 's'} are going.` : ''}` : count > 0 ? `${count} from Great Neck ${count === 1 ? 'is' : 'are'} going so far.` : 'Be the first to RSVP.'}
-        </Text>
+      <View style={st.btnRow}>
+        {mine ? (
+          <Slab kind="outline" icon="tick" label="You're in" height={56} style={st.btnMain} accessibilityLabel={`You're in: signed up for ${e.title}`} />
+        ) : (
+          <Slab label={busy ? 'Saving…' : "I'm in"} height={56} disabled={busy} style={st.btnMain}
+            onPress={() => { setDeclined(false); name ? run(true) : setAsk(true); }} accessibilityLabel={`I'm in: sign up for ${e.title}`} />
+        )}
+        <Slab kind="ghost" label="Can't go" height={56} disabled={busy} style={st.btnSide} accessibilityState={{ selected: declined && !mine }}
+          onPress={() => { setDeclined(true); if (mine) run(false); }} accessibilityLabel={`Can't go to ${e.title}`} />
       </View>
+      {names.length ? <Text style={st.names} numberOfLines={2}>{names.slice(0, 4).join(', ')}{names.length > 4 ? ` and ${names.length - 4} more` : ''}</Text> : null}
+      <Text style={st.note}>{note}</Text>
       {err ? <Text style={st.err} accessibilityLiveRegion="polite">{err}</Text> : null}
-      {e.payUrl ? (
-        <View style={{ marginTop: 10 }}>
-          <Button kind="ghost" icon="ticket" label={mine ? 'Next: get your ticket' : 'Ticket info'} onPress={() => open(e.payUrl!)} />
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -160,57 +175,66 @@ function InAppSignup({ e }: { e: EventItem }) {
 function WebsiteSignup({ e }: { e: EventItem }) {
   return (
     <View>
-      <View style={st.intlNote}>
-        <Icon name="globe" size={20} color={C.sub} />
-        <Text style={[T.small, { flex: 1, color: C.ink }]}>This is an international CTeen event. Registration happens on the CTeen website.</Text>
-      </View>
-      {e.url ? (
-        <View style={{ marginTop: 10 }}>
-          <Button label="Register on the CTeen website" icon="external" color={C.night} onPress={() => open(e.url!)} />
-        </View>
-      ) : null}
+      {e.url ? <Slab label="Register on the CTeen website" icon="external" height={56} onPress={() => open(e.url!)} accessibilityLabel="Register on the CTeen website" /> : null}
+      <Text style={st.note}>This is an international CTeen event. Registration happens on the CTeen website.</Text>
     </View>
   );
 }
 
-function Row({ icon, label, value, first }: { icon: string; label: string; value: string; first?: boolean }) {
+// A plain row with a chevron: calendar, directions, tickets.
+function Action({ icon, label, onPress, last }: { icon: string; label: string; onPress: () => void; last?: boolean }) {
   return (
-    <View style={[st.row, !first && st.rule]}>
-      <Icon name={icon} size={18} color={C.sub} />
-      <Text style={[T.small, { fontSize: 14 }]}>{label}</Text>
-      <Text style={[T.strong, { fontSize: 15, flex: 1, textAlign: 'right' }]}>{value}</Text>
-    </View>
+    <Pressable onPress={onPress} style={({ pressed }) => [st.action, !last && st.rule, pressed && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel={label}>
+      <Icon name={icon} size={20} color={C.blue} stroke={2.1} />
+      <Text style={st.actionText}>{label}</Text>
+      <Icon name="right" size={16} color={C.faint} stroke={2.4} />
+    </Pressable>
   );
+}
+
+function TicketAction({ e }: { e: EventItem }) {
+  const { going } = useStore();
+  return <Action icon="ticket" label={going.includes(e.id) ? 'Next: get your ticket' : 'Ticket info'} onPress={() => open(e.payUrl!)} last />;
 }
 
 function Para({ title, body }: { title: string; body: string }) {
   return (
-    <View style={{ marginTop: 20 }}>
-      <Label>{title}</Label>
-      <Text style={[T.body, { marginTop: 6 }]}>{body}</Text>
+    <View style={st.block}>
+      <Text style={st.paraHead}>{title}</Text>
+      <Text style={st.paraBody}>{body}</Text>
     </View>
   );
 }
 
 const st = StyleSheet.create({
+  page: { paddingHorizontal: SP.gutter, paddingTop: 58, paddingBottom: 28 },
+  panel: { width: '100%', borderRadius: R.photo, backgroundColor: C.raised, borderWidth: 1, borderColor: C.printEdge, alignItems: 'center', justifyContent: 'center' },
+  panelBare: { backgroundColor: 'transparent', borderWidth: 0 },
+  dateBox: { height: 160, alignItems: 'flex-start', justifyContent: 'center', padding: 18 },
+  dateNum: { ...numeral(72), marginLeft: -2, paddingRight: 10 },
+  tagRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 28 },
+  tag: { flexShrink: 1 },
+  title: { ...T.h1, marginTop: 18 },
+  scope: { fontSize: 15, lineHeight: 21, color: C.sub, marginTop: 8 },
+  facts: { marginTop: 32 },
+  fact: { flexDirection: 'row', alignItems: 'baseline', gap: 16, paddingVertical: 16 },
+  rule: { borderBottomWidth: 1, borderBottomColor: C.line },
+  factLabel: { width: 72, fontSize: 15, lineHeight: 21, color: C.sub },
+  factValue: { flex: 1, fontSize: 17, lineHeight: 23, fontWeight: '600', color: C.ink },
+  block: { marginTop: 36 },
+  btnRow: { flexDirection: 'row', gap: 10 },
+  btnMain: { flex: 1 },
+  btnSide: { minWidth: 130 },
+  names: { fontSize: 15, lineHeight: 21, fontWeight: '600', color: C.ink, marginTop: 16 },
+  note: { fontSize: 15, lineHeight: 21, color: C.sub, marginTop: 12 },
+  err: { color: C.red, fontWeight: '700', fontSize: 14, marginTop: 10 },
+  paraHead: { ...display(26), marginBottom: 10 },
+  paraBody: { fontSize: 16, lineHeight: 24, color: C.ink },
+  action: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 17, minHeight: 56 },
+  actionText: { flex: 1, fontSize: 17, fontWeight: '600', color: C.ink },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   notApplicable: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderTopWidth: 1, borderTopColor: C.line, opacity: 0.7 },
   naIcon: { width: 42, height: 42, borderRadius: R.chip, borderWidth: 1, borderColor: C.lineStrong, alignItems: 'center', justifyContent: 'center' },
   naPill: { paddingHorizontal: 10, height: 26, borderRadius: R.chip, borderWidth: 1, borderColor: C.lineStrong, justifyContent: 'center' },
   naText: { fontSize: 12, fontWeight: '700', color: C.sub },
-  rsvp: { padding: 16, borderRadius: R.card, backgroundColor: C.card },
-  rsvpHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  goingPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, height: 28, borderRadius: R.chip, backgroundColor: C.bluePale },
-  goingPillText: { fontSize: 13, fontWeight: '800', color: C.blueDeep },
-  rsvpRow: { flexDirection: 'row', gap: 10, marginTop: 14 },
-  rsvpBtn: { flex: 1, height: 50, borderRadius: R.btn, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: C.lineStrong },
-  rsvpYes: { backgroundColor: C.blue, borderColor: C.blue },
-  rsvpText: { fontSize: 16, fontWeight: '800', color: C.ink },
-  rsvpNo: { backgroundColor: C.inverse, borderColor: C.inverse },
-  goingNames: { fontSize: 14, fontWeight: '700', color: C.ink, marginTop: 12 },
-  rsvpNote: { fontSize: 13, color: C.sub, marginTop: 12, lineHeight: 18 },
-  err: { color: C.red, fontWeight: '700', fontSize: 13, marginTop: 8, textAlign: 'center' },
-  intlNote: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.card, borderRadius: R.card, padding: 14 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 14, paddingHorizontal: 16 },
-  rule: { borderTopWidth: 1, borderTopColor: C.line },
 });

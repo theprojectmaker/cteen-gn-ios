@@ -3,8 +3,8 @@ import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from 'r
 import { C, R, T, display } from './theme';
 import { Icon } from './icons';
 import { Glass } from './glass';
-import { Cover } from './ui';
-import { countdown, dateLabel, occurrencesInRange, tap, useStore, type EventItem } from './store';
+import { BrushTag, TimeBlock } from './look';
+import { countdown, occurrencesInRange, tap, useStore, type EventItem } from './store';
 
 // A live month calendar of everything the chapter has coming up. The rabbi posts events from the
 // leader panel (or the dashboard); they show here the moment they save. The day picker is a glass
@@ -84,6 +84,7 @@ export function CalendarScreen() {
   const selEvents = byDay[selected] || [];
   const selDate = parse(selected);
   const selLabel = new Date(selDate.y, selDate.m, selDate.d).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  const key = selected;
   const monthHasToday = t0.y === cursor.y && t0.m === cursor.m;
 
   return (
@@ -91,7 +92,7 @@ export function CalendarScreen() {
       <View style={st.head}>
         <View style={{ flex: 1 }}>
           <Text style={T.h1}>Calendar</Text>
-          <Text style={[T.small, { marginTop: 4 }]}>Everything coming up at CTeen Great Neck</Text>
+          <Text style={st.sub}>Everything coming up at CTeen Great Neck</Text>
         </View>
       </View>
 
@@ -143,28 +144,30 @@ export function CalendarScreen() {
       </Animated.View>
 
       <View style={st.dayHead}>
-        <Text style={st.dayHeadText}>{selLabel}</Text>
-        {selEvents.length ? <Text style={st.dayCount}>{selEvents.length} event{selEvents.length > 1 ? 's' : ''}</Text> : null}
+        {key === today ? <BrushTag label="TODAY" style={st.todayTag} /> : null}
+        <Text style={st.dayHeadText} accessibilityRole="header">{selLabel}</Text>
       </View>
 
       {selEvents.length ? (
-        <View style={{ gap: 10 }}>
-          {selEvents.map((e) => (
-            <Pressable key={e.id} onPress={() => openEvent(e.id)} style={({ pressed }) => [st.evRow, pressed && { backgroundColor: C.raised, transform: [{ scale: 0.99 }] }]} accessibilityRole="button" accessibilityLabel={e.title}>
-              <Cover e={e} style={st.evThumb} iconSize={26} />
-              <View style={{ flex: 1 }}>
-                <Text style={T.h3} numberOfLines={1}>{e.title}</Text>
-                <Text style={[T.small, { marginTop: 2 }]} numberOfLines={1}>{dateLabel(e)}{e.time ? ` · ${e.time}` : ''}{e.place ? ` · ${e.place}` : ''}</Text>
-                <Text style={[st.evCount, { marginTop: 2 }]}>{countdown(e)}</Text>
-              </View>
-              <Icon name="right" size={18} color={C.faint} stroke={2.4} />
-            </Pressable>
-          ))}
+        <View>
+          {selEvents.map((e, i) => {
+            const line = [e.place, e.price].filter(Boolean).join(' · ') || countdown(e);
+            return (
+              <Pressable key={e.id} onPress={() => openEvent(e.id)} style={({ pressed }) => [st.evRow, i < selEvents.length - 1 && st.evRule, pressed && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel={`${e.title}, ${e.time || 'all day'}, ${line}`}>
+                <TimeBlock time={e.time || 'All day'} />
+                <View style={{ flex: 1 }}>
+                  <Text style={st.evTitle} numberOfLines={2}>{e.title}</Text>
+                  <Text style={st.evLine} numberOfLines={2}>{line}</Text>
+                </View>
+                <Icon name="right" size={16} color={C.faint} stroke={2.4} />
+              </Pressable>
+            );
+          })}
         </View>
       ) : (
         <View style={st.empty}>
-          <Icon name="calendar" size={26} color={C.faint} stroke={1.8} />
-          <Text style={st.emptyText}>Nothing on this day. Tap a day with a dot to see what's on.</Text>
+          <Text style={[T.h2, { color: C.sub }]}>Nothing on this day</Text>
+          <Text style={st.emptyText}>Tap a day with a dot to see what's on.</Text>
         </View>
       )}
     </>
@@ -172,14 +175,15 @@ export function CalendarScreen() {
 }
 
 const st = StyleSheet.create({
-  head: { marginBottom: 14 },
+  head: { marginBottom: 20 },
+  sub: { fontSize: 15, lineHeight: 21, color: C.sub, marginTop: 4 },
   monthBar: { flexDirection: 'row', alignItems: 'center', borderRadius: R.input, padding: 4, marginBottom: 14 },
   navBtn: { width: 44, height: 44, borderRadius: R.btnSm, alignItems: 'center', justifyContent: 'center' },
   monthLabelWrap: { flex: 1, alignItems: 'center' },
-  monthLabel: { ...display(22) },
-  todayHint: { ...T.eyebrow, fontSize: 11, color: C.blue, marginTop: 1 },
+  monthLabel: { ...display(28) },
+  todayHint: { fontSize: 13, lineHeight: 16, fontWeight: '700', color: C.blue, marginTop: 1 },
   weekRow: { flexDirection: 'row', marginBottom: 4 },
-  weekLabel: { flex: 1, textAlign: 'center', fontSize: 12, fontWeight: '800', color: C.faint },
+  weekLabel: { flex: 1, textAlign: 'center', fontSize: 13, fontWeight: '700', color: C.faint },
   grid: { position: 'relative' },
   week: { flexDirection: 'row' },
   cell: { flex: 1, height: CELL_H, alignItems: 'center', justifyContent: 'center', gap: 3 },
@@ -190,12 +194,13 @@ const st = StyleSheet.create({
   dot: { width: 5, height: 5, borderRadius: 3 },
   lensWrap: { position: 'absolute', left: 0, top: 0, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 5 },
   lensCircle: { width: 32, height: 32, borderRadius: 16, backgroundColor: C.blue },
-  dayHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginTop: 22, marginBottom: 12 },
-  dayHeadText: { ...T.h2, flex: 1 },
-  dayCount: { ...T.eyebrow, color: C.blue },
-  evRow: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: C.card, borderRadius: R.card, padding: 12 },
-  evThumb: { width: 54, height: 54, borderRadius: R.print, overflow: 'hidden' },
-  evCount: { fontSize: 12, fontWeight: '700', color: C.blueDeep },
-  empty: { alignItems: 'center', gap: 10, paddingVertical: 30, paddingHorizontal: 30 },
-  emptyText: { fontSize: 14, color: C.sub, textAlign: 'center', lineHeight: 20 },
+  dayHead: { marginTop: 24, marginBottom: 8 },
+  todayTag: { marginBottom: 14 },
+  dayHeadText: { ...display(28) },
+  evRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 18 },
+  evRule: { borderBottomWidth: 1, borderBottomColor: C.line },
+  evTitle: { ...display(22) },
+  evLine: { fontSize: 15, lineHeight: 21, color: C.sub, marginTop: 3 },
+  empty: { paddingTop: 14 },
+  emptyText: { fontSize: 15, lineHeight: 21, color: C.sub, marginTop: 6 },
 });
