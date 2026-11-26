@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon } from './icons';
 import { pickPhotos, type Snap } from './photo';
-import { C, HUES, T } from './theme';
+import { C, HUES, R, T } from './theme';
 import { challengeRules } from './challengeRules';
 import { useStore, type AiDraft, type MinyanRow, type Popup } from './store';
 import { Button, Chips, Field, Toggle } from './ui';
@@ -46,12 +46,12 @@ export function PopupEditor({ onDone }: { onDone: (msg: string) => void }) {
       <Text style={T.h2}>Pop-up message</Text>
       <Text style={[T.small, { marginTop: 4 }]}>A card that shows every time someone opens the app, until you turn it off.</Text>
       <View style={st.toggleRow}>
-        <Text style={[T.h3, { flex: 1 }]}>Show the pop-up</Text>
+        <Text style={[T.strong, { flex: 1 }]}>Show the pop-up</Text>
         <Toggle value={on} onChange={setOn} label="Show the pop-up" />
       </View>
       {cur?.image ? (
         <View style={{ marginTop: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <Image source={{ uri: cur.image }} style={{ width: 64, height: 86, borderRadius: 10, backgroundColor: C.line }} resizeMode="cover" />
+          <Image source={{ uri: cur.image }} style={{ width: 64, height: 86, borderRadius: R.print, backgroundColor: C.raised }} resizeMode="cover" />
           <Text style={[T.small, { flex: 1 }]}>{cur.on ? 'This poster is showing every time the app opens. Turn the switch off and save to stop it.' : 'This poster is saved but not showing.'}</Text>
         </View>
       ) : null}
@@ -108,7 +108,7 @@ export function MinyanEditor({ onDone }: { onDone: (msg: string) => void }) {
       <Text style={T.h2}>Minyan times</Text>
       <Text style={[T.small, { marginTop: 4 }]}>One line each: name | time. Leave the time off to show "Call for times". Write "Candle lighting" or "10 min after Shabbat ends" and the app fills in this week's time.</Text>
       <View style={st.draft}>
-        <Text style={T.h3}>Got the schedule on WhatsApp?</Text>
+        <Text style={T.strong}>Got the schedule on WhatsApp?</Text>
         <Text style={T.small}>Paste it here and the AI fills in the times for you. Nothing changes until you tap Save.</Text>
         <Field label="Schedule message" value={paste} onChange={setPaste} placeholder="Paste it here" multiline />
         <View style={{ marginTop: 10 }}><Button kind="ghost" icon="send" label={reading ? 'Reading…' : 'Fill in the times'} disabled={reading || paste.trim().length < 5} onPress={fillFromPaste} /></View>
@@ -154,7 +154,7 @@ export function PhotoPicker({ photos, onChange }: { photos: Snap[]; onChange: (p
           <View key={p.uri + i} style={st.thumb}>
             <Image source={{ uri: p.uri }} style={StyleSheet.absoluteFill} />
             <Pressable onPress={() => onChange(photos.filter((_, j) => j !== i))} style={st.thumbX} hitSlop={6} accessibilityRole="button" accessibilityLabel="Remove photo">
-              <Icon name="x" size={12} color="#FFFFFF" stroke={3} />
+              <Icon name="x" size={12} color={C.white} stroke={3} />
             </Pressable>
           </View>
         ))}
@@ -224,7 +224,7 @@ export function WhatsAppImport({ onDone }: { onDone: (msg: string) => void }) {
           {draft.event ? (
             <View style={st.eventBox}>
               <View style={{ flex: 1 }}>
-                <Text style={T.h3}>Also add it as an event</Text>
+                <Text style={T.strong}>Also add it as an event</Text>
                 <Text style={T.small}>{[draft.event.title, draft.event.date, draft.event.time, draft.event.place].filter(Boolean).join(' · ')}</Text>
               </View>
               <Toggle value={addEvent} onChange={setAddEvent} label="Also add it as an event" />
@@ -333,7 +333,7 @@ export function ChallengeEditor({ onDone }: { onDone: (msg: string) => void }) {
         </View>
       ) : null}
       <View style={st.toggleRow}>
-        <Text style={[T.h3, { flex: 1 }]}>Live</Text>
+        <Text style={[T.strong, { flex: 1 }]}>Live</Text>
         <Toggle value={active} onChange={setActive} label="Challenge is live" />
       </View>
       <Field label="Name" value={title} onChange={setTitle} />
@@ -363,21 +363,21 @@ export function ChallengeEditor({ onDone }: { onDone: (msg: string) => void }) {
 }
 
 const st = StyleSheet.create({
-  toggleRow: { flexDirection: 'row', alignItems: 'center', marginTop: 18, padding: 14, borderRadius: 16, backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
-  label: { fontSize: 13, fontWeight: '800', color: C.sub },
-  err: { color: '#C0303F', marginTop: 10, fontSize: 14 },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', marginTop: 18, padding: 14, borderRadius: R.card, backgroundColor: C.card },
+  label: { ...T.eyebrow, marginBottom: 2 },
+  err: { color: C.red, marginTop: 10, fontSize: 14, fontWeight: '600' },
   colors: { flexDirection: 'row', gap: 12, marginTop: 8 },
   swatch: { width: 36, height: 36, borderRadius: 18 },
   swatchOn: { borderWidth: 3, borderColor: C.ink },
   coverRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 },
-  coverThumb: { width: 96, height: 60, borderRadius: 12, backgroundColor: C.line },
-  removeText: { fontSize: 14, fontWeight: '700', color: '#C0303F' },
+  coverThumb: { width: 96, height: 60, borderRadius: R.print, backgroundColor: C.raised },
+  removeText: { fontSize: 14, fontWeight: '700', color: C.red },
   thumbs: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
-  thumb: { width: 76, height: 76, borderRadius: 14, overflow: 'hidden', backgroundColor: C.line },
+  thumb: { width: 76, height: 76, borderRadius: R.photo, overflow: 'hidden', backgroundColor: C.raised },
   thumbX: { position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },
-  thumbAdd: { alignItems: 'center', justifyContent: 'center', backgroundColor: C.bluePale, borderWidth: 1, borderColor: C.blue, borderStyle: 'dashed' },
-  thumbAddText: { fontSize: 12, fontWeight: '800', color: C.blueDeep, marginTop: 2 },
-  draft: { marginTop: 18, padding: 14, borderRadius: 18, backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
-  draftTag: { fontSize: 12, fontWeight: '800', color: C.green },
-  eventBox: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 16, padding: 12, borderRadius: 14, backgroundColor: C.bg },
+  thumbAdd: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', borderWidth: 1, borderColor: C.blue, borderStyle: 'dashed' },
+  thumbAddText: { fontSize: 12, fontWeight: '700', color: C.blueDeep, marginTop: 2 },
+  draft: { marginTop: 18, padding: 14, borderRadius: R.card, backgroundColor: C.card },
+  draftTag: { fontSize: 12.5, fontWeight: '700', color: C.blueDeep },
+  eventBox: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 16, padding: 12, borderRadius: R.chip, backgroundColor: C.raised },
 });

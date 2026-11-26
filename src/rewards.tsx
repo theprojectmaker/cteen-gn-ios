@@ -5,12 +5,13 @@ import { challengeRules } from './challengeRules';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Fire, FireBadge } from './fire';
 import Svg, { Circle } from 'react-native-svg';
-import { C, HUES, R, T, F } from './theme';
+import { C, HUES, R, T, display, numeral } from './theme';
 import { Icon, challengeIcon } from './icons';
 import { nyTime, untilText, wrapWindow } from './zmanim';
 import { leftText, useWrapStatus } from './wrap';
 import { challengeFits, doneThisPeriod, hourLabel, periodKey, streak, tap, useStore, type Challenge, type ChallengeStats, type Wall as WallT, type WallPost } from './store';
 import { Button, Card, Chips, Field, IconTile, s as u } from './ui';
+import { Ticks } from './look';
 import { snapPhoto } from './photo';
 
 const doneLabel = (ch: Challenge) => (ch.every === 'day' ? 'Done for today' : 'Done this week');
@@ -36,14 +37,14 @@ export function ChallengeBanner({ ch }: { ch: Challenge }) {
         <Text style={T.h3} numberOfLines={2}>{ch.title}</Text>
         <Text style={[T.small, { marginTop: 2 }]} numberOfLines={2}>{line}</Text>
       </View>
-      <View style={[st.pill, { backgroundColor: done ? hue.pale : C.orange }]}>
-        {done ? <Icon name="tick" size={14} color={hue.deep} stroke={2.8} /> : ch.photo && mine ? <Icon name="camera" size={14} color={C.white} stroke={2.4} /> : null}
-        <Text style={[st.pillText, done && { color: hue.deep }]}>{action}</Text>
+      <View style={[st.pill, done && st.pillDone]}>
+        {done ? <Icon name="tick" size={14} color={C.blue} stroke={2.8} /> : ch.photo && mine ? <Icon name="camera" size={14} color={C.onOrange} stroke={2.4} /> : null}
+        <Text style={[st.pillText, done && { color: C.blue }]}>{action}</Text>
       </View>
       </View>
       {mine ? (
         <View style={st.bannerFoot}>
-          <View style={st.bannerTrack}><View style={[st.bannerFill, { width: `${Math.min(100, Math.round(((counts[ch.id] ?? 0) / Math.max(1, ch.goal)) * 100))}%`, backgroundColor: hue.solid }]} /></View>
+          <Ticks total={ch.goal} done={counts[ch.id] ?? 0} pending={!done} height={10} />
           <View style={st.bannerFootRow}>
             <Text style={st.bannerFootText}>{counts[ch.id] ?? 0} of {ch.goal} {unit(ch, ch.goal)}</Text>
             {ch.rewards.length ? <Text style={st.bannerFootText} numberOfLines={1}>{ch.rewards[ch.rewards.length - 1].prize}</Text> : null}
@@ -237,8 +238,8 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
       </View>
 
       {/* the rules, in a decorated pop-up */}
-      <Pressable onPress={() => router.push(`/challenge-rules/${ch.id}`)} style={({ pressed }) => [st.rulesBanner, { borderColor: hue.pale }, pressed && { opacity: 0.85 }]} accessibilityRole="button" accessibilityLabel="Read the rules">
-        <View style={[st.rulesIcon, { backgroundColor: hue.pale }]}><Icon name="book" size={19} color={hue.deep} stroke={2.1} /></View>
+      <Pressable onPress={() => router.push(`/challenge-rules/${ch.id}`)} style={({ pressed }) => [st.rulesBanner, pressed && { opacity: 0.85 }]} accessibilityRole="button" accessibilityLabel="Read the rules">
+        <View style={st.rulesIcon}><Icon name="book" size={19} color={C.ink} stroke={2.1} /></View>
         <View style={{ flex: 1 }}>
           <Text style={st.rulesTitle}>The rules</Text>
           <Text style={T.small}>{challengeRules(ch).length} quick rules. Tap to read.</Text>
@@ -248,14 +249,16 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
 
       {/* the prize and your progress */}
       <View style={st.prize}>
-        <View style={[u.blob, { backgroundColor: hue.solid, opacity: 0.35, right: -80, top: -110 }]} />
         <Text style={st.prizeEyebrow}>{prize ? `Finish all ${prize.at}, win` : `Goal: ${ch.goal}`}</Text>
         {prize ? <Text style={st.prizeName}>{prize.prize}</Text> : null}
         {mine ? (
           <>
-            <View style={st.prizeTrack}><View style={[st.prizeFill, { width: `${Math.min(100, (me.count / Math.max(1, me.goal)) * 100)}%`, backgroundColor: hue.solid }]} /></View>
+            <Ticks total={me.goal} done={me.count} pending={!done && !me.out} style={{ marginTop: 16 }} />
             <View style={st.prizeRow}>
-              <Text style={st.prizeCount}>{me.count} <Text style={st.prizeOf}>of {me.goal} days</Text></Text>
+              <View style={st.prizeCountRow}>
+                <Text style={st.prizeCount}>{me.count}</Text>
+                <Text style={st.prizeOf}>of {me.goal} days</Text>
+              </View>
               <Text style={st.prizeLeft}>{me.out ? 'Out' : left === 0 ? 'Done' : `${left} to go`}</Text>
             </View>
           </>
@@ -284,7 +287,7 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
           {/* today: one clear thing to do */}
           {me.out ? (
             <View style={st.stateCard}>
-              <View style={[st.stateIcon, { backgroundColor: '#FBE4E7' }]}><Icon name="x" size={22} color="#C0303F" stroke={2.6} /></View>
+              <View style={[st.stateIcon, { backgroundColor: C.redPale }]}><Icon name="x" size={22} color={C.red} stroke={2.6} /></View>
               <View style={{ flex: 1 }}>
                 <Text style={T.h3}>You're out of this one</Text>
                 <Text style={T.small}>3 missed days. Talk to Rabbi Zevy about the next challenge.</Text>
@@ -292,7 +295,7 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
             </View>
           ) : done ? (
             <View style={st.stateCard}>
-              <View style={[st.stateIcon, { backgroundColor: C.green }]}><Icon name="tick" size={22} color={C.white} stroke={3} /></View>
+              <View style={[st.stateIcon, { backgroundColor: C.bluePale }]}><Icon name="tick" size={22} color={C.blue} stroke={3} /></View>
               <View style={{ flex: 1 }}>
                 <Text style={T.h3}>Done for today</Text>
                 <Text style={T.small}>{left > 0 ? `See you tomorrow. ${left} to go.` : 'You did all of it. Rabbi Zevy will be in touch about your prize.'}</Text>
@@ -307,15 +310,15 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
               </View>
             </View>
           ) : (
-            <Pressable onPress={doCheck} disabled={busy || !ch.active} style={({ pressed }) => [st.snap, { backgroundColor: ws?.lastHour ? '#E5561A' : C.orange }, pressed && { transform: [{ scale: 0.98 }], opacity: 0.95 }]} accessibilityRole="button" accessibilityLabel="Snap today's selfie">
-              <View style={st.snapIconWrap}><Icon name={ch.photo ? 'camera' : 'tick'} size={24} color={C.orange} stroke={2.2} /></View>
+            <Pressable onPress={doCheck} disabled={busy || !ch.active} style={({ pressed }) => [st.snap, pressed && { transform: [{ scale: 0.98 }], opacity: 0.85 }]} accessibilityRole="button" accessibilityLabel="Snap today's selfie">
+              <View style={st.snapIconWrap}><Icon name={ch.photo ? 'camera' : 'tick'} size={26} color={C.onOrange} stroke={2.2} /></View>
               <View style={{ flex: 1 }}>
                 <Text style={st.snapText}>{busy ? 'Posting…' : ch.photo ? "Snap today's selfie" : 'Check in for today'}</Text>
                 {win ? <Text style={st.snapSub}>{win.friday ? 'Before candle lighting' : 'Before sunset'}, {nyTime(win.set)}</Text> : null}
               </View>
               {ws && ws.left > 0 ? (
                 <View style={st.snapTimer}><Text style={st.snapTimerText}>{leftText(ws.left)}</Text><Text style={st.snapTimerLabel}>left</Text></View>
-              ) : <Icon name="right" size={20} color="rgba(255,255,255,0.85)" stroke={2.4} />}
+              ) : <Icon name="right" size={20} color={C.onOrange} stroke={2.4} />}
             </Pressable>
           )}
           {me.strikes > 0 && !me.out ? <Text style={st.strikeNote}>{me.strikes === 1 ? 'You missed 1 day.' : `You missed ${me.strikes} days.`} A 3rd miss and you're out.</Text> : null}
@@ -367,7 +370,7 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
 function Step({ icon, title, sub, last }: { icon: string; title: string; sub: string; last?: boolean }) {
   return (
     <View style={[st.step, !last && st.stepLine]}>
-      <View style={st.stepIcon}><Icon name={icon} size={20} color={C.blueDeep} stroke={2} /></View>
+      <View style={st.stepIcon}><Icon name={icon} size={20} color={C.ink} stroke={2} /></View>
       <View style={{ flex: 1 }}>
         <Text style={T.h3}>{title}</Text>
         <Text style={T.small}>{sub}</Text>
@@ -386,7 +389,7 @@ function Board({ wall, onOpen }: { wall: WallT; onOpen: (i: number) => void }) {
         <Pressable key={p.key} onPress={() => onOpen(i)} style={({ pressed }) => [st.cell, pressed && { opacity: 0.85 }]} accessibilityRole="button" accessibilityLabel={`${p.name}, ${timeOf(p.at)}`}>
           <View style={st.square}>
             <Image source={{ uri: p.url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-            {p.status === 'checked' ? <View style={st.checkBadge}><Icon name="tick" size={10} color="#FFFFFF" stroke={3.2} /></View> : null}
+            {p.status === 'checked' ? <View style={st.checkBadge}><Icon name="tick" size={10} color={C.onBlue} stroke={3.2} /></View> : null}
           </View>
           <Text style={st.cellName} numberOfLines={1}>{p.mine ? 'You' : p.name}</Text>
           <Text style={st.cellTime}>{timeOf(p.at)}</Text>
@@ -448,7 +451,7 @@ function Celebrate({ ch, count, streak: days, onClose }: { ch: Challenge; count:
         {next ? <Text style={st.partyNext}>{next.at - count} more to go for the {next.prize.replace(/\s*\(.*\)$/, '')}</Text> : null}
       </Animated.View>
       <View style={{ width: '100%', marginTop: 30 }}>
-        <Button label="See today's photos" color="#FF5A1F" onPress={onClose} />
+        <Button label="See today's photos" color={C.orange} onPress={onClose} />
       </View>
     </View>
   );
@@ -510,7 +513,7 @@ function PhotoViewer({ ch, posts, start, onClose, onChanged }: { ch: Challenge; 
               </View>
               <Text style={st.viewerCount}>{idx + 1} / {posts.length}</Text>
               <Pressable onPress={onClose} hitSlop={10} style={st.viewerClose} accessibilityRole="button" accessibilityLabel="Close">
-                <Icon name="x" size={18} color="#FFFFFF" stroke={2.4} />
+                <Icon name="x" size={18} color={C.white} stroke={2.4} />
               </Pressable>
             </View>
             <View style={{ flex: 1 }} onLayout={(e) => setW(e.nativeEvent.layout.width)}>
@@ -541,7 +544,7 @@ function PhotoViewer({ ch, posts, start, onClose, onChanged }: { ch: Challenge; 
               {showComments ? (
                 <ScrollView style={{ maxHeight: 180 }} keyboardShouldPersistTaps="handled">
                   {comments.map((c, i) => (
-                    <Text key={c.at + i} style={st.viewerComment}><Text style={{ fontWeight: '800', color: c.leader ? '#7FD0F5' : '#FFFFFF' }}>{c.leader ? 'Rabbi Zevy' : c.name}  </Text>{c.text}</Text>
+                    <Text key={c.at + i} style={st.viewerComment}><Text style={{ fontWeight: '800', color: c.leader ? C.blueDeep : C.white }}>{c.leader ? 'Rabbi Zevy' : c.name}  </Text>{c.text}</Text>
                   ))}
                 </ScrollView>
               ) : null}
@@ -549,7 +552,7 @@ function PhotoViewer({ ch, posts, start, onClose, onChanged }: { ch: Challenge; 
                 <View style={st.viewerMe}><Text style={st.viewerInitial}>{name[0]?.toUpperCase() || '?'}</Text></View>
                 <TextInput value={text} onChangeText={setText} placeholder={`Cheer on ${post.mine ? 'yourself' : post.name.split(' ')[0]}…`} placeholderTextColor="rgba(255,255,255,0.5)" style={st.viewerInput} maxLength={200} onSubmitEditing={send} returnKeyType="send" accessibilityLabel="Add a comment" />
                 <Pressable onPress={send} disabled={busy || !text.trim()} style={[st.viewerSend, (!text.trim() || busy) && { opacity: 0.35 }]} accessibilityRole="button" accessibilityLabel="Send comment">
-                  <Icon name="send" size={15} color="#FFFFFF" stroke={2.4} />
+                  <Icon name="send" size={15} color={C.onBlue} stroke={2.4} />
                 </Pressable>
               </View>
             </View>
@@ -561,25 +564,25 @@ function PhotoViewer({ ch, posts, start, onClose, onChanged }: { ch: Challenge; 
 }
 
 const st = StyleSheet.create({
-  cover: { height: 170, borderRadius: 26, overflow: 'hidden', backgroundColor: C.line, marginBottom: 16 },
-  rulesBanner: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 14, padding: 14, borderRadius: 20, backgroundColor: C.card, borderWidth: 1.5 },
-  rulesIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  rulesTitle: { fontSize: 16, fontWeight: '800', color: C.ink },
+  cover: { height: 170, borderRadius: R.photo, overflow: 'hidden', backgroundColor: C.card, marginBottom: 16 },
+  rulesBanner: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 14, padding: 14, borderRadius: R.card, backgroundColor: C.card },
+  rulesIcon: { width: 40, height: 40, borderRadius: R.chip, borderWidth: 1, borderColor: C.lineStrong, alignItems: 'center', justifyContent: 'center' },
+  rulesTitle: { ...T.h3 },
   liveRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#E8364F' },
-  square: { width: '100%', aspectRatio: 1, borderRadius: 16, overflow: 'hidden', backgroundColor: C.line },
-  squareWaiting: { alignItems: 'center', justifyContent: 'center', backgroundColor: C.line },
-  waitingInitial: { fontSize: 26, fontFamily: F.display, color: C.faint },
-  checkBadge: { position: 'absolute', top: 6, right: 6, width: 18, height: 18, borderRadius: 9, backgroundColor: '#1FA971', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#FFFFFF' },
+  liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: C.red },
+  square: { width: '100%', aspectRatio: 1, borderRadius: R.photo, overflow: 'hidden', backgroundColor: C.card },
+  squareWaiting: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', borderWidth: 1, borderStyle: 'dashed', borderColor: C.lineStrong },
+  waitingInitial: { ...display(28, C.faint) },
+  checkBadge: { position: 'absolute', top: 6, right: 6, width: 18, height: 18, borderRadius: 9, backgroundColor: C.blue, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: C.bg },
   cellName: { fontSize: 13, fontWeight: '800', color: C.ink, marginTop: 6 },
   cellTime: { fontSize: 11, fontWeight: '600', color: C.faint, marginTop: 1, fontVariant: ['tabular-nums'] },
   skelLine: { height: 10, width: '60%', borderRadius: 5, backgroundColor: C.line, marginTop: 8 },
-  partyNum: { fontSize: 76, lineHeight: 82, fontFamily: F.display, color: C.ink, marginTop: 22, fontVariant: ['tabular-nums'] },
-  partyLabel: { fontSize: 15, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase', color: '#FF5A1F', marginTop: -4 },
+  partyNum: { ...numeral(88), marginTop: 22 },
+  partyLabel: { ...T.eyebrow, fontSize: 13, color: C.orangeText },
   viewer: { flex: 1, backgroundColor: '#000000' },
   viewerTop: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingBottom: 10 },
-  viewerAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#2A3440', alignItems: 'center', justifyContent: 'center' },
-  viewerMe: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#2A3440', alignItems: 'center', justifyContent: 'center' },
+  viewerAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: C.avatar, alignItems: 'center', justifyContent: 'center' },
+  viewerMe: { width: 30, height: 30, borderRadius: 15, backgroundColor: C.avatar, alignItems: 'center', justifyContent: 'center' },
   viewerInitial: { color: '#FFFFFF', fontWeight: '900', fontSize: 14 },
   viewerName: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
   viewerTime: { color: 'rgba(255,255,255,0.65)', fontSize: 12, marginTop: 1 },
@@ -588,165 +591,59 @@ const st = StyleSheet.create({
   viewerBottom: { paddingHorizontal: 14, paddingTop: 10, gap: 10 },
   viewerCaption: { color: '#FFFFFF', fontSize: 15, lineHeight: 21 },
   viewerReacts: { flexDirection: 'row', gap: 8 },
-  vReact: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 36, paddingHorizontal: 11, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.12)' },
-  vReactOn: { backgroundColor: 'rgba(43,178,238,0.35)' },
+  vReact: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 36, paddingHorizontal: 11, borderRadius: R.chip, backgroundColor: 'rgba(255,255,255,0.12)', borderWidth: 1, borderColor: 'transparent' },
+  vReactOn: { backgroundColor: C.bluePale, borderColor: C.blue },
   vReactCount: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
   viewerComments: { color: 'rgba(255,255,255,0.65)', fontSize: 14, fontWeight: '600' },
   viewerComment: { color: 'rgba(255,255,255,0.92)', fontSize: 14, lineHeight: 20, marginBottom: 6 },
   viewerInputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 2 },
-  viewerInput: { flex: 1, height: 42, borderRadius: 21, paddingHorizontal: 16, backgroundColor: 'rgba(255,255,255,0.12)', color: '#FFFFFF', fontSize: 15 },
-  viewerSend: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#0BAFE6', alignItems: 'center', justifyContent: 'center' },
+  viewerInput: { flex: 1, height: 42, borderRadius: R.input, paddingHorizontal: 16, backgroundColor: 'rgba(255,255,255,0.12)', color: C.white, fontSize: 15 },
+  viewerSend: { width: 38, height: 38, borderRadius: R.btnSm, backgroundColor: C.blue, alignItems: 'center', justifyContent: 'center' },
   snapTimer: { alignItems: 'flex-end' },
-  snapTimerText: { fontSize: 20, fontFamily: F.display, color: '#FFFFFF', fontVariant: ['tabular-nums'] },
-  snapTimerLabel: { fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.85)', marginTop: -2 },
+  snapTimerText: { ...numeral(26, C.onOrange) },
+  snapTimerLabel: { ...T.eyebrow, fontSize: 11, color: C.onOrange },
   top: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 4 },
-  topTitle: { fontSize: 25, lineHeight: 29, fontFamily: F.display, color: C.ink, letterSpacing: -0.5 },
-  topSub: { fontSize: 14, fontWeight: '700', color: C.sub, marginTop: 3 },
-  prize: { marginTop: 18, padding: 20, borderRadius: 26, backgroundColor: '#101C2A', overflow: 'hidden' },
-  prizeEyebrow: { fontSize: 12, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', color: '#F5C542' },
-  prizeName: { fontSize: 22, lineHeight: 27, fontFamily: F.display, color: '#FFFFFF', marginTop: 6, letterSpacing: -0.3 },
-  prizeSub: { fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 8 },
-  prizeTrack: { height: 10, borderRadius: 5, backgroundColor: 'rgba(255,255,255,0.12)', marginTop: 18, overflow: 'hidden' },
-  prizeFill: { height: 10, borderRadius: 5 },
+  topTitle: { ...display(30) },
+  topSub: { ...T.eyebrow, marginTop: 5 },
+  prize: { marginTop: 18, padding: 18, borderRadius: R.card, backgroundColor: C.card },
+  prizeEyebrow: { ...T.eyebrow, color: C.orangeText },
+  prizeName: { ...display(26), marginTop: 5 },
+  prizeSub: { fontSize: 14, color: C.sub, marginTop: 8 },
   prizeRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginTop: 10 },
-  prizeCount: { fontSize: 22, fontFamily: F.display, color: '#FFFFFF', fontVariant: ['tabular-nums'] },
-  prizeOf: { fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.65)', fontFamily: undefined },
-  prizeLeft: { fontSize: 14, fontWeight: '800', color: 'rgba(255,255,255,0.85)' },
-  steps: { borderRadius: 22, backgroundColor: C.card, borderWidth: 1, borderColor: C.line, paddingHorizontal: 16 },
+  prizeCountRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
+  prizeCount: { ...numeral(28, C.blue) },
+  prizeOf: { fontSize: 14, fontWeight: '600', color: C.sub },
+  prizeLeft: { ...T.eyebrow },
+  steps: { borderRadius: R.card, backgroundColor: C.card, paddingHorizontal: 16 },
   step: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14 },
   stepLine: { borderBottomWidth: 1, borderBottomColor: C.line },
-  stepIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: C.bluePale, alignItems: 'center', justifyContent: 'center' },
-  stateCard: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 16, padding: 16, borderRadius: 22, backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
-  stateIcon: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
-  snap: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 16, paddingHorizontal: 16, height: 72, borderRadius: 24 },
-  snapIconWrap: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
-  snapText: { fontSize: 18, fontWeight: '800', color: '#FFFFFF' },
-  snapSub: { fontSize: 13, color: 'rgba(255,255,255,0.85)', marginTop: 2, fontWeight: '600' },
-  strikeNote: { fontSize: 13, color: '#B4532A', fontWeight: '700', marginTop: 10, textAlign: 'center' },
+  stepIcon: { width: 40, height: 40, borderRadius: R.chip, borderWidth: 1, borderColor: C.lineStrong, alignItems: 'center', justifyContent: 'center' },
+  stateCard: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 16, padding: 16, borderRadius: R.card, backgroundColor: C.card },
+  stateIcon: { width: 46, height: 46, borderRadius: R.chip, alignItems: 'center', justifyContent: 'center' },
+  snap: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 16, paddingHorizontal: 16, height: 72, borderRadius: R.btn, backgroundColor: C.orange },
+  snapIconWrap: { width: 34, height: 44, alignItems: 'center', justifyContent: 'center' },
+  snapText: { ...display(23, C.onOrange), letterSpacing: 1.1 },
+  snapSub: { fontSize: 13, color: C.onOrange, marginTop: 1, fontWeight: '600' },
+  strikeNote: { fontSize: 13, color: C.orangeText, fontWeight: '700', marginTop: 10, textAlign: 'center' },
   boardHint: { fontSize: 12, color: C.faint, marginTop: 10 },
   party: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28, maxWidth: 520, width: '100%', alignSelf: 'center' },
-  partyStage: { width: 220, height: 200, alignItems: 'center', justifyContent: 'center' },
-  partyCheck: { width: 108, height: 108, borderRadius: 54, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 20, shadowOffset: { width: 0, height: 10 } },
-  partyTitle: { fontSize: 30, fontFamily: F.display, color: C.ink, letterSpacing: -0.6, textAlign: 'center', marginTop: 6 },
   partySub: { fontSize: 15, color: C.sub, marginTop: 6, textAlign: 'center' },
-  partyStats: { flexDirection: 'row', alignItems: 'center', marginTop: 22, paddingVertical: 14, paddingHorizontal: 26, borderRadius: 20, backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
-  partyStat: { alignItems: 'center', minWidth: 90 },
-  partyDivider: { width: 1, height: 34, backgroundColor: C.line, marginHorizontal: 10 },
-  partyNext: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 14, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 14, backgroundColor: C.bluePale },
-  partyNextText: { fontSize: 14, fontWeight: '800', flexShrink: 1 },
-  closedCard: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 16, padding: 16, borderRadius: 22, backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
-  window: { marginTop: 14, padding: 16, borderRadius: 20, backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
-  windowEnds: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  windowEnd: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  windowTime: { fontSize: 15, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },
-  windowState: { fontSize: 12, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase', color: C.sub },
-  windowTrack: { height: 6, borderRadius: 3, backgroundColor: C.line, marginTop: 12, justifyContent: 'center' },
-  windowFill: { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 3, backgroundColor: '#F5B81F' },
-  windowNow: { position: 'absolute', width: 14, height: 14, borderRadius: 7, marginLeft: -7, backgroundColor: C.card, borderWidth: 3, borderColor: '#F5B81F' },
-  windowNote: { fontSize: 12, color: C.faint, marginTop: 10 },
+  partyNext: { marginTop: 14, paddingVertical: 10, paddingHorizontal: 14, borderRadius: R.chip, backgroundColor: C.bluePale, overflow: 'hidden', fontSize: 14, fontWeight: '600', color: C.ink, textAlign: 'center' },
   board: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -5, marginTop: 14 },
   cell: { width: '33.333%', paddingHorizontal: 5, marginBottom: 14 },
-  cellWaiting: { backgroundColor: C.line, alignItems: 'center', justifyContent: 'center' },
-  cellOpen: { backgroundColor: 'transparent', borderWidth: 1, borderColor: C.line, opacity: 0.6 },
-  cellInitial: { fontSize: 11, fontWeight: '900', color: C.faint },
-  cellCheck: { position: 'absolute', right: 3, top: 3, width: 7, height: 7, borderRadius: 4, backgroundColor: '#29C27A', borderWidth: 1, borderColor: '#fff' },
-  legend: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, flexWrap: 'wrap' },
-  legendDot: { width: 12, height: 12, borderRadius: 3, marginLeft: 6 },
-  legendText: { fontSize: 12, color: C.sub, fontWeight: '700' },
-  whoRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 10 },
-  whoThumb: { width: 36, height: 36, borderRadius: 10, backgroundColor: C.line },
-  whoEmpty: { alignItems: 'center', justifyContent: 'center' },
-  whoTime: { fontSize: 13, fontWeight: '800', color: C.sub, fontVariant: ['tabular-nums'] },
-  captionInput: { marginTop: 14, minHeight: 50, borderRadius: 16, backgroundColor: C.card, borderWidth: 1, borderColor: C.line, paddingHorizontal: 16, fontSize: 16, color: C.ink },
-  caption: { fontSize: 16, lineHeight: 23, color: C.ink, marginTop: 14 },
-  reactRow: { flexDirection: 'row', gap: 8, marginTop: 14, flexWrap: 'wrap' },
-  reactBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 40, paddingHorizontal: 12, borderRadius: R.pill, backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
-  reactOn: { backgroundColor: C.bluePale, borderColor: C.blue },
-  reactEmoji: { fontSize: 18 },
-  reactCount: { fontSize: 14, fontWeight: '800', color: C.sub },
-  strikes: { flexDirection: 'row', gap: 6, marginTop: 4 },
-  strike: { width: 22, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.3)' },
-  strikeOn: { backgroundColor: '#FFD27A' },
-  outCard: { marginTop: 16, flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: C.card, borderRadius: 24, padding: 16, borderWidth: 2, borderColor: '#F2C1C7' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14 },
-  tile: { width: '31.9%', aspectRatio: 3 / 4, borderRadius: 18, overflow: 'hidden', backgroundColor: C.line, justifyContent: 'flex-end', padding: 8 },
-  tileShade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '45%', backgroundColor: 'rgba(8,16,26,0.45)' },
-  tileCheck: { position: 'absolute', top: 8, right: 8, width: 20, height: 20, borderRadius: 10, backgroundColor: '#1A8F5C', alignItems: 'center', justifyContent: 'center' },
-  tileName: { color: C.white, fontSize: 13, fontWeight: '800' },
-  tileTime: { color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '700' },
-  tileEmpty: { backgroundColor: C.card, borderWidth: 2, borderColor: C.line, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', opacity: 0.75 },
-  emptyAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: C.line, alignItems: 'center', justifyContent: 'center' },
-  emptyInitial: { fontSize: 16, fontWeight: '900', color: C.faint },
-  emptyName: { fontSize: 12, fontWeight: '800', color: C.sub, marginTop: 8, maxWidth: '100%' },
-  emptyState: { fontSize: 11, fontWeight: '700', color: C.faint, marginTop: 2 },
-  rule: { marginTop: 22, backgroundColor: C.card, borderRadius: 18, padding: 16, gap: 6, borderWidth: 1, borderColor: C.line },
-  ruleTitle: { fontSize: 15, fontWeight: '900', color: C.ink, marginBottom: 2 },
-  ruleLine: { fontSize: 14, lineHeight: 20, color: C.sub },
-  ruleTop: { borderTopWidth: 1, borderTopColor: C.line },
-  sheetGrab: { width: 40, height: 5, borderRadius: 3, backgroundColor: C.line, alignSelf: 'center', marginTop: 8, marginBottom: 10 },
+  captionInput: { marginTop: 14, minHeight: 50, borderRadius: R.input, backgroundColor: C.card, borderWidth: 1, borderColor: C.lineStrong, paddingHorizontal: 16, fontSize: 16, color: C.ink },
   sheetHead: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
-  sheetClose: { width: 36, height: 36, borderRadius: 18, backgroundColor: C.card, alignItems: 'center', justifyContent: 'center' },
-  bigPhoto: { width: '100%', aspectRatio: 3 / 4, borderRadius: 24, backgroundColor: C.line },
-  checkedRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12 },
-  hero: { borderRadius: 28, padding: 20, overflow: 'hidden' },
-  heroRow: { flexDirection: 'row', alignItems: 'center', gap: 20 },
-  ringBig: { color: C.white, fontSize: 38, lineHeight: 42, fontFamily: F.display, letterSpacing: -1 },
-  ringLabel: { color: 'rgba(255,255,255,0.9)', fontSize: 12, fontWeight: '800' },
-  statLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
-  statValue: { color: C.white, fontSize: 18, fontFamily: F.display },
-  snapCard: { marginTop: 16, flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: C.card, borderRadius: 24, padding: 16, borderWidth: 2, borderColor: C.line },
-  snapIcon: { width: 58, height: 58, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  snapTitle: { fontSize: 18, fontFamily: F.display, color: C.ink },
-  doneCard: { marginTop: 16, flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: C.greenPale, borderRadius: 24, padding: 16 },
-  doneIcon: { width: 46, height: 46, borderRadius: 23, backgroundColor: C.green, alignItems: 'center', justifyContent: 'center' },
-  doneRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14 },
-  miniAvatar: { width: 30, height: 30, borderRadius: 15, backgroundColor: C.bluePale, borderWidth: 2, borderColor: C.bg, alignItems: 'center', justifyContent: 'center' },
-  miniAvatarText: { fontSize: 12, fontWeight: '900', color: C.blueDeep },
-  photoChip: { position: 'absolute', left: 12, bottom: 12, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(10,18,28,0.62)', borderRadius: R.pill, paddingLeft: 4, paddingRight: 14, paddingVertical: 4 },
-  photoName: { color: C.white, fontSize: 14, fontWeight: '800' },
-  photoTime: { color: 'rgba(255,255,255,0.8)', fontSize: 12 },
-  checkedOnPhoto: { position: 'absolute', right: 12, top: 12, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(26,107,69,0.92)', borderRadius: R.pill, paddingHorizontal: 10, paddingVertical: 6 },
-  checkedOnPhotoText: { color: C.white, fontSize: 12, fontWeight: '800' },
-  streakTop: { flexDirection: 'row', alignItems: 'center', gap: 12, justifyContent: 'center' },
-  weekOnBlue: { marginTop: 18, paddingHorizontal: 14 },
+  sheetClose: { width: 38, height: 38, borderRadius: 19, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine, alignItems: 'center', justifyContent: 'center' },
+  bigPhoto: { width: '100%', aspectRatio: 3 / 4, borderRadius: R.photo, backgroundColor: C.card },
   wallHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 },
-  section0: { fontSize: 20, fontFamily: F.display, color: C.ink },
-  postHead: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14 },
-  avatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: C.bluePale, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 16, fontWeight: '900', color: C.blueDeep },
-  checked: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: C.greenPale, borderRadius: R.pill, paddingHorizontal: 10, paddingVertical: 5 },
-  checkedText: { fontSize: 12, fontWeight: '800', color: C.green },
-  wallPhoto: { width: '100%', aspectRatio: 4 / 5, backgroundColor: C.line },
-  comment: { fontSize: 14, lineHeight: 20, color: C.ink },
-  commentName: { fontWeight: '800' },
-  commentRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
-  commentInput: { flex: 1, minHeight: 42, borderRadius: R.pill, backgroundColor: C.bg, paddingHorizontal: 16, fontSize: 15, color: C.ink },
-  send: { width: 42, height: 42, borderRadius: 21, backgroundColor: C.blue, alignItems: 'center', justifyContent: 'center' },
-  track: { overflow: 'hidden' },
-  fillBar: { position: 'absolute', left: 0, top: 0, bottom: 0 },
+  section0: { ...T.h2 },
   bannerCard: { padding: 16 },
   banner: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   bannerFoot: { marginTop: 14 },
-  bannerTrack: { height: 6, borderRadius: 3, backgroundColor: C.line, overflow: 'hidden' },
-  bannerFill: { height: 6, borderRadius: 3 },
   bannerFootRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, marginTop: 8 },
   bannerFootText: { fontSize: 12, fontWeight: '700', color: C.sub, flexShrink: 1 },
-  pill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: R.pill, paddingHorizontal: 16, minHeight: 38, justifyContent: 'center' },
-  pillText: { color: C.white, fontSize: 14, fontWeight: '800' },
-  head: { alignItems: 'center', paddingHorizontal: 12, paddingTop: 8, paddingBottom: 26 },
-  title: { fontSize: 30, lineHeight: 34, fontFamily: F.display, color: C.ink, letterSpacing: -0.5, textAlign: 'center', marginTop: 4 },
-  streak: { borderRadius: 26, paddingVertical: 22, overflow: 'hidden' },
-  streakBig: { color: C.white, fontSize: 56, lineHeight: 62, fontFamily: F.display, letterSpacing: -2 },
-  streakLabel: { color: C.white, fontSize: 15, lineHeight: 19, fontWeight: '800' },
-  week: { flexDirection: 'row', justifyContent: 'space-between' },
-  weekCol: { alignItems: 'center', gap: 6 },
-  weekDot: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  weekLabel: { fontSize: 11, fontWeight: '800', color: C.sub },
-  photo: { width: 140, height: 140, borderRadius: 18, alignSelf: 'center', marginTop: 14, backgroundColor: C.line },
+  pill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: R.btnSm, paddingHorizontal: 16, minHeight: 36, justifyContent: 'center', backgroundColor: C.orange, borderWidth: 1.5, borderColor: C.orange },
+  pillDone: { backgroundColor: 'transparent', borderColor: C.blue },
+  pillText: { ...display(19, C.onOrange), letterSpacing: 1.1 },
   note: { fontSize: 14, color: C.ink, fontWeight: '700', marginTop: 12, textAlign: 'center' },
-  progressRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginTop: 28, marginBottom: 10 },
-  section: { fontSize: 19, fontFamily: F.display, color: C.ink, marginTop: 34, marginBottom: 12 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
-  dot: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  rank: { fontSize: 14, fontWeight: '900', color: C.sub },
 });

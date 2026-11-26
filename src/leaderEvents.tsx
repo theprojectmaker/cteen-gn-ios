@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { C, F, T } from './theme';
+import { C, R, T } from './theme';
 import { Icon } from './icons';
 import { upcoming, useStore, type AiEvent, type EventItem, type Popup } from './store';
 import { Button, Chips, Field, Toggle, s as u } from './ui';
@@ -186,7 +186,7 @@ export function AiPlanner({ onDone }: { onDone: (msg: string) => void }) {
   return (
     <View>
       <View style={st.aiHead}>
-        <View style={st.aiIcon}><Icon name="star" size={20} color="#FFFFFF" stroke={2.2} /></View>
+        <View style={st.aiIcon}><Icon name="star" size={20} color={C.ink} stroke={2} /></View>
         <View style={{ flex: 1 }}>
           <Text style={st.h}>AI event planner</Text>
           <Text style={T.small}>Say the idea, add what you know. The AI sets up the event for you to check.</Text>
@@ -290,19 +290,19 @@ export function InviteForm({ onDone }: { onDone: (msg: string) => void }) {
 }
 
 const st = StyleSheet.create({
-  h: { fontSize: 22, fontFamily: F.display, color: C.ink, letterSpacing: -0.3 },
+  h: { ...T.h2 },
   sub: { fontSize: 14, lineHeight: 20, color: C.sub, marginTop: 4 },
-  switch: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12, padding: 14, borderRadius: 16, backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
-  switchTitle: { fontSize: 15, fontWeight: '800', color: C.ink },
-  err: { color: '#C0303F', marginTop: 12, fontSize: 14, fontWeight: '700' },
-  listHead: { fontSize: 13, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase', color: C.sub, marginBottom: 8 },
-  invRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 16, backgroundColor: C.card, borderWidth: 1, borderColor: C.line, marginBottom: 8 },
+  switch: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12, padding: 14, borderRadius: R.card, backgroundColor: C.card },
+  switchTitle: { fontSize: 15.5, fontWeight: '600', color: C.ink },
+  err: { color: C.red, marginTop: 12, fontSize: 14, fontWeight: '700' },
+  listHead: { ...T.eyebrow, marginBottom: 8 },
+  invRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: R.card, backgroundColor: C.card, marginBottom: 8 },
   names: { fontSize: 13, color: C.ink, marginTop: 4 },
-  back: { fontSize: 15, fontWeight: '800', color: C.blue },
+  back: { fontSize: 15, fontWeight: '700', color: C.blue },
   aiHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  aiIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: '#7C5CFC', alignItems: 'center', justifyContent: 'center' },
-  seg: { flexDirection: 'row', gap: 6, padding: 4, borderRadius: 14, backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
-  segBtn: { flex: 1, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  segOn: { backgroundColor: C.inverse },
-  segText: { fontSize: 14, fontWeight: '800', color: C.ink },
+  aiIcon: { width: 44, height: 44, borderRadius: R.chip, borderWidth: 1, borderColor: C.lineStrong, alignItems: 'center', justifyContent: 'center' },
+  seg: { flexDirection: 'row', gap: 6, padding: 4, borderRadius: R.input, backgroundColor: C.card, borderWidth: 1, borderColor: C.lineStrong },
+  segBtn: { flex: 1, height: 40, borderRadius: R.chip, alignItems: 'center', justifyContent: 'center' },
+  segOn: { backgroundColor: C.paper },
+  segText: { fontSize: 14.5, fontWeight: '600', color: C.ink },
 });

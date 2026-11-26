@@ -1,30 +1,22 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { C, T, F } from '../src/theme';
+import { Text, View } from 'react-native';
+import { T } from '../src/theme';
 import { useStore } from '../src/store';
 import { ChallengeBanner } from '../src/rewards';
+import { Page } from '../src/look';
 
-// All live challenges (opened from the trophy button when more than one is running).
+// All live challenges (opened from the header chip when more than one is running).
 export default function ChallengesRoute() {
-  const insets = useSafeAreaInsets();
   const { content } = useStore();
   const live = content.challenges.filter((c) => c.active);
   return (
-    <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ paddingTop: insets.top + 60, paddingBottom: insets.bottom + 40 }}>
-      <View style={st.col}>
-        <Text style={st.title}>Challenges</Text>
-        <Text style={[T.small, { fontSize: 15, marginTop: 6, marginBottom: 22 }]}>Sign up, keep your streak, win rewards.</Text>
-        <View style={{ gap: 12 }}>
-          {live.map((c) => <ChallengeBanner key={c.id} ch={c} />)}
-          {live.length === 0 ? <Text style={T.body}>No challenges right now.</Text> : null}
-        </View>
+    <Page top={60}>
+      <Text style={T.h1}>Challenges</Text>
+      <Text style={[T.small, { fontSize: 15, marginTop: 6, marginBottom: 22 }]}>Sign up, keep your streak, win rewards.</Text>
+      <View style={{ gap: 12 }}>
+        {live.map((c) => <ChallengeBanner key={c.id} ch={c} />)}
+        {live.length === 0 ? <Text style={T.body}>No challenges right now.</Text> : null}
       </View>
-    </ScrollView>
+    </Page>
   );
 }
-
-const st = StyleSheet.create({
-  col: { width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 20 },
-  title: { fontSize: 32, fontFamily: F.display, color: C.ink, letterSpacing: -0.6 },
-});

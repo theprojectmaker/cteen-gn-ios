@@ -1,11 +1,18 @@
-import React from 'react';
-import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ViewStyle } from 'react-native';
-import { C, HUES, R, T, shadow } from './theme';
+// The older shared pieces, restyled to the Flyer look so every screen that still uses them
+// inherits it. New screens should reach for the pieces in look.tsx first (its top comment lists
+// them); the ones here keep their old names and props.
+import React, { useState } from 'react';
+import { Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
+import { C, F, HUES, R, SP, T, display, shadow } from './theme';
 import { Icon, challengeIcon } from './icons';
-import { Glass } from './glass';
-import { IMAGES, countdown, dateLabel, repeatLabel, useStore, type ColorKey, type EventItem } from './store';
+import { IMAGES, dateLabel, repeatLabel, useStore, type ColorKey, type EventItem } from './store';
+import { CloseButton, DayBlock, Label, Photo, PosterStage, Slab, TextTabs, eventPicture, whenTag } from './look';
 
-export function Card({ children, style, onPress, label }: { children: React.ReactNode; style?: ViewStyle | ViewStyle[]; onPress?: () => void; label?: string }) {
+export { SectionHead } from './look';
+
+// A quiet card-colored block. Only where a container is truly needed: forms and the leader panel.
+// Teen-facing content sits straight on the page (use Row / Band from look.tsx instead).
+export function Card({ children, style, onPress, label }: { children: React.ReactNode; style?: StyleProp<ViewStyle>; onPress?: () => void; label?: string }) {
   if (!onPress) return <View style={[s.card, style]}>{children}</View>;
   return (
     <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={({ pressed }) => [s.card, style, pressed && s.pressed]}>
@@ -14,12 +21,16 @@ export function Card({ children, style, onPress, label }: { children: React.Reac
   );
 }
 
-export function Chips<V extends string>({ options, value, onChange, wrap }: { options: readonly V[]; value: V; onChange: (v: V) => void; wrap?: boolean }) {
+// Choice chips for forms: radius 8, hairline outline, the chosen one paper-white with dark text.
+// `wrap` lets them flow onto more lines; without it they scroll sideways.
+// `tabs` draws them as the text tabs used for filters (TextTabs in look.tsx) instead.
+export function Chips<V extends string>({ options, value, onChange, wrap, tabs }: { options: readonly V[]; value: V; onChange: (v: V) => void; wrap?: boolean; tabs?: boolean }) {
+  if (tabs) return <TextTabs options={options} value={value} onChange={onChange} />;
   const items = options.map((o) => {
     const on = o === value;
     return (
       <Pressable key={o} onPress={() => onChange(o)} style={[s.chip, on && s.chipOn]} accessibilityRole="button" accessibilityState={{ selected: on }}>
-        <Text style={[s.chipText, on && s.chipTextOn]}>{o}</Text>
+        <Text style={[s.chipText, on && s.chipTextOn]} numberOfLines={1}>{o}</Text>
       </Pressable>
     );
   });
@@ -31,79 +42,76 @@ export function Chips<V extends string>({ options, value, onChange, wrap }: { op
   );
 }
 
+// The old button, drawn as a Slab: primary = cyan (orange when asked for), ghost, danger = red label.
 export function Button({ label, onPress, kind = 'primary', icon, color, disabled, small }: { label: string; onPress: () => void; kind?: 'primary' | 'ghost' | 'danger'; icon?: string; color?: string; disabled?: boolean; small?: boolean }) {
-  const fg = kind === 'primary' ? C.white : kind === 'danger' ? '#C0303F' : C.ink;
-  return (
-    <Pressable onPress={onPress} disabled={disabled} accessibilityRole="button" accessibilityState={{ disabled: !!disabled }} style={({ pressed }) => [s.btn, small && s.btnSmall, kind === 'primary' ? { backgroundColor: color ?? C.blue } : s.btnGhost, disabled && { opacity: 0.45 }, pressed && s.pressed]}>
-      {icon ? <Icon name={icon} size={small ? 15 : 17} color={fg} stroke={2.2} /> : null}
-      <Text style={[s.btnText, small && { fontSize: 14 }, { color: fg }]}>{label}</Text>
-    </Pressable>
-  );
+  const slab = kind === 'danger' ? 'danger' : kind === 'ghost' ? 'ghost' : color === C.orange || color === HUES.orange.solid ? 'orange' : 'cyan';
+  return <Slab label={label} onPress={onPress} kind={slab} size={small ? 'md' : 'lg'} height={small ? 38 : 48} icon={icon} disabled={disabled} />;
 }
 
 export function Field({ label, value, onChange, placeholder, multiline, hint, secure }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; multiline?: boolean; hint?: string; secure?: boolean }) {
+  const [focus, setFocus] = useState(false);
   return (
     <View style={{ marginTop: 14 }}>
       <Text style={s.fieldLabel}>{label}</Text>
-      <TextInput value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={C.faint} multiline={multiline} secureTextEntry={secure} autoCapitalize={secure ? 'none' : undefined} accessibilityLabel={label} style={[s.input, multiline && s.inputMulti]} />
-      {hint ? <Text style={[T.small, { marginTop: 4, fontSize: 12 }]}>{hint}</Text> : null}
+      <TextInput value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={C.faint} multiline={multiline} secureTextEntry={secure} autoCapitalize={secure ? 'none' : undefined} accessibilityLabel={label}
+        selectionColor={C.blue} keyboardAppearance="dark" onFocus={() => setFocus(true)} onBlur={() => setFocus(false)} style={[s.input, multiline && s.inputMulti, focus && s.inputFocus]} />
+      {hint ? <Text style={[T.small, s.hint]}>{hint}</Text> : null}
     </View>
   );
 }
 
 export function Toggle({ value, onChange, label }: { value: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
-    <Pressable onPress={() => onChange(!value)} hitSlop={8} accessibilityRole="switch" accessibilityState={{ checked: value }} accessibilityLabel={label} style={[s.switch, value && { backgroundColor: C.blue }]}>
+    <Pressable onPress={() => onChange(!value)} hitSlop={8} accessibilityRole="switch" accessibilityState={{ checked: value }} accessibilityLabel={label} style={[s.switch, value && s.switchOn]}>
       <View style={[s.knob, value && { alignSelf: 'flex-end' }]} />
     </Pressable>
   );
 }
 
-// Rounded square holding one icon, tinted with one of the accent colors.
-export function IconTile({ icon, color = 'blue', size = 44, solid }: { icon: string; color?: ColorKey; size?: number; solid?: boolean }) {
-  const hue = HUES[color] ?? HUES.blue;
+// Leader panel only: an outlined square holding one icon. No fill, no pastel. (Teen-facing
+// screens do not use icon tiles at all; `color` and `solid` are accepted and ignored.)
+export function IconTile({ icon, size = 44 }: { icon: string; color?: ColorKey; size?: number; solid?: boolean }) {
   return (
-    <View style={{ width: size, height: size, borderRadius: size * 0.3, backgroundColor: solid ? hue.solid : hue.pale, alignItems: 'center', justifyContent: 'center' }}>
-      <Icon name={icon} size={size * 0.5} color={solid ? C.white : hue.deep} stroke={2} />
+    <View style={[s.tile, { width: size, height: size }]}>
+      <Icon name={icon} size={Math.round(size * 0.5)} color={C.ink} stroke={1.9} />
     </View>
   );
 }
 
-export function ScopeBadge({ scope, style }: { scope: 'gn' | 'intl'; style?: ViewStyle }) {
+// "GREAT NECK" / "INTERNATIONAL" as a small dark tag. Old screens put it on top of a picture;
+// on the page itself use a plain <Label> instead.
+export function ScopeBadge({ scope, style }: { scope: 'gn' | 'intl'; style?: StyleProp<ViewStyle> }) {
   const gn = scope === 'gn';
   return (
-    <View style={[s.scope, { backgroundColor: gn ? C.blue : C.night }, style]}>
-      <Icon name={gn ? 'pin' : 'globe'} size={12} color={C.white} stroke={2.4} />
-      <Text style={s.scopeText}>{gn ? 'Great Neck' : 'International'}</Text>
+    <View style={[s.scope, style]}>
+      <Icon name={gn ? 'pin' : 'globe'} size={11} color={gn ? C.blue : C.ink} stroke={2.4} />
+      <Label size={11} tone={gn ? 'blue' : 'ink'}>{gn ? 'Great Neck' : 'International'}</Label>
     </View>
   );
 }
 
-// Event artwork: a bundled photo when there is one, otherwise a color block with a large icon.
-export function Cover({ e, style, iconSize = 56 }: { e: { id?: string; image?: string; poster?: string; cover?: string; icon: string; color: ColorKey }; style?: ViewStyle; iconSize?: number }) {
-  // A wide cover photo wins for cards and the home hero; the portrait poster/flyer is the fallback.
+// A picture filling whatever box `style` gives it, cropped to fit (thumbnails in old screens).
+// With no picture: a card-colored block with a faint icon, never a color wash.
+// New code: use eventPicture() with Print / PosterStage / Photo / Thumb from look.tsx.
+export function Cover({ e, style, iconSize = 56 }: { e: { id?: string; image?: string; poster?: string; cover?: string; icon: string; color: ColorKey }; style?: StyleProp<ViewStyle>; iconSize?: number }) {
+  // A wide cover photo wins; the portrait poster/flyer is the fallback.
   const img = e.cover ? { uri: e.cover } : e.poster ? { uri: e.poster } : e.image ? IMAGES[e.image] : undefined;
-  const hue = HUES[e.color] ?? HUES.blue;
   return (
-    <View style={[{ backgroundColor: hue.solid, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, style]}>
+    <View style={[s.cover, style]}>
       {img ? <Image source={img} style={s.fill} resizeMode="cover" /> : (
-        <>
-          <View style={[s.blob, { backgroundColor: hue.deep, opacity: 0.22, right: -40, top: -50 }]} />
-          <Icon name={e.id ? challengeIcon({ id: e.id, icon: e.icon || 'star' }) : e.icon || 'star'} size={iconSize} color="rgba(255,255,255,0.92)" stroke={1.6} />
-        </>
+        <Icon name={e.id ? challengeIcon({ id: e.id, icon: e.icon || 'star' }) : e.icon || 'star'} size={Math.min(iconSize, 64)} color={C.faint} stroke={1.6} />
       )}
     </View>
   );
 }
 
-export function SaveHeart({ id }: { id: string }) {
+// The save heart: an outline, filled orange once saved.
+export function SaveHeart({ id, style }: { id: string; style?: StyleProp<ViewStyle> }) {
   const { saved, toggleSaved } = useStore();
   const on = saved.includes(id);
   return (
-    <Pressable onPress={() => toggleSaved(id)} hitSlop={8} style={s.heartPos} accessibilityRole="button" accessibilityLabel={on ? 'Remove from saved' : 'Save event'}>
-      <Glass style={s.heart}>
-        <Icon name="heart" size={17} color={on ? '#E0445C' : C.ink} fill={on ? '#E0445C' : 'none'} />
-      </Glass>
+    <Pressable onPress={() => toggleSaved(id)} hitSlop={6} style={({ pressed }) => [s.heart, style, pressed && { opacity: 0.55 }]} accessibilityRole="button" accessibilityLabel={on ? 'Remove from saved' : 'Save event'}>
+      <Icon name="heart" size={22} color={on ? C.orange : C.sub} fill={on ? C.orange : 'none'} stroke={2} />
     </Pressable>
   );
 }
@@ -120,63 +128,55 @@ export function EventMeta({ e }: { e: EventItem }) {
   const mine = going.includes(e.id);
   return (
     <Text style={s.meta} numberOfLines={1}>
-      <Text style={{ color: mine ? C.green : C.sub }}>{mine ? "You're signed up" : repeatLabel(e) || dateLabel(e)}</Text>
+      <Text style={{ color: mine ? C.blue : C.sub }}>{mine ? "You're signed up" : repeatLabel(e) || dateLabel(e)}</Text>
       {e.price ? <Text style={{ color: C.ink }}> · {e.price}</Text> : null}
-      {audienceLabel(e) ? <Text style={{ color: C.blueDeep }}> · {audienceLabel(e)}</Text> : null}
+      {audienceLabel(e) ? <Text style={{ color: C.sub }}> · {audienceLabel(e)}</Text> : null}
     </Text>
   );
 }
 
+// One event in a list, as a block on the page (not a card): its picture whole (a photograph at
+// 16:10, a poster on a PosterStage, nothing when it has none), then the date, a cyan time
+// label, the title, a meta line, who is going, the save heart and the RSVP / IN chip.
 export function EventCard({ e, width }: { e: EventItem; width?: number }) {
   const { openEvent, goingCount, going } = useStore();
   const n = e.signup === 'app' ? goingCount[e.id] ?? 0 : 0;
+  const mine = going.includes(e.id);
+  const picture = eventPicture(e);
+  const meta = [repeatLabel(e), e.place, e.price, audienceLabel(e)].filter(Boolean).join(' · ');
+  const goingLine = mine ? `You're in${n > 1 ? ` · ${n} going` : ''}` : n > 0 ? `${n} going` : '';
   return (
     <View style={{ width }}>
       <Pressable onPress={() => openEvent(e.id)} style={({ pressed }) => pressed && s.pressed} accessibilityRole="button" accessibilityLabel={e.title}>
-        <View style={s.evImgWrap}>
-          {e.fullPoster && e.cover
-            ? <View style={[s.fill, { backgroundColor: '#0B1520' }]}><Image source={{ uri: e.cover }} style={s.fill} resizeMode="contain" /></View>
-            : <Cover e={e} style={s.fill} />}
-          {e.priority ? <View style={s.featured}><Icon name="star" size={12} color={C.white} fill={C.white} /><Text style={s.featuredText}>Featured</Text></View> : <ScopeBadge scope={e.scope} style={s.tagPos} />}
-          <View style={s.badge}>
-            <Text style={s.badgeText}>{countdown(e)}</Text>
+        {picture ? (picture.kind === 'poster' ? <PosterStage source={picture.source} maxHeight={300} /> : <Photo source={picture.source} />) : null}
+        <View style={[s.evRow, !!picture && { marginTop: 12 }]}>
+          <DayBlock date={e.start} />
+          <View style={s.evText}>
+            <View style={s.evKickers}>
+              {e.priority ? <Label size={11} tone="orange">Featured</Label> : null}
+              <Label size={11} tone="blue" numberOfLines={1} style={{ flexShrink: 1 }}>{whenTag(e)}</Label>
+            </View>
+            <Text style={s.evTitle} numberOfLines={2}>{e.title}</Text>
+            {meta ? <Text style={[T.small, { marginTop: 3 }]} numberOfLines={2}>{meta}</Text> : null}
+            {goingLine ? <Label size={11} tone={mine ? 'blue' : 'sub'} style={{ marginTop: 6 }}>{goingLine}</Label> : null}
+          </View>
+          <View style={s.evSide}>
+            <SaveHeart id={e.id} />
+            {e.signup !== 'app' ? null : mine ? <Slab size="chip" kind="outline" icon="tick" label="In" /> : <Slab size="chip" kind="paper" label="RSVP" onPress={() => openEvent(e.id)} accessibilityLabel={`RSVP to ${e.title}`} />}
           </View>
         </View>
-        <Text style={[T.h3, { marginTop: 10 }]} numberOfLines={2}>{e.title}</Text>
-        <EventMeta e={e} />
-        {e.about ? <Text style={[T.small, { marginTop: 6, lineHeight: 19 }]} numberOfLines={2}>{e.about}</Text> : null}
-        {n > 0 || going.includes(e.id) ? (
-          <View style={s.goingRow}>
-            <Icon name={going.includes(e.id) ? 'check' : 'users'} size={14} color={going.includes(e.id) ? C.green : C.sub} stroke={2.2} />
-            <Text style={[s.goingText, going.includes(e.id) && { color: C.green }]}>{going.includes(e.id) ? `You're going${n > 1 ? ` · ${n} going` : ''}` : `${n} going`}</Text>
-          </View>
-        ) : null}
+        {e.about ? <Text style={[T.small, { marginTop: 8 }]} numberOfLines={2}>{e.about}</Text> : null}
       </Pressable>
-      <SaveHeart id={e.id} />
     </View>
   );
 }
 
-export function SectionHead({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
-  return (
-    <View style={s.sectionHead}>
-      <Text style={T.h2}>{title}</Text>
-      {action ? (
-        <Pressable onPress={onAction} hitSlop={10} style={s.sectionAction} accessibilityRole="button">
-          <Text style={s.link}>{action}</Text>
-          <Icon name="right" size={15} color={C.blue} stroke={2.4} />
-        </Pressable>
-      ) : null}
-    </View>
-  );
-}
-
-export function Empty({ icon, title, body }: { icon: string; title: string; body: string }) {
+// No icon tile: one quiet headline and one line under it, left aligned, with room above.
+export function Empty({ title, body }: { icon?: string; title: string; body: string }) {
   return (
     <View style={s.empty}>
-      <IconTile icon={icon} size={56} />
-      <Text style={[T.h3, { marginTop: 12 }]}>{title}</Text>
-      <Text style={[T.small, { marginTop: 4, textAlign: 'center' }]}>{body}</Text>
+      <Text style={[T.h2, { color: C.sub }]}>{title}</Text>
+      <Text style={[T.small, { marginTop: 6 }]}>{body}</Text>
     </View>
   );
 }
@@ -189,59 +189,53 @@ export function Sheet({ onClose, children }: { onClose: () => void; children: Re
         <Pressable style={s.fill} onPress={onClose} accessibilityLabel="Close" />
         <View style={s.sheet}>
           <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" bounces={false} keyboardShouldPersistTaps="handled">{children}</ScrollView>
-          <Pressable onPress={onClose} style={s.closePos} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close">
-            <Glass style={s.close}>
-              <Icon name="x" size={18} color={C.ink} stroke={2.4} />
-            </Glass>
-          </Pressable>
+          <CloseButton onPress={onClose} style={s.closePos} />
         </View>
       </View>
     </Modal>
   );
 }
 
+// These names are also used directly by other files (as `u.chip`, `u.fieldLabel`, ...).
 export const s = StyleSheet.create({
-  goingRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 5 },
-  goingText: { fontSize: 13, fontWeight: '700', color: C.sub },
   // Note: the 100% size is measured inside the parent's padding. In a padded box use
-  // StyleSheet.absoluteFill instead (the Home hero did, which left a blue strip).
+  // StyleSheet.absoluteFill instead.
   fill: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, width: '100%', height: '100%' },
   card: { backgroundColor: C.card, borderRadius: R.card, padding: 16, ...shadow },
   pressed: { opacity: 0.82, transform: [{ scale: 0.985 }] },
-  chipsWrap: { flexGrow: 0, marginHorizontal: -20 },
-  chips: { gap: 8, paddingHorizontal: 20, paddingVertical: 4 },
+  // choice chips
+  chipsWrap: { flexGrow: 0, marginHorizontal: -SP.gutter },
+  chips: { gap: 8, paddingHorizontal: SP.gutter, paddingVertical: 2 },
   chipsFlow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { paddingHorizontal: 16, height: 38, borderRadius: R.pill, backgroundColor: C.card, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.line },
-  chipOn: { backgroundColor: C.inverse, borderColor: C.inverse },
-  chipText: { fontSize: 14, fontWeight: '700', color: C.ink },
-  chipTextOn: { color: C.onInverse },
-  btn: { minHeight: 50, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 18 },
-  btnSmall: { minHeight: 38, borderRadius: R.pill, paddingHorizontal: 16 },
-  btnGhost: { backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
-  btnText: { fontSize: 16, fontWeight: '800' },
-  fieldLabel: { fontSize: 12, fontWeight: '800', color: C.sub, letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: 6 },
-  input: { backgroundColor: C.card, borderWidth: 1, borderColor: C.line, borderRadius: 12, paddingHorizontal: 14, minHeight: 48, fontSize: 16, color: C.ink },
+  chip: { paddingHorizontal: 14, minHeight: 42, borderRadius: R.chip, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.lineStrong },
+  chipOn: { backgroundColor: C.paper, borderColor: C.paper },
+  chipText: { fontSize: 15, fontWeight: '600', color: C.ink },
+  chipTextOn: { color: C.night },
+  // form fields
+  fieldLabel: { fontFamily: F.bold, fontSize: 12, lineHeight: 15, letterSpacing: 2, color: C.sub, textTransform: 'uppercase', marginBottom: 7 },
+  input: { backgroundColor: C.card, borderWidth: 1, borderColor: C.lineStrong, borderRadius: R.input, paddingHorizontal: 14, minHeight: 48, fontSize: 16, color: C.ink, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null) },
   inputMulti: { minHeight: 96, paddingVertical: 12, textAlignVertical: 'top' },
-  switch: { width: 50, height: 30, borderRadius: 15, backgroundColor: '#C9D3DC', padding: 3, justifyContent: 'center' },
+  inputFocus: { borderColor: C.blue },
+  hint: { marginTop: 5, fontSize: 12.5, lineHeight: 17 },
+  switch: { width: 50, height: 30, borderRadius: 15, backgroundColor: C.track, padding: 3, justifyContent: 'center' },
+  switchOn: { backgroundColor: C.blue },
   knob: { width: 24, height: 24, borderRadius: 12, backgroundColor: C.white },
-  scope: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: R.pill, paddingHorizontal: 10, paddingVertical: 5, alignSelf: 'flex-start' },
-  scopeText: { color: C.white, fontSize: 12, fontWeight: '800' },
+  tile: { borderRadius: R.chip, borderWidth: 1, borderColor: C.lineStrong, alignItems: 'center', justifyContent: 'center' },
+  scope: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 4, paddingHorizontal: 8, height: 22, alignSelf: 'flex-start', backgroundColor: C.onPhoto },
+  cover: { backgroundColor: C.card, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   blob: { position: 'absolute', width: 200, height: 200, borderRadius: 100 },
-  heartPos: { position: 'absolute', top: 10, right: 10 },
-  heart: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  meta: { fontSize: 13, fontWeight: '700', marginTop: 3 },
-  evImgWrap: { borderRadius: 22, overflow: 'hidden', backgroundColor: C.line, aspectRatio: 16 / 10 },
-  badge: { position: 'absolute', left: 10, bottom: 10, backgroundColor: 'rgba(19,32,44,0.78)', borderRadius: R.pill, paddingHorizontal: 11, paddingVertical: 6 },
-  badgeText: { color: C.white, fontSize: 12, fontWeight: '800' },
-  tagPos: { position: 'absolute', left: 10, top: 10 },
-  featured: { position: 'absolute', left: 10, top: 10, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: C.orange, borderRadius: R.pill, paddingHorizontal: 10, paddingVertical: 5 },
-  featuredText: { color: C.white, fontSize: 12, fontWeight: '800' },
-  sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 30, marginBottom: 12 },
-  sectionAction: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  link: { color: C.blue, fontWeight: '800', fontSize: 14 },
-  empty: { alignItems: 'center', paddingVertical: 48 },
-  sheetBack: { flex: 1, backgroundColor: 'rgba(19,32,44,0.45)', justifyContent: 'flex-end', alignItems: 'center' },
-  sheet: { backgroundColor: C.bg, borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '92%', width: '100%', maxWidth: 560, overflow: 'hidden' },
+  heart: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  meta: { fontSize: 13.5, lineHeight: 18, fontWeight: '500', color: C.sub, marginTop: 3 },
+  // event block
+  evRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.gap },
+  evText: { flex: 1, minWidth: 0 },
+  evKickers: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 },
+  evTitle: { ...display(26) },
+  evSide: { alignItems: 'flex-end', gap: 8 },
+  // a link in the old screens: a cyan label
+  link: { fontFamily: F.bold, fontSize: 12, lineHeight: 15, letterSpacing: 2, color: C.blue, textTransform: 'uppercase' },
+  empty: { paddingTop: 44, paddingBottom: 20 },
+  sheetBack: { flex: 1, backgroundColor: C.shade, justifyContent: 'flex-end', alignItems: 'center' },
+  sheet: { backgroundColor: C.bg, borderTopLeftRadius: R.sheet, borderTopRightRadius: R.sheet, maxHeight: '92%', width: '100%', maxWidth: 560, overflow: 'hidden' },
   closePos: { position: 'absolute', right: 14, top: 14 },
-  close: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
 });

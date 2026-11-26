@@ -71,17 +71,17 @@ function AppleRow() {
   if (account?.apple) {
     return (
       <View style={[st.row, { marginBottom: 16 }]}>
-        <View style={[st.gBadge, { backgroundColor: '#000' }]}><Text style={[st.gLetter, { color: '#fff' }]}>{''}</Text></View>
-        <Text style={[T.h3, { flex: 1 }]}>Signed in with Apple</Text>
-        <Icon name="check" size={20} color={C.green} />
+        <View style={[st.gBadge, { backgroundColor: C.white }]}><Text style={[st.gLetter, { color: C.black }]}>{''}</Text></View>
+        <Text style={[T.strong, { flex: 1 }]}>Signed in with Apple</Text>
+        <Icon name="check" size={20} color={C.blue} />
       </View>
     );
   }
   return (
     <View style={{ marginBottom: 16 }}>
-      <Pressable onPress={async () => { setBusy(true); setErr(await signInWithApple()); setBusy(false); }} disabled={busy} style={({ pressed }) => [st.gButton, { backgroundColor: '#000', borderColor: '#000' }, pressed && u.pressed]} accessibilityRole="button" accessibilityLabel="Sign in with Apple">
-        <Text style={{ color: '#fff', fontSize: 20, marginTop: -2 }}>{''}</Text>
-        <Text style={[st.gText, { color: '#fff' }]}>{busy ? 'Opening…' : 'Sign in with Apple'}</Text>
+      <Pressable onPress={async () => { setBusy(true); setErr(await signInWithApple()); setBusy(false); }} disabled={busy} style={({ pressed }) => [st.gButton, { backgroundColor: C.white, borderColor: C.white }, pressed && u.pressed]} accessibilityRole="button" accessibilityLabel="Sign in with Apple">
+        <Text style={{ color: C.black, fontSize: 20, marginTop: -2 }}>{''}</Text>
+        <Text style={[st.gText, { color: C.black }]}>{busy ? 'Opening…' : 'Sign in with Apple'}</Text>
       </Pressable>
       {err ? <Text style={st.err}>{err}</Text> : null}
     </View>
@@ -97,10 +97,10 @@ function GoogleRow() {
       <View style={st.row}>
         <View style={st.gBadge}><Text style={st.gLetter}>G</Text></View>
         <View style={{ flex: 1 }}>
-          <Text style={T.h3}>Linked with Google</Text>
+          <Text style={T.strong}>Linked with Google</Text>
           <Text style={T.small} numberOfLines={1}>{account.google.email}</Text>
         </View>
-        <Icon name="check" size={20} color={C.green} />
+        <Icon name="check" size={20} color={C.blue} />
       </View>
     );
   }
@@ -126,8 +126,8 @@ function GoogleRow() {
 // A quick look at what's yours: events you're going to, saved events, and your challenge streaks.
 function ActivityRow({ icon, title, sub, onPress, first }: { icon: string; title: string; sub: string; onPress: () => void; first?: boolean }) {
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [st.actRow, !first && st.actRule, pressed && { backgroundColor: C.bg }]} accessibilityRole="button" accessibilityLabel={title}>
-      <View style={st.actIcon}><Icon name={icon} size={18} color={C.blueDeep} stroke={2} /></View>
+    <Pressable onPress={onPress} style={({ pressed }) => [st.actRow, !first && st.actRule, pressed && { backgroundColor: C.raised }]} accessibilityRole="button" accessibilityLabel={title}>
+      <View style={st.actIcon}><Icon name={icon} size={18} color={C.ink} stroke={2} /></View>
       <View style={{ flex: 1 }}>
         <Text style={T.h3} numberOfLines={1}>{title}</Text>
         <Text style={T.small} numberOfLines={1}>{sub}</Text>
@@ -195,7 +195,7 @@ export function AccountPage() {
               : name ? <Text style={st.avatarLetter}>{name[0].toUpperCase()}</Text> : <Icon name="user" size={34} color={C.white} />}
           </View>
           <View style={st.avatarCamera}>
-            <Icon name="camera" size={13} color={C.white} />
+            <Icon name="camera" size={13} color={C.onOrange} />
           </View>
         </Pressable>
         <Text style={st.title}>{name || 'Your account'}</Text>
@@ -207,9 +207,9 @@ export function AccountPage() {
       <Card style={{ padding: 20 }}>
         <ProfileForm cta={saved ? 'Saved' : 'Save'} onSaved={() => setSaved(true)} />
       </Card>
-      <Pressable onPress={() => router.push('/settings')} style={({ pressed }) => [st.settingsRow, pressed && { backgroundColor: C.bg }]} accessibilityRole="button" accessibilityLabel="Notifications and settings">
-        <View style={st.actIcon}><Icon name="bell" size={18} color={C.blueDeep} stroke={2} /></View>
-        <Text style={[T.h3, { flex: 1 }]}>Notifications & settings</Text>
+      <Pressable onPress={() => router.push('/settings')} style={({ pressed }) => [st.settingsRow, pressed && { backgroundColor: C.raised }]} accessibilityRole="button" accessibilityLabel="Notifications and settings">
+        <View style={st.actIcon}><Icon name="bell" size={18} color={C.ink} stroke={2} /></View>
+        <Text style={[T.strong, { flex: 1 }]}>Notifications & settings</Text>
         <Icon name="right" size={16} color={C.faint} stroke={2.4} />
       </Pressable>
       <Text style={st.section}>Sign in</Text>
@@ -228,24 +228,22 @@ export function AccountPage() {
 
 const st = StyleSheet.create({
   chip: { minWidth: 56, ...{ shadowOpacity: 0 } },
-  err: { color: '#C0303F', fontWeight: '700', fontSize: 13, marginTop: 12 },
+  err: { color: C.red, fontWeight: '700', fontSize: 13, marginTop: 12 },
   head: { alignItems: 'center', paddingTop: 8, paddingBottom: 24 },
   avatarWrap: { position: 'relative' },
-  avatarBig: { width: 84, height: 84, borderRadius: 42, backgroundColor: C.blue, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  avatarBig: { width: 90, height: 90, borderRadius: 45, backgroundColor: C.avatar, borderWidth: 3, borderColor: C.blue, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   avatarImg: { width: 84, height: 84 },
   avatarCamera: { position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: 13, backgroundColor: C.orange, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: C.bg },
-  avatarLetter: { color: C.white, fontSize: 36, fontFamily: F.display },
-  title: { fontSize: 28, fontFamily: F.display, color: C.ink, marginTop: 14, letterSpacing: -0.4 },
-  section: { fontSize: 19, fontFamily: F.display, color: C.ink, marginTop: 30, marginBottom: 12 },
+  avatarLetter: { color: C.white, fontSize: 38, lineHeight: 40, fontFamily: F.display, paddingHorizontal: 4 },
+  title: { ...T.h1, marginTop: 14, textAlign: 'center' },
+  section: { ...T.h2, marginTop: 30, marginBottom: 12 },
   actRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 14 },
-  actRule: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line },
-  actIcon: { width: 36, height: 36, borderRadius: 12, backgroundColor: C.bluePale, alignItems: 'center', justifyContent: 'center' },
-  settingsRow: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.line, paddingHorizontal: 16, paddingVertical: 14, marginTop: 16 },
+  actRule: { borderTopWidth: 1, borderTopColor: C.line },
+  actIcon: { width: 36, height: 36, borderRadius: R.chip, borderWidth: 1, borderColor: C.lineStrong, alignItems: 'center', justifyContent: 'center' },
+  settingsRow: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: C.card, borderRadius: R.card, paddingHorizontal: 16, paddingVertical: 14, marginTop: 16 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  gButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, minHeight: 50, borderRadius: R.pill, borderWidth: 1, borderColor: C.line, backgroundColor: C.card },
-  gBadge: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#F1F3F4', alignItems: 'center', justifyContent: 'center' },
-  gLetter: { fontSize: 15, fontWeight: '900', color: '#4285F4' },
-  gText: { fontSize: 16, fontWeight: '800', color: C.ink },
-  logo: { width: 72, height: 72, borderRadius: 18 },
-  welcome: { fontSize: 30, lineHeight: 34, fontFamily: F.display, color: C.ink, marginTop: 18, letterSpacing: -0.5 },
+  gButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, minHeight: 50, borderRadius: R.btn, borderWidth: 1, borderColor: C.lineStrong },
+  gBadge: { width: 26, height: 26, borderRadius: 13, backgroundColor: C.paper, alignItems: 'center', justifyContent: 'center' },
+  gLetter: { fontSize: 15, fontWeight: '800', color: C.night },
+  gText: { fontSize: 17, fontWeight: '600', color: C.ink },
 });

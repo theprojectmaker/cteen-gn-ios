@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { router } from 'expo-router';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { C, R, T, F } from './theme';
+import { C, R, T, F, display } from './theme';
 import { Icon } from './icons';
-import { challengeFits, countdown, dateLabel, daysUntil, sortPosts, upcoming, useShabbat, useStore, type ColorKey, type EventItem } from './store';
+import { challengeFits, countdown, dateLabel, daysUntil, sortPosts, upcoming, useShabbat, useStore, type EventItem } from './store';
 import { Card, Cover, IconTile, ScopeBadge, s as u } from './ui';
 import { ChallengeBanner } from './rewards';
 import { timeAgo } from './feed';
@@ -38,7 +38,7 @@ export function Home() {
 
       {food ? (
         <Pressable onPress={() => router.push(`/post/${food.id}`)} style={({ pressed }) => [st.food, pressed && u.pressed]} accessibilityRole="button" accessibilityLabel={`On the menu: ${food.title}`}>
-          <View style={st.foodIcon}><Icon name="food" size={22} color="#9A5A16" stroke={2.1} /></View>
+          <View style={st.foodIcon}><Icon name="food" size={22} color={C.orangeText} stroke={2.1} /></View>
           <View style={{ flex: 1 }}>
             <Text style={st.foodEyebrow}>On the menu</Text>
             <Text style={st.foodTitle} numberOfLines={2}>{food.title}</Text>
@@ -58,10 +58,10 @@ export function Home() {
               const isToday = d === 0;
               const dt = parseDay(e.start);
               return (
-                <Pressable key={e.id} onPress={() => openEvent(e.id)} style={({ pressed }) => [st.weekRow, i > 0 && st.weekRule, isToday && st.weekRowToday, pressed && { backgroundColor: C.bg }]} accessibilityRole="button" accessibilityLabel={`${e.title}, ${isToday ? 'today' : countdown(e)}`}>
+                <Pressable key={e.id} onPress={() => openEvent(e.id)} style={({ pressed }) => [st.weekRow, i > 0 && st.weekRule, isToday && st.weekRowToday, pressed && { backgroundColor: C.raised }]} accessibilityRole="button" accessibilityLabel={`${e.title}, ${isToday ? 'today' : countdown(e)}`}>
                   <View style={[st.weekDay, isToday && { backgroundColor: C.orange }]}>
-                    <Text style={[st.weekDow, isToday && { color: 'rgba(255,255,255,0.9)' }]}>{WKD[dt.getDay()]}</Text>
-                    <Text style={[st.weekNum, isToday && { color: C.white }]}>{dt.getDate()}</Text>
+                    <Text style={[st.weekDow, isToday && { color: C.onOrange }]}>{WKD[dt.getDay()]}</Text>
+                    <Text style={[st.weekNum, isToday && { color: C.onOrange }]}>{dt.getDate()}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={T.h3} numberOfLines={1}>{e.title}</Text>
@@ -92,7 +92,7 @@ export function Home() {
           </View>
           <View style={st.latest}>
             {posts.slice(0, 3).map((p, i) => (
-              <Pressable key={p.id} onPress={() => router.push(`/post/${p.id}`)} style={({ pressed }) => [st.latestRow, i > 0 && st.rule, pressed && { backgroundColor: C.bg }]} accessibilityRole="button" accessibilityLabel={p.title}>
+              <Pressable key={p.id} onPress={() => router.push(`/post/${p.id}`)} style={({ pressed }) => [st.latestRow, i > 0 && st.rule, pressed && { backgroundColor: C.raised }]} accessibilityRole="button" accessibilityLabel={p.title}>
                 {p.photos?.[0] ? <Image source={{ uri: p.photos[0] }} style={st.latestThumb} resizeMode="cover" /> : null}
                 <View style={{ flex: 1 }}>
                   <Text style={T.h3} numberOfLines={2}>{p.title}</Text>
@@ -110,16 +110,6 @@ export function Home() {
       <ShabbatCard />
 
     </>
-  );
-}
-
-function Quick({ icon, color, label, onPress }: { icon: string; color: ColorKey; label: string; onPress: () => void }) {
-  return (
-    <Card style={st.quick} onPress={onPress} label={label}>
-      <IconTile icon={icon} color={color} size={46} />
-      <Text style={st.quickLabel}>{label}</Text>
-      <Icon name="right" size={16} color={C.faint} stroke={2.4} />
-    </Card>
   );
 }
 
@@ -194,7 +184,7 @@ function EventsCarousel({ events, onOpen }: { events: EventItem[]; onOpen: (id: 
           return (
             <Pressable key={ev.id} onPress={() => onOpen(ev.id)} style={({ pressed }) => [st.hero, { width: w || 1 }, pressed && { opacity: 0.95 }]} accessibilityRole="button" accessibilityLabel={ev.title}>
               <Cover e={ev} style={StyleSheet.absoluteFill} iconSize={150} />
-              <View style={[StyleSheet.absoluteFill, { backgroundColor: ev.image || ev.cover ? 'rgba(13,60,110,0.42)' : 'rgba(19,32,44,0.18)' }]} />
+              {ev.image || ev.cover || ev.poster ? <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.42)' }]} /> : null}
               <View style={st.heroTopRow}>
                 <View style={st.upNext}><Text style={st.upNextText}>{ev.priority ? 'Featured' : i === 0 ? 'Up next' : 'Coming up'}</Text></View>
                 <ScopeBadge scope={ev.scope} />
@@ -218,82 +208,50 @@ function EventsCarousel({ events, onOpen }: { events: EventItem[]; onOpen: (id: 
   );
 }
 
-// Shown on Home until your account is linked with Apple, so a new phone keeps your streak and RSVPs.
-function LinkAppleCard() {
-  const { account, appleReady, signInWithApple } = useStore();
-  const [hidden, setHidden] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  if (!appleReady || account?.apple || hidden) return null;
-  return (
-    <View style={st.appleCard}>
-      <View style={st.appleBadge}><Text style={st.appleGlyph}>{'\uF8FF'}</Text></View>
-      <View style={{ flex: 1 }}>
-        <Text style={T.h3}>Link your Apple account</Text>
-        <Text style={T.small}>{err ?? 'Keep your streak and RSVPs if you ever get a new phone.'}</Text>
-      </View>
-      <Pressable onPress={async () => { setBusy(true); setErr(await signInWithApple()); setBusy(false); }} disabled={busy} style={({ pressed }) => [st.appleBtn, pressed && { opacity: 0.85 }]} accessibilityRole="button" accessibilityLabel="Link with Apple">
-        <Text style={st.appleBtnText}>{busy ? '…' : 'Link'}</Text>
-      </Pressable>
-      <Pressable onPress={() => setHidden(true)} hitSlop={10} style={st.appleX} accessibilityRole="button" accessibilityLabel="Not now">
-        <Icon name="x" size={13} color={C.faint} stroke={2.4} />
-      </Pressable>
-    </View>
-  );
-}
-
 const st = StyleSheet.create({
   helloRow: { flexDirection: 'row', alignItems: 'baseline', gap: 10, marginBottom: 12 },
-  helloSmall: { flex: 1, fontSize: 19, fontFamily: F.display, color: C.ink, letterSpacing: -0.3 },
+  helloSmall: { ...T.h2, flex: 1 },
   todaySmall: { fontSize: 13, fontWeight: '700', color: C.faint },
-  food: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderRadius: 22, backgroundColor: '#FDF0E3', borderWidth: 1, borderColor: '#F4D2AE' },
-  foodIcon: { width: 46, height: 46, borderRadius: 23, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
-  foodEyebrow: { fontSize: 11, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', color: '#9A5A16' },
-  foodTitle: { fontSize: 17, fontWeight: '800', color: '#3B2412', marginTop: 2 },
-  homeSection: { fontSize: 20, fontFamily: F.display, color: C.ink, letterSpacing: -0.3, marginTop: 32, marginBottom: 12 },
-  weekList: { borderRadius: 22, backgroundColor: C.card, borderWidth: 1, borderColor: C.line, overflow: 'hidden' },
+  food: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, borderRadius: R.card, backgroundColor: C.card },
+  foodIcon: { width: 44, height: 44, borderRadius: R.chip, borderWidth: 1, borderColor: C.lineStrong, alignItems: 'center', justifyContent: 'center' },
+  foodEyebrow: { ...T.eyebrow, fontSize: 11, color: C.orangeText },
+  foodTitle: { ...T.h3, marginTop: 2 },
+  homeSection: { ...T.h2, marginTop: 28, marginBottom: 12 },
+  weekList: { borderRadius: R.card, backgroundColor: C.card, overflow: 'hidden' },
   weekRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 14, paddingVertical: 12 },
-  weekRule: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line },
+  weekRule: { borderTopWidth: 1, borderTopColor: C.line },
   weekRowToday: { backgroundColor: C.orangePale },
-  weekDay: { width: 46, height: 48, borderRadius: 14, backgroundColor: C.bluePale, alignItems: 'center', justifyContent: 'center' },
-  weekDow: { fontSize: 11, fontWeight: '800', letterSpacing: 0.4, color: C.blueDeep, textTransform: 'uppercase' },
-  weekNum: { fontSize: 20, fontFamily: F.display, color: C.ink, marginTop: -1 },
+  weekDay: { width: 46, height: 48, borderRadius: R.chip, backgroundColor: C.bluePale, alignItems: 'center', justifyContent: 'center' },
+  weekDow: { fontFamily: F.bold, fontSize: 11, lineHeight: 12, letterSpacing: 1.6, color: C.blue, textTransform: 'uppercase' },
+  weekNum: { fontFamily: F.display, fontSize: 22, lineHeight: 23, color: C.ink, paddingHorizontal: 2 },
   todayPill: { backgroundColor: C.orange, borderRadius: R.pill, paddingHorizontal: 10, paddingVertical: 4 },
-  todayPillText: { color: C.white, fontSize: 12, fontWeight: '800' },
-  homeHeadRow: { flexDirection: 'row', alignItems: 'center', marginTop: 32, marginBottom: 12 },
-  latest: { borderRadius: 22, backgroundColor: C.card, borderWidth: 1, borderColor: C.line, overflow: 'hidden' },
+  todayPillText: { color: C.onOrange, fontSize: 12, fontWeight: '800' },
+  homeHeadRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: 28, marginBottom: 12 },
+  latest: { borderRadius: R.card, backgroundColor: C.card, overflow: 'hidden' },
   latestRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 14 },
   rule: { borderTopWidth: 1, borderTopColor: C.line },
-  latestThumb: { width: 52, height: 52, borderRadius: 12, backgroundColor: C.line },
+  latestThumb: { width: 52, height: 52, borderRadius: R.print, backgroundColor: C.raised },
   latestMeta: { fontSize: 12, fontWeight: '600', color: C.faint, marginTop: 4 },
-  quick: { width: '47%', flexGrow: 1, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 16, paddingHorizontal: 14 },
-  quickLabel: { flex: 1, fontSize: 16, fontWeight: '800', color: C.ink },
   shabbat: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   shabbatTimes: { flexDirection: 'row', alignItems: 'center', gap: 18, marginTop: 8 },
-  timeBig: { fontSize: 20, fontFamily: F.display, color: C.ink, letterSpacing: -0.3 },
+  timeBig: { ...display(24) },
   timeRule: { width: 1, height: 30, backgroundColor: C.line },
-  shabbatExtra: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 12, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line },
+  shabbatExtra: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: C.line },
   shabbatExtraLabel: { fontSize: 14, fontWeight: '600', color: C.sub, flex: 1 },
   shabbatExtraTime: { fontSize: 15, fontWeight: '800', color: C.ink },
-  carousel: { borderRadius: 28, overflow: 'hidden' },
-  hero: { marginTop: 0, borderRadius: 28, overflow: 'hidden', minHeight: 280, justifyContent: 'flex-end', padding: 20, backgroundColor: C.blueDeep },
-  heroPoster: { padding: 0, backgroundColor: '#0B1520' },
+  carousel: { borderRadius: R.photo, overflow: 'hidden' },
+  hero: { marginTop: 0, borderRadius: R.photo, overflow: 'hidden', minHeight: 280, justifyContent: 'flex-end', padding: 20, backgroundColor: C.card },
+  heroPoster: { padding: 0, backgroundColor: C.card },
   heroTopRow: { position: 'absolute', left: 18, right: 18, top: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  upNext: { paddingHorizontal: 11, height: 26, borderRadius: 13, backgroundColor: C.orange, justifyContent: 'center' },
-  upNextText: { fontSize: 12, fontWeight: '900', letterSpacing: 0.6, textTransform: 'uppercase', color: '#FFFFFF' },
+  upNext: { paddingHorizontal: 9, height: 24, borderRadius: 4, backgroundColor: C.orange, justifyContent: 'center' },
+  upNextText: { fontFamily: F.bold, fontSize: 12, lineHeight: 14, letterSpacing: 1.6, textTransform: 'uppercase', color: C.onOrange },
   heroKicker: { color: 'rgba(255,255,255,0.92)', fontSize: 13, fontWeight: '800' },
-  heroTitle: { color: C.white, fontSize: 28, lineHeight: 32, fontFamily: F.display, letterSpacing: -0.4, marginTop: 4 },
+  heroTitle: { ...display(32, C.white), marginTop: 4 },
   heroDate: { color: C.white, fontSize: 14, fontWeight: '700', marginTop: 6 },
   heroWhere: { color: 'rgba(255,255,255,0.88)', fontSize: 13, fontWeight: '600', marginTop: 3 },
-  heroBtn: { marginTop: 16, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: C.white, borderRadius: R.pill, paddingHorizontal: 18, height: 42 },
+  heroBtn: { marginTop: 16, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: C.paper, borderRadius: R.pill, paddingHorizontal: 18, height: 42 },
   heroBtnText: { color: C.night, fontSize: 15, fontWeight: '800' },
   carDots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 10 },
-  carDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: C.line },
+  carDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: C.tick },
   carDotOn: { width: 18, backgroundColor: C.orange },
-  appleCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, paddingRight: 30, borderRadius: 22, backgroundColor: C.card, borderWidth: 1, borderColor: C.line, marginBottom: 16 },
-  appleBadge: { width: 42, height: 42, borderRadius: 21, backgroundColor: C.inverse, alignItems: 'center', justifyContent: 'center' },
-  appleGlyph: { color: C.onInverse, fontSize: 20, marginTop: -2 },
-  appleBtn: { paddingHorizontal: 16, height: 36, borderRadius: 18, backgroundColor: C.inverse, justifyContent: 'center' },
-  appleBtnText: { color: C.onInverse, fontSize: 14, fontWeight: '800' },
-  appleX: { position: 'absolute', top: 8, right: 8, padding: 4 },
 });

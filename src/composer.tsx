@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { C, F, T } from './theme';
+import { C, R, T } from './theme';
 import { Icon } from './icons';
 import { tap, upcoming, useStore, type Post } from './store';
 import { pickPhotos, type Snap } from './photo';
@@ -71,7 +71,7 @@ export function Composer() {
                   <Pressable key={p.uri + i} onPress={() => setMain(i)} style={[st.thumb, i === main && st.thumbOn]} accessibilityRole="button" accessibilityLabel={`Photo ${i + 1}`}>
                     <Image source={{ uri: p.uri }} style={StyleSheet.absoluteFill} />
                     <Pressable onPress={() => { setPhotos((x) => x.filter((_, j) => j !== i)); setMain(0); }} hitSlop={6} style={st.thumbX} accessibilityRole="button" accessibilityLabel="Remove photo">
-                      <Icon name="x" size={10} color="#FFFFFF" stroke={3} />
+                      <Icon name="x" size={10} color={C.white} stroke={3} />
                     </Pressable>
                   </Pressable>
                 ))}
@@ -84,7 +84,7 @@ export function Composer() {
             </View>
           ) : (
             <Pressable onPress={add} style={({ pressed }) => [st.empty, pressed && { opacity: 0.8 }]} accessibilityRole="button" accessibilityLabel="Add photos">
-              <View style={st.emptyIcon}><Icon name="camera" size={28} color={C.blueDeep} stroke={2} /></View>
+              <View style={st.emptyIcon}><Icon name="camera" size={28} color={C.ink} stroke={1.9} /></View>
               <Text style={st.emptyTitle}>Add photos</Text>
               <Text style={T.small}>Optional. Up to 4.</Text>
             </Pressable>
@@ -126,27 +126,27 @@ export function Composer() {
 
 const st = StyleSheet.create({
   bar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.line },
-  barTitle: { fontSize: 17, fontWeight: '800', color: C.ink },
-  linkLabel: { fontSize: 13, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase', color: C.sub, marginBottom: 10 },
+  barTitle: { ...T.h2 },
+  linkLabel: { ...T.eyebrow, marginBottom: 10 },
   cancel: { fontSize: 16, color: C.ink },
-  share: { fontSize: 16, fontWeight: '800', color: C.blue },
-  preview: { width: '100%', aspectRatio: 1, backgroundColor: C.line },
+  share: { fontSize: 16, fontWeight: '700', color: C.blue },
+  preview: { width: '100%', aspectRatio: 1, backgroundColor: C.raised },
   thumbs: { gap: 8, paddingHorizontal: 18, paddingVertical: 12 },
-  thumb: { width: 60, height: 60, borderRadius: 12, overflow: 'hidden', backgroundColor: C.line },
+  thumb: { width: 60, height: 60, borderRadius: R.print, overflow: 'hidden', backgroundColor: C.raised },
   thumbOn: { borderWidth: 2.5, borderColor: C.blue },
   thumbX: { position: 'absolute', top: 3, right: 3, width: 18, height: 18, borderRadius: 9, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },
-  thumbAdd: { alignItems: 'center', justifyContent: 'center', backgroundColor: C.bluePale },
-  empty: { margin: 18, aspectRatio: 1.6, borderRadius: 22, borderWidth: 1.5, borderColor: C.line, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: C.bg },
-  emptyIcon: { width: 56, height: 56, borderRadius: 28, backgroundColor: C.bluePale, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
-  emptyTitle: { fontSize: 17, fontWeight: '800', color: C.ink },
-  headline: { fontSize: 20, fontFamily: F.display, color: C.ink, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.line },
+  thumbAdd: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', borderWidth: 1, borderStyle: 'dashed', borderColor: C.blue },
+  empty: { margin: 18, aspectRatio: 1.6, borderRadius: R.card, borderWidth: 1, borderColor: C.lineStrong, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  emptyIcon: { height: 40, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
+  emptyTitle: { ...T.h3 },
+  headline: { fontSize: 20, fontWeight: '700', color: C.ink, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.line },
   caption: { fontSize: 16, lineHeight: 23, color: C.ink, minHeight: 120, paddingTop: 12, textAlignVertical: 'top' },
   kinds: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
-  kind: { paddingHorizontal: 14, height: 34, borderRadius: 17, backgroundColor: C.bg, borderWidth: 1, borderColor: C.line, justifyContent: 'center' },
-  kindOn: { backgroundColor: C.inverse, borderColor: C.inverse },
-  kindText: { fontSize: 14, fontWeight: '700', color: C.ink },
-  kindTextOn: { color: C.onInverse },
-  note: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 18, padding: 12, borderRadius: 14, backgroundColor: C.bluePale },
+  kind: { paddingHorizontal: 14, height: 40, borderRadius: R.chip, borderWidth: 1, borderColor: C.lineStrong, justifyContent: 'center' },
+  kindOn: { backgroundColor: C.paper, borderColor: C.paper },
+  kindText: { fontSize: 14.5, fontWeight: '600', color: C.ink },
+  kindTextOn: { color: C.night },
+  note: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 18, padding: 12, borderRadius: R.chip, backgroundColor: C.bluePale },
   noteText: { flex: 1, fontSize: 13, fontWeight: '600', color: C.ink },
-  err: { color: '#C0303F', marginTop: 12, fontSize: 14, fontWeight: '700' },
+  err: { color: C.red, marginTop: 12, fontSize: 14, fontWeight: '700' },
 });

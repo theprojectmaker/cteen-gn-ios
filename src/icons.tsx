@@ -1,5 +1,6 @@
 import React from 'react';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
+import { C } from './theme';
 
 // Stroke-icon set (24px grid). No emoji anywhere in the app: every symbol comes from here.
 const PATHS: Record<string, React.ReactNode> = {
@@ -41,16 +42,20 @@ const PATHS: Record<string, React.ReactNode> = {
   question: <><Circle cx="12" cy="12" r="9" /><Path d="M9.500 9.500a2.500 2.500 0 1 1 3.500 2.300c-.700.300-1 .900-1 1.700M12 16.800v.100" /></>,
   tefillin: <><Rect x="7" y="2.5" width="10" height="10" rx="1.8" /><Path d="M9.4 5.5v3c0 1 .6 1.6 1.6 1.6h2c1 0 1.6-.6 1.6-1.6V5.5M12 5.5v4.6" /><Rect x="4.5" y="12.5" width="15" height="2.6" rx="1" /><Path d="M19.5 13.8c2.3.2 2.6 3 .6 4.3-2.3 1.5-7.5 1.4-11.3 2.2-2 .4-3 1.3-3.3 2.2" /></>,
   send: <Path d="M20.500 3.500 3 11l6.500 2.500L12 20zM9.500 13.500l5-5" />,
+  // solid shapes (drawn filled, no outline): the streak flame in the header
+  fire: <Path d="M13 2.2c.5 2.7-.5 4.5-2 6.2C9.3 10.2 7 12 7 15.2a5 5 0 0 0 10 0c0-1.9-.8-3.3-1.7-4.6-.3 1-.9 1.7-1.7 2.1.4-3.5-.1-7.2-.6-10.5z" />,
 };
+const SOLID: Record<string, boolean> = { fire: true };
 
 export const EVENT_ICONS = ['tefillin', 'star', 'flame', 'ticket', 'users', 'heart', 'trophy', 'food', 'ball', 'music', 'book', 'cap', 'sun', 'gift', 'globe', 'calendar', 'pin'] as const;
 
 // The Tefillin Challenge always wears the tefillin icon, whatever was picked for it.
 export const challengeIcon = (ch: { id: string; icon?: string }) => (ch.id === 'tefillin' ? 'tefillin' : ch.icon || 'trophy');
 
-export function Icon({ name, size = 22, color = '#13202C', fill, stroke = 1.9 }: { name: string; size?: number; color?: string; fill?: string; stroke?: number }) {
+export function Icon({ name, size = 22, color = C.ink, fill, stroke = 1.9 }: { name: string; size?: number; color?: string; fill?: string; stroke?: number }) {
+  const solid = !!SOLID[name];
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill={fill ?? 'none'} stroke={color} strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round">
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill={fill ?? (solid ? color : 'none')} stroke={color} strokeWidth={solid ? 0 : stroke} strokeLinecap="round" strokeLinejoin="round">
       {PATHS[name] ?? PATHS.star}
     </Svg>
   );

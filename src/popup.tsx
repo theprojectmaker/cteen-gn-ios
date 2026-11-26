@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, AppState, Easing, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
-import { C, F, IS_DARK } from './theme';
+import { C, R, SH, T } from './theme';
 import { Icon } from './icons';
 import { useStore } from './store';
+import { Label, Slab } from './look';
 
 // The leaders' pop-up: right after the opening animation (and when you come back after 30+ minutes
 // away) while a leader has it on. With a poster it "posts" itself: the poster rises up, tilts and
@@ -80,19 +81,16 @@ export function StartupPopup({ ready }: { ready: boolean }) {
             </Animated.View>
           ) : null}
           <Animated.View style={[st.card, p.image && st.cardUnder, { opacity: p.image ? info : rise, transform: [{ translateY: (p.image ? info : rise).interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }] }]}>
-            {!p.image ? <View style={st.badge}><Icon name="megaphone" size={22} color={C.white} stroke={2.1} /></View> : null}
-            <Text style={st.eyebrow}>From Rabbi Zevy</Text>
+            <Label tone="orange">From Rabbi Zevy</Label>
             {p.title ? <Text style={st.title}>{p.title}</Text> : null}
             {p.body ? <Text style={st.body}>{p.body}</Text> : null}
             {p.more ? <Text style={st.more}>{p.more}</Text> : null}
-            <Pressable onPress={go} style={({ pressed }) => [st.btn, pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }]} accessibilityRole="button">
-              <Text style={st.btnText}>{p.button || (p.target ? 'Take a look' : 'Got it')}</Text>
-            </Pressable>
+            <Slab label={p.button || (p.target ? 'Take a look' : 'Got it')} onPress={go} style={st.btn} />
             {p.target ? <Pressable onPress={() => close()} hitSlop={8} style={{ marginTop: 12 }} accessibilityRole="button"><Text style={st.later}>Not now</Text></Pressable> : null}
           </Animated.View>
         </ScrollView>
         <Pressable onPress={() => close()} hitSlop={10} style={st.x} accessibilityRole="button" accessibilityLabel="Close">
-          <Icon name="x" size={16} color="#FFFFFF" stroke={2.6} />
+          <Icon name="x" size={16} color={C.ink} stroke={2.6} />
         </Pressable>
       </Animated.View>
     </Modal>
@@ -100,18 +98,15 @@ export function StartupPopup({ ready }: { ready: boolean }) {
 }
 
 const st = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: IS_DARK ? 'rgba(0,0,0,0.75)' : 'rgba(8,18,30,0.72)' },
+  backdrop: { flex: 1, backgroundColor: C.shade },
   center: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 24, paddingTop: 70 },
-  poster: { borderRadius: 18, backgroundColor: '#1B2633', shadowColor: '#000', shadowOpacity: 0.45, shadowRadius: 30, shadowOffset: { width: 0, height: 18 } },
-  card: { width: '100%', maxWidth: 380, borderRadius: 26, backgroundColor: C.card, padding: 22, alignItems: 'center' },
+  poster: { borderRadius: R.print, backgroundColor: C.card, ...SH.print },
+  card: { width: '100%', maxWidth: 380, borderRadius: R.sheet, backgroundColor: C.card, padding: 22, alignItems: 'center' },
   cardUnder: { marginTop: 16 },
-  badge: { width: 50, height: 50, borderRadius: 25, backgroundColor: C.blue, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  eyebrow: { fontSize: 11, fontWeight: '800', letterSpacing: 0.9, textTransform: 'uppercase', color: C.sub },
-  title: { fontSize: 22, lineHeight: 27, fontFamily: F.display, color: C.ink, textAlign: 'center', marginTop: 6, letterSpacing: -0.3 },
+  title: { ...T.h1, fontSize: 30, lineHeight: 30, textAlign: 'center', marginTop: 8 },
   body: { fontSize: 16, lineHeight: 22, color: C.ink, textAlign: 'center', marginTop: 8 },
   more: { fontSize: 14, lineHeight: 20, color: C.sub, textAlign: 'center', marginTop: 8 },
-  btn: { alignSelf: 'stretch', height: 50, borderRadius: 25, backgroundColor: C.blue, alignItems: 'center', justifyContent: 'center', marginTop: 18 },
-  btnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
-  later: { fontSize: 15, fontWeight: '700', color: C.sub },
-  x: { position: 'absolute', top: 54, right: 18, width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
+  btn: { alignSelf: 'stretch', marginTop: 18 },
+  later: { fontSize: 14, fontWeight: '600', color: C.sub },
+  x: { position: 'absolute', top: 54, right: 18, width: 36, height: 36, borderRadius: 18, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine, alignItems: 'center', justifyContent: 'center' },
 });

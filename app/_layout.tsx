@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { useFonts, BricolageGrotesque_700Bold, BricolageGrotesque_800ExtraBold } from '@expo-google-fonts/bricolage-grotesque';
-import { Appearance, Platform, Pressable, Text, View } from 'react-native';
-import { Stack } from 'expo-router';
+import { useFonts } from 'expo-font';
+import { Appearance, Platform, Text, View } from 'react-native';
+import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { C, IS_DARK, PREFS, F } from '../src/theme';
+import { C, PREFS, T } from '../src/theme';
 import { StoreProvider, useStore } from '../src/store';
 import { AdminPanel } from '../src/admin';
 import { Setup } from '../src/setup';
@@ -15,16 +15,29 @@ import { EventReminderSync } from '../src/screens';
 import { Composer } from '../src/composer';
 import { WrapReminderSync } from '../src/wrapReminders';
 import { useOtaUpdates } from '../src/shell';
+import { Backdrop, Slab } from '../src/look';
+
+// Browser only: paint the page itself navy right away, so no pale flash shows before the app draws.
+if (Platform.OS === 'web') {
+  const doc = (globalThis as { document?: { documentElement: { style: { backgroundColor: string } }; body: { style: { backgroundColor: string } } | null } }).document;
+  if (doc) {
+    doc.documentElement.style.backgroundColor = C.bg;
+    if (doc.body) doc.body.style.backgroundColor = C.bg;
+  }
+}
+
+// The Flyer look is one dark theme: the pieces drawn by the navigation (page backgrounds while
+// they slide, the back button) use the same navy and ink.
+const NAV_THEME = { ...DarkTheme, colors: { ...DarkTheme.colors, primary: C.blue, background: C.bg, card: C.bg, text: C.ink, border: C.line, notification: C.orange } };
 
 // If anything throws while drawing, show this instead of closing the app.
 export function ErrorBoundary({ error, retry }: { error: Error; retry: () => Promise<void> }) {
   return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 30, backgroundColor: C.bg }}>
-      <Text style={{ fontSize: 22, fontFamily: F.display, color: C.ink, textAlign: 'center' }}>Something went wrong</Text>
-      <Text style={{ fontSize: 14, color: C.sub, textAlign: 'center', marginTop: 8 }}>{String(error?.message || error).slice(0, 200)}</Text>
-      <Pressable onPress={() => { retry(); }} style={{ marginTop: 22, paddingHorizontal: 26, height: 48, borderRadius: 24, backgroundColor: C.blue, justifyContent: 'center' }} accessibilityRole="button">
-        <Text style={{ color: '#fff', fontWeight: '800', fontSize: 16 }}>Try again</Text>
-      </Pressable>
+    <View style={{ flex: 1, justifyContent: 'center', padding: 30, backgroundColor: C.bg }}>
+      <Backdrop />
+      <Text style={T.h1}>Something went wrong</Text>
+      <Text style={[T.small, { marginTop: 10 }]}>{String(error?.message || error).slice(0, 200)}</Text>
+      <Slab label="Try again" onPress={() => { retry(); }} style={{ marginTop: 24, alignSelf: 'flex-start' }} />
     </View>
   );
 }
@@ -37,14 +50,14 @@ function Root() {
   // Opening animation first (everyone, every launch unless turned off in Settings); the sign-up
   // screen waits for it, so there is never more than one layer opening at the same moment.
   const [introDone, setIntroDone] = useState(false);
-  // Make Apple's own pieces (tab bar, sheets, keyboard) follow Settings > Appearance, after the first frame.
+  // This look is dark only: make Apple's own pieces (tab bar, sheets, keyboard) dark too, after the first frame.
   useEffect(() => {
-    if (Platform.OS === 'web' || PREFS.theme === 'system') return;
-    try { Appearance.setColorScheme(PREFS.theme); } catch {}
+    if (Platform.OS === 'web') return;
+    try { Appearance.setColorScheme('dark'); } catch {}
   }, []);
   return (
-    <>
-      <StatusBar style={IS_DARK ? 'light' : 'dark'} />
+    <ThemeProvider value={NAV_THEME}>
+      <StatusBar style="light" />
       <Stack screenOptions={{ contentStyle: { backgroundColor: C.bg }, animation: PREFS.reduceMotion ? 'fade' : 'default', gestureEnabled: true }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="challenge/[id]" options={page} />
@@ -67,7 +80,7 @@ function Root() {
       <Intro onDone={() => setIntroDone(true)} />
       <StartupPopup ready={introDone} />
       <TourGate ready={introDone} />
-    </>
+    </ThemeProvider>
   );
 }
 
@@ -79,8 +92,15 @@ function TourGate({ ready }: { ready: boolean }) {
 }
 
 export default function RootLayout() {
-  // Headline font. Wait for it briefly so the first frame looks right, but never more than 1.5s.
-  const [fontsReady, fontError] = useFonts({ BricolageGrotesque_700Bold, BricolageGrotesque_800ExtraBold });
+  // The Flyer look's one type family. Wait for it briefly so the first frame looks right, but never more than 1.5s.
+  const [fontsReady, fontError] = useFonts({
+    BarlowCondensed_600SemiBold: require('../assets/fonts/BarlowCondensed_600SemiBold.ttf'),
+    BarlowCondensed_700Bold: require('../assets/fonts/BarlowCondensed_700Bold.ttf'),
+    BarlowCondensed_700Bold_Italic: require('../assets/fonts/BarlowCondensed_700Bold_Italic.ttf'),
+    BarlowCondensed_800ExtraBold: require('../assets/fonts/BarlowCondensed_800ExtraBold.ttf'),
+    BarlowCondensed_800ExtraBold_Italic: require('../assets/fonts/BarlowCondensed_800ExtraBold_Italic.ttf'),
+    BarlowCondensed_900Black_Italic: require('../assets/fonts/BarlowCondensed_900Black_Italic.ttf'),
+  });
   const [waited, setWaited] = useState(false);
   useEffect(() => { const t = setTimeout(() => setWaited(true), 1500); return () => clearTimeout(t); }, []);
   if (!fontsReady && !fontError && !waited) return <View style={{ flex: 1, backgroundColor: C.bg }} />;

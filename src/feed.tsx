@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
-import { C, F, T } from './theme';
+import { C, R, T, display } from './theme';
 import { Icon } from './icons';
 import { CHAPTER, countdown, daysUntil, open, sortPosts, tap, upcoming, useStore, type Post, type PostComment } from './store';
 import { Button, Cover, Empty, EventMeta, s as u } from './ui';
@@ -34,7 +34,7 @@ export function Feed() {
         </View>
         {leader ? (
           <Pressable onPress={() => setComposerOpen(true)} style={({ pressed }) => [st.newBtn, pressed && { opacity: 0.8 }]} accessibilityRole="button" accessibilityLabel="New post">
-            <Icon name="plus" size={20} color={C.white} stroke={2.6} />
+            <Icon name="plus" size={20} color={C.onOrange} stroke={2.6} />
           </Pressable>
         ) : null}
       </View>
@@ -50,7 +50,7 @@ export function Feed() {
                   <Text style={st.soonTitle} numberOfLines={1}>{e.title}</Text>
                   <Text style={st.soonSub} numberOfLines={1}>{countdown(e)}{e.time ? ` · ${e.time}` : ''}{e.place ? ` · ${e.place}` : ''}</Text>
                 </View>
-                <Text style={[st.soonGo, today && { color: C.orange }]}>{e.signup === 'app' ? 'RSVP' : 'Details'}</Text>
+                <Text style={[st.soonGo, today && { color: C.orangeText }]}>{e.signup === 'app' ? 'RSVP' : 'Details'}</Text>
               </Pressable>
             );
           })}
@@ -121,8 +121,8 @@ export function PostCard({ post, full, compact }: { post: Post; full?: boolean; 
         </View>
         {leader ? (
           <Pressable onPress={togglePin} disabled={pinBusy} hitSlop={8} style={({ pressed }) => [st.pinBtn, post.pinned && st.pinOn, pressed && { opacity: 0.7 }]} accessibilityRole="button" accessibilityLabel={post.pinned ? 'Unpin post' : 'Pin post'}>
-            <Icon name="pinned" size={13} color={post.pinned ? C.white : C.blueDeep} stroke={2.2} />
-            <Text style={[st.pinText, post.pinned && { color: C.white }]}>{pinBusy ? '…' : post.pinned ? 'Pinned' : 'Pin'}</Text>
+            <Icon name="pinned" size={13} color={post.pinned ? C.onBlue : C.blueDeep} stroke={2.2} />
+            <Text style={[st.pinText, post.pinned && { color: C.onBlue }]}>{pinBusy ? '…' : post.pinned ? 'Pinned' : 'Pin'}</Text>
           </Pressable>
         ) : post.pinned ? (
           <View style={st.pinBtn}><Icon name="pinned" size={13} color={C.blueDeep} stroke={2.2} /><Text style={st.pinText}>Pinned</Text></View>
@@ -154,7 +154,7 @@ export function PostCard({ post, full, compact }: { post: Post; full?: boolean; 
             opacity: burst.interpolate({ inputRange: [0, 0.3, 1, 2], outputRange: [0, 1, 1, 0] }),
             transform: [{ scale: burst.interpolate({ inputRange: [0, 1, 2], outputRange: [0.3, 1, 1.15] }) }],
           }]}>
-            <Icon name="heart" size={96} color="#FFFFFF" fill="#FFFFFF" />
+            <Icon name="heart" size={96} color={C.white} fill={C.white} />
           </Animated.View>
           {photos && photos.length > 1 ? (
             <View style={st.dots}>{photos.map((_, i) => <View key={i} style={[st.dot, i === page && st.dotOn]} />)}</View>
@@ -166,7 +166,7 @@ export function PostCard({ post, full, compact }: { post: Post; full?: boolean; 
       <View style={st.actions}>
         <Pressable onPress={() => like()} hitSlop={8} style={st.action} accessibilityRole="button" accessibilityLabel={on ? 'Unlike' : 'Like'}>
           <Animated.View style={{ transform: [{ scale: pop }] }}>
-            <Icon name="heart" size={25} color={on ? '#E8364F' : C.ink} fill={on ? '#E8364F' : 'none'} stroke={2} />
+            <Icon name="heart" size={25} color={on ? C.orange : C.ink} fill={on ? C.orange : 'none'} stroke={2} />
           </Animated.View>
           {meta.likes > 0 ? <Text style={st.actionCount}>{meta.likes}</Text> : null}
         </Pressable>
@@ -185,7 +185,7 @@ export function PostCard({ post, full, compact }: { post: Post; full?: boolean; 
 
       {/* text */}
       <Pressable onPress={openPost} disabled={full} style={{ paddingHorizontal: 16 }} accessibilityRole={full ? undefined : 'button'}>
-        <Text style={[st.title, full && { fontSize: 22, lineHeight: 27 }]}>{post.title}</Text>
+        <Text style={full ? st.titleFull : st.title}>{post.title}</Text>
         {post.body ? <Text style={[st.body, full && { fontSize: 16, lineHeight: 24 }]} numberOfLines={full ? undefined : 3}>{post.body}</Text> : null}
         {!full && (post.body?.length ?? 0) > 140 ? <Text style={st.more}>more</Text> : null}
       </Pressable>
@@ -216,9 +216,7 @@ export function PostCard({ post, full, compact }: { post: Post; full?: boolean; 
   );
 }
 
-// Comments under a post (on the post's own page): soft bubbles, a colored initial, a pill to reply.
-const AVATAR_HUES = ['#0BAFE6', '#F2913D', '#7C5CFC', '#1FA971', '#F0569A', '#E0A400'];
-const hueFor = (name: string) => AVATAR_HUES[[...name].reduce((a, c) => a + c.charCodeAt(0), 0) % AVATAR_HUES.length];
+// Comments under a post (on the post's own page): the initial, the comment, a box to reply.
 
 export function PostComments({ postId }: { postId: string }) {
   const { loadComments, addComment, deletePostComment, leader, name } = useStore();
@@ -240,7 +238,10 @@ export function PostComments({ postId }: { postId: string }) {
   };
   return (
     <View style={st.comments}>
-      <Text style={st.commentsTitle}>Comments{list && list.length ? <Text style={st.commentsCount}>  {list.length}</Text> : null}</Text>
+      <View style={st.commentsHead}>
+        <Text style={T.h2}>Comments</Text>
+        {list && list.length ? <Text style={st.commentsCount}>{list.length}</Text> : null}
+      </View>
       {list === null ? <Text style={[T.small, { paddingVertical: 8 }]}>Loading…</Text> : list.length === 0 ? (
         <View style={st.noComments}>
           <Icon name="chat" size={26} color={C.faint} stroke={1.8} />
@@ -250,7 +251,7 @@ export function PostComments({ postId }: { postId: string }) {
         <View style={{ gap: 12 }}>
           {list.map((c) => (
             <View key={c.at + c.name} style={st.comment}>
-              <View style={[st.cAvatar, { backgroundColor: hueFor(c.name) }]}><Text style={st.cInitial}>{c.name[0]?.toUpperCase()}</Text></View>
+              <View style={st.cAvatar}><Text style={st.cInitial}>{c.name[0]?.toUpperCase()}</Text></View>
               <View style={{ flex: 1 }}>
                 <View style={st.bubble}>
                   <Text style={st.cName}>{c.name}</Text>
@@ -270,76 +271,76 @@ export function PostComments({ postId }: { postId: string }) {
         </View>
       )}
       <View style={st.inputRow}>
-        <View style={[st.cAvatar, { backgroundColor: hueFor(name || '?') }]}><Text style={st.cInitial}>{name[0]?.toUpperCase() || '?'}</Text></View>
+        <View style={st.cAvatar}><Text style={st.cInitial}>{name[0]?.toUpperCase() || '?'}</Text></View>
         <View style={st.inputPill}>
           <TextInput value={text} onChangeText={setText} placeholder="Add a comment…" placeholderTextColor={C.faint} style={st.input} maxLength={300} onSubmitEditing={send} returnKeyType="send" multiline accessibilityLabel="Add a comment" />
           <Pressable onPress={send} disabled={busy || !text.trim()} hitSlop={6} style={[st.sendBtn, (!text.trim() || busy) && { opacity: 0.35 }]} accessibilityRole="button" accessibilityLabel="Post comment">
-            <Icon name="send" size={16} color="#FFFFFF" stroke={2.4} />
+            <Icon name="send" size={16} color={C.onBlue} stroke={2.4} />
           </Pressable>
         </View>
       </View>
-      {err ? <Text style={[T.small, { color: '#C0303F', marginTop: 8 }]}>{err}</Text> : null}
+      {err ? <Text style={[T.small, { color: C.red, marginTop: 8 }]}>{err}</Text> : null}
     </View>
   );
 }
 
 const st = StyleSheet.create({
   feedHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  newBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: C.orange, alignItems: 'center', justifyContent: 'center' },
-  card: { backgroundColor: C.card, borderRadius: 24, overflow: 'hidden', borderWidth: 1, borderColor: C.line },
+  newBtn: { width: 44, height: 44, borderRadius: R.btnSm, backgroundColor: C.orange, alignItems: 'center', justifyContent: 'center' },
+  card: { backgroundColor: C.card, borderRadius: R.card, overflow: 'hidden' },
   head: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
   avatarRing: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: C.blue, alignItems: 'center', justifyContent: 'center', backgroundColor: C.card },
   avatar: { width: 22, height: 28 },
   author: { fontSize: 15, fontWeight: '800', color: C.ink },
   ago: { fontSize: 14, fontWeight: '500', color: C.faint },
   kind: { fontSize: 12, color: C.sub, marginTop: 1 },
-  pinBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, height: 28, borderRadius: 14, backgroundColor: C.bluePale },
+  pinBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, height: 28, borderRadius: R.chip, backgroundColor: C.bluePale },
   pinOn: { backgroundColor: C.blue },
   pinText: { fontSize: 12, fontWeight: '800', color: C.blueDeep },
-  media: { width: '100%', aspectRatio: 4 / 5, maxHeight: 520, backgroundColor: C.line, overflow: 'hidden' },
-  mediaShade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '45%', backgroundColor: 'rgba(8,20,32,0.35)' },
-  mediaChip: { position: 'absolute', left: 12, right: 12, bottom: 12, padding: 12, borderRadius: 16, backgroundColor: C.card },
+  media: { width: '100%', aspectRatio: 4 / 5, maxHeight: 520, backgroundColor: C.raised, overflow: 'hidden' },
+  mediaChip: { position: 'absolute', left: 12, right: 12, bottom: 12, padding: 12, borderRadius: R.card, backgroundColor: C.card },
   mediaGoing: { color: C.sub, fontSize: 12, fontWeight: '700', marginTop: 3 },
-  soonBox: { marginTop: 16, borderRadius: 20, backgroundColor: C.card, borderWidth: 1, borderColor: C.line, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 6 },
-  soonHead: { fontSize: 12, fontWeight: '800', letterSpacing: 0.7, textTransform: 'uppercase', color: C.sub, marginBottom: 4 },
+  soonBox: { marginTop: 16, borderRadius: R.card, backgroundColor: C.card, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 6 },
+  soonHead: { ...T.eyebrow, marginBottom: 4 },
   soonRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11 },
-  soonRule: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line },
-  soonDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: C.blue },
-  soonTitle: { fontSize: 15, fontWeight: '800', color: C.ink },
-  soonSub: { fontSize: 13, color: C.sub, marginTop: 1 },
-  soonGo: { fontSize: 13, fontWeight: '800', color: C.blue },
-  mediaChipTitle: { fontSize: 16, fontWeight: '800', color: C.ink },
+  soonRule: { borderTopWidth: 1, borderTopColor: C.line },
+  soonDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: C.blue },
+  soonTitle: { ...T.h3, fontSize: 18 },
+  soonSub: { fontSize: 13, color: C.sub, marginTop: 2 },
+  soonGo: { ...T.eyebrow, color: C.blue },
+  mediaChipTitle: { ...T.h3 },
   bigHeart: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   dots: { position: 'absolute', bottom: 12, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 6 },
   dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.5)' },
-  dotOn: { backgroundColor: '#FFFFFF' },
+  dotOn: { backgroundColor: C.white },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 18, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 6 },
   action: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   actionCount: { fontSize: 15, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },
   linkBtn: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   linkText: { fontSize: 14, fontWeight: '800', color: C.blue },
-  title: { fontSize: 17, lineHeight: 22, fontFamily: F.display, color: C.ink, marginTop: 2 },
+  title: { ...display(22), marginTop: 4 },
+  titleFull: { ...display(28), marginTop: 4 },
   body: { fontSize: 15, lineHeight: 21, color: C.ink, marginTop: 4 },
   more: { fontSize: 14, color: C.faint, fontWeight: '700', marginTop: 2 },
-  attach: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 14, marginTop: 12, padding: 10, borderRadius: 16, backgroundColor: C.bg },
-  attachImg: { width: 48, height: 48, borderRadius: 12 },
+  attach: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 14, marginTop: 12, padding: 10, borderRadius: R.card, backgroundColor: C.raised },
+  attachImg: { width: 48, height: 48, borderRadius: R.print },
   viewComments: { fontSize: 14, color: C.faint, fontWeight: '600' },
-  comments: { marginTop: 18, padding: 16, borderRadius: 24, backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
-  commentsTitle: { fontSize: 18, fontFamily: F.display, color: C.ink, marginBottom: 14 },
-  commentsCount: { fontSize: 15, fontFamily: undefined, fontWeight: '700', color: C.faint },
+  comments: { marginTop: 18, padding: 16, borderRadius: R.card, backgroundColor: C.card },
+  commentsHead: { flexDirection: 'row', alignItems: 'baseline', gap: 10, marginBottom: 14 },
+  commentsCount: { ...T.eyebrow, fontSize: 13 },
   noComments: { alignItems: 'center', gap: 8, paddingVertical: 18 },
   noCommentsText: { fontSize: 14, color: C.sub, fontWeight: '600' },
   comment: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  cAvatar: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  cInitial: { fontSize: 14, fontWeight: '900', color: '#FFFFFF' },
-  bubble: { alignSelf: 'flex-start', maxWidth: '100%', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 18, borderTopLeftRadius: 6, backgroundColor: C.bg },
+  cAvatar: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: C.avatar },
+  cInitial: { fontSize: 14, fontWeight: '700', color: C.white },
+  bubble: { alignSelf: 'flex-start', maxWidth: '100%', paddingHorizontal: 14, paddingVertical: 10, borderRadius: R.card, borderTopLeftRadius: 3, backgroundColor: C.raised },
   cName: { fontSize: 13, fontWeight: '800', color: C.ink, marginBottom: 2 },
   cText: { fontSize: 15, lineHeight: 21, color: C.ink },
   cMeta: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 4, marginLeft: 12 },
   cAgo: { fontSize: 12, color: C.faint, fontWeight: '600' },
-  cDelete: { fontSize: 12, color: '#C0303F', fontWeight: '700' },
+  cDelete: { fontSize: 12, color: C.red, fontWeight: '700' },
   inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 10, marginTop: 16, paddingTop: 14, borderTopWidth: 1, borderTopColor: C.line },
-  inputPill: { flex: 1, flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingLeft: 14, paddingRight: 5, paddingVertical: 5, borderRadius: 22, backgroundColor: C.bg, borderWidth: 1, borderColor: C.line },
+  inputPill: { flex: 1, flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingLeft: 14, paddingRight: 5, paddingVertical: 5, borderRadius: R.input, backgroundColor: C.raised, borderWidth: 1, borderColor: C.lineStrong },
   input: { flex: 1, minHeight: 32, maxHeight: 110, fontSize: 15, color: C.ink, paddingTop: 7, paddingBottom: 7 },
-  sendBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: C.blue, alignItems: 'center', justifyContent: 'center' },
+  sendBtn: { width: 34, height: 34, borderRadius: R.chip, backgroundColor: C.blue, alignItems: 'center', justifyContent: 'center' },
 });

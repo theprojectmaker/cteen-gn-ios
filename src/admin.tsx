@@ -4,10 +4,11 @@ import { AiPlanner, EventForm, InviteForm, PosterForm } from './leaderEvents';
 import { ChallengeEditor, FoodForm, MinyanEditor, PhotoPicker, PopupEditor, WhatsAppImport, publishPhotos } from './leaderTools';
 import type { Snap } from './photo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { C, T, F } from './theme';
+import { C, R, SP, T } from './theme';
 import { EVENT_ICONS, Icon } from './icons';
 import { dateLabel, todayIso, upcoming, useStore, type Content, type Person, type PhotoRow, type Question, type SignupRow, type Target } from './store';
 import { Button, Card, Chips, Field, IconTile, Toggle, s as u } from './ui';
+import { Backdrop, CloseButton, Label } from './look';
 
 // ───────── form description ─────────
 type Opt = { v: string; l: string };
@@ -134,7 +135,7 @@ function Form({ list, draft, set }: { list: Spec[]; draft: Draft; set: (d: Draft
         const v = draft[f.k];
         if (f.t === 'bool') return (
           <View key={f.k} style={st.toggle}>
-            <Text style={[T.h3, { flex: 1 }]}>{f.label}</Text>
+            <Text style={[T.strong, { flex: 1 }]}>{f.label}</Text>
             <Toggle value={!!v} onChange={(x) => set({ ...draft, [f.k]: x })} label={f.label} />
           </View>
         );
@@ -251,7 +252,7 @@ export function AdminPanel() {
               <Chips wrap options={DURATIONS.map((d) => d.l)} value={String(live.hours)} onChange={(l) => setLive({ ...live, hours: l })} />
             </View>
             <View style={st.toggle}>
-              <Text style={[T.h3, { flex: 1 }]}>Also send as a notification to every phone</Text>
+              <Text style={[T.strong, { flex: 1 }]}>Also send as a notification to every phone</Text>
               <Toggle value={!!live.push} onChange={(x) => setLive({ ...live, push: x })} label="Also send as a notification" />
             </View>
             <View style={{ marginTop: 18 }}>
@@ -280,7 +281,7 @@ export function AdminPanel() {
                 <Text style={[T.small, { marginTop: 2 }]}>{dateLabel(e)} · {rows.length} signed up</Text>
                 {rows.map((r, i) => (
                   <View key={i} style={st.signRow}>
-                    <Text style={[T.h3, { flex: 1 }]}>{r.name}</Text>
+                    <Text style={[T.strong, { flex: 1 }]}>{r.name}</Text>
                     <Text style={T.small}>{[r.grade ? `Grade ${r.grade}` : '', r.age ? `Age ${r.age}` : '', r.gender === 'girl' ? 'Girl' : r.gender === 'boy' ? 'Boy' : ''].filter(Boolean).join(' · ')}</Text>
                   </View>
                 ))}
@@ -349,7 +350,7 @@ export function AdminPanel() {
               <PhotoPicker photos={coverPick} onChange={(p) => setCoverPick(p.slice(-1))} />
               {d.cover || coverPick.length ? (
                 <View style={st.toggle}>
-                  <Text style={[T.h3, { flex: 1, fontSize: 16 }]}>This cover is a full poster (show it whole, no text over it)</Text>
+                  <Text style={[T.strong, { flex: 1 }]}>This cover is a full poster (show it whole, no text over it)</Text>
                   <Toggle value={!!d.fullPoster} onChange={(x) => setEditing({ ...editing, draft: { ...d, fullPoster: x } })} label="Cover is a full poster" />
                 </View>
               ) : null}
@@ -396,15 +397,14 @@ export function AdminPanel() {
   return (
     <Modal visible animationType="slide" onRequestClose={() => setAdminOpen(false)}>
       <View style={[st.root, { paddingTop: insets.top + 10 }]}>
+        <Backdrop />
         <View style={st.col}>
           <View style={st.top}>
             <View style={{ flex: 1 }}>
-              <Text style={T.eyebrow}>CTeen Great Neck</Text>
-              <Text style={[T.h1, { fontSize: 26 }]}>Leader panel</Text>
+              <Label>CTeen Great Neck</Label>
+              <Text style={[T.h1, { marginTop: 4 }]}>Leader panel</Text>
             </View>
-            <Pressable onPress={() => setAdminOpen(false)} style={st.close} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close leader panel">
-              <Icon name="x" size={18} color={C.ink} stroke={2.4} />
-            </Pressable>
+            <CloseButton onPress={() => setAdminOpen(false)} label="Close leader panel" />
           </View>
         </View>
         <ScrollView ref={scroller} automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" style={{ flex: 1 }} contentContainerStyle={{ paddingVertical: 16, paddingBottom: insets.bottom + 40 }} keyboardShouldPersistTaps="handled">
@@ -482,14 +482,14 @@ function Home({ onCreate, onManage, onMinyan, onCompose }: { onCreate: (t: Task)
           <Text style={st.liveBoxHead}>Live now</Text>
           {alertOn ? (
             <View style={st.liveRow}>
-              <View style={[st.liveDot, { backgroundColor: '#E8364F' }]} />
+              <View style={[st.liveDot, { backgroundColor: C.red }]} />
               <Text style={st.liveRowText} numberOfLines={1}>Banner: {alertOn.title}</Text>
               <Pressable disabled={busy === 'alert'} onPress={async () => { setBusy('alert'); await sendAlert(null); setBusy(null); }} hitSlop={8} accessibilityRole="button"><Text style={st.turnOff}>{busy === 'alert' ? '…' : 'Turn off'}</Text></Pressable>
             </View>
           ) : null}
           {popupOn ? (
             <View style={st.liveRow}>
-              <View style={[st.liveDot, { backgroundColor: '#7C5CFC' }]} />
+              <View style={[st.liveDot, { backgroundColor: C.blue }]} />
               <Text style={st.liveRowText} numberOfLines={1}>Pop-up: {popupOn.title || 'Poster'}</Text>
               <Pressable disabled={busy === 'popup'} onPress={async () => { setBusy('popup'); await saveContent({ ...content, popup: { ...popupOn, on: false } }); setBusy(null); }} hitSlop={8} accessibilityRole="button"><Text style={st.turnOff}>{busy === 'popup' ? '…' : 'Turn off'}</Text></Pressable>
             </View>
@@ -512,7 +512,7 @@ function Home({ onCreate, onManage, onMinyan, onCompose }: { onCreate: (t: Task)
       <Text style={st.groupHead}>Manage</Text>
       <View style={st.manage}>
         {manage.map((x, i) => (
-          <Pressable key={x.title} onPress={x.go} style={({ pressed }) => [st.manageRow, i > 0 && st.manageRule, pressed && { backgroundColor: C.bg }]} accessibilityRole="button">
+          <Pressable key={x.title} onPress={x.go} style={({ pressed }) => [st.manageRow, i > 0 && st.manageRule, pressed && { backgroundColor: C.raised }]} accessibilityRole="button">
             <Icon name={x.icon} size={19} color={C.sub} stroke={2} />
             <Text style={st.manageText}>{x.title}</Text>
             <Icon name="right" size={16} color={C.faint} stroke={2.4} />
@@ -629,14 +629,14 @@ function SimpleForm({ kind, onDone, link }: { kind: 'post' | 'event' | 'alert' |
       ) : null}
       {kind === 'notify' && linkedChallenge ? (
         <View style={st.toggle}>
-          <Text style={[T.h3, { flex: 1, fontSize: 16 }]}>Only people in {linkedChallenge.title}</Text>
+          <Text style={[T.strong, { flex: 1 }]}>Only people in {linkedChallenge.title}</Text>
           <Toggle value={onlyMembers} onChange={setOnlyMembers} label="Only people in the challenge" />
         </View>
       ) : null}
       {kind === 'post' ? <PhotoPicker photos={photos} onChange={setPhotos} /> : null}
       {kind === 'notify' ? null : kind === 'alert' ? (
         <View style={st.toggle}>
-          <Text style={[T.h3, { flex: 1, fontSize: 16 }]}>Send a notification to every phone</Text>
+          <Text style={[T.strong, { flex: 1 }]}>Send a notification to every phone</Text>
           <Toggle value={notify} onChange={setNotify} label="Send a notification" />
         </View>
       ) : (
@@ -645,7 +645,7 @@ function SimpleForm({ kind, onDone, link }: { kind: 'post' | 'event' | 'alert' |
           <Text style={[T.small, { flex: 1, color: C.ink }]}>Every phone gets a notification automatically.</Text>
         </View>
       )}
-      {err ? <Text style={{ color: '#C0303F', fontWeight: '700', marginTop: 12 }}>{err}</Text> : null}
+      {err ? <Text style={{ color: C.red, fontWeight: '700', marginTop: 12 }}>{err}</Text> : null}
       <View style={{ marginTop: 20 }}>
         <Button label={busy ? 'Sending…' : kind === 'post' ? 'Post it' : kind === 'event' ? 'Add the event' : kind === 'notify' ? (linkedChallenge && onlyMembers ? 'Send to the challenge' : 'Send to everyone') : 'Put the banner up'} disabled={busy} onPress={go} />
       </View>
@@ -667,7 +667,7 @@ function PeopleView() {
     <View style={{ gap: 12 }}>
       <Text style={T.small}>{people === null ? 'Loading…' : `${people.length} signed up · ${leaders} leader${leaders === 1 ? '' : 's'}`}{isOwner ? '' : '. Only Rabbi Zevy can change who is a leader.'}</Text>
       <Field label="Search" value={q} onChange={setQ} placeholder="Name" />
-      {note ? <Text style={[T.small, { color: '#C0303F' }]}>{note}</Text> : null}
+      {note ? <Text style={[T.small, { color: C.red }]}>{note}</Text> : null}
       <Card style={{ padding: 0 }}>
         {shown.map((p, i) => (
           <View key={p.id} style={[st.person, i > 0 && { borderTopWidth: 1, borderTopColor: C.line }]}>
@@ -745,46 +745,38 @@ function PhotoReview() {
 }
 
 const st = StyleSheet.create({
-  hiLine: { fontSize: 20, fontFamily: F.display, color: C.ink, letterSpacing: -0.3 },
-  liveBox: { marginTop: 16, padding: 14, borderRadius: 18, backgroundColor: C.card, borderWidth: 1, borderColor: C.line, gap: 10 },
-  liveBoxHead: { fontSize: 11, fontWeight: '900', letterSpacing: 0.8, textTransform: 'uppercase', color: C.sub },
+  hiLine: { fontSize: 17, lineHeight: 23, fontWeight: '600', color: C.ink },
+  liveBox: { marginTop: 16, padding: 14, borderRadius: R.card, backgroundColor: C.card, gap: 10 },
+  liveBoxHead: { ...T.eyebrow, color: C.orangeText },
   liveRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   liveDot: { width: 8, height: 8, borderRadius: 4 },
   liveRowText: { flex: 1, fontSize: 14, fontWeight: '700', color: C.ink },
-  turnOff: { fontSize: 14, fontWeight: '800', color: '#C0303F' },
-  groupHead: { fontSize: 13, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase', color: C.sub, marginTop: 24, marginBottom: 10 },
+  turnOff: { fontSize: 14, fontWeight: '700', color: C.red },
+  groupHead: { ...T.eyebrow, marginTop: 26, marginBottom: 10 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -5 },
   tile: { width: '50%', padding: 5 },
-  tileCard: { padding: 14, borderRadius: 18, backgroundColor: C.card, borderWidth: 1, borderColor: C.line, minHeight: 104, justifyContent: 'space-between' },
-  tileTitle: { fontSize: 15, fontWeight: '800', color: C.ink, marginTop: 10 },
-  manage: { borderRadius: 18, backgroundColor: C.card, borderWidth: 1, borderColor: C.line, overflow: 'hidden' },
+  tileCard: { padding: 14, borderRadius: R.card, backgroundColor: C.card, minHeight: 104, justifyContent: 'space-between' },
+  tileTitle: { ...T.h3, marginTop: 10 },
+  manage: { borderRadius: R.card, backgroundColor: C.card, overflow: 'hidden' },
   manageRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 15 },
   manageRule: { borderTopWidth: 1, borderTopColor: C.line },
-  manageText: { flex: 1, fontSize: 16, fontWeight: '700', color: C.ink },
-  autoNote: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 16, backgroundColor: C.bluePale, borderRadius: 12, padding: 12 },
+  manageText: { flex: 1, fontSize: 16, fontWeight: '600', color: C.ink },
+  autoNote: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 16, backgroundColor: C.bluePale, borderRadius: R.chip, padding: 12 },
   person: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
-  personAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: C.bluePale, alignItems: 'center', justifyContent: 'center' },
-  personInitial: { fontSize: 16, fontWeight: '900', color: C.blueDeep },
-  modeRow: { flexDirection: 'row', backgroundColor: C.card, borderRadius: 14, padding: 4, marginBottom: 12, borderWidth: 1, borderColor: C.line },
-  modeBtn: { flex: 1, height: 40, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  modeOn: { backgroundColor: C.inverse },
-  modeText: { fontSize: 15, fontWeight: '800', color: C.ink },
-  simpleHello: { fontSize: 22, fontFamily: F.display, color: C.ink },
-  task: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16 },
-  taskTitle: { fontSize: 18, fontWeight: '800', color: C.ink },
-  taskSub: { fontSize: 14, color: C.sub, marginTop: 2 },
+  personAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: C.avatar, alignItems: 'center', justifyContent: 'center' },
+  personInitial: { fontSize: 15, fontWeight: '700', color: C.white },
+  simpleHello: { ...T.h2 },
   backRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 },
   backText: { fontSize: 16, fontWeight: '800', color: C.blueDeep },
   cRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
-  photo: { width: '100%', aspectRatio: 3 / 4, borderRadius: 14, marginTop: 12, backgroundColor: C.line },
+  photo: { width: '100%', aspectRatio: 3 / 4, borderRadius: R.photo, marginTop: 12, backgroundColor: C.raised },
   root: { flex: 1, backgroundColor: C.bg },
-  col: { width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 20 },
+  col: { width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: SP.gutter },
   top: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  close: { width: 40, height: 40, borderRadius: 20, backgroundColor: C.card, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.line },
-  note: { backgroundColor: C.inverse, color: C.onInverse, fontWeight: '700', fontSize: 14, lineHeight: 19, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 12, overflow: 'hidden' },
+  note: { backgroundColor: C.paper, color: C.night, fontWeight: '600', fontSize: 14, lineHeight: 19, borderRadius: R.chip, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 12, overflow: 'hidden' },
   toggle: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 16, minHeight: 44 },
   coverRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 10 },
-  coverThumb: { width: 96, height: 64, borderRadius: 10, backgroundColor: C.line },
+  coverThumb: { width: 96, height: 64, borderRadius: R.print, backgroundColor: C.raised },
   item: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 },
   itemMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
   signRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderTopWidth: 1, borderTopColor: C.line, marginTop: 10 },

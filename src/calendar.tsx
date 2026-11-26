@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { C, F, R, T, HUES } from './theme';
+import { C, R, T, display } from './theme';
 import { Icon } from './icons';
 import { Glass } from './glass';
 import { Cover } from './ui';
@@ -130,10 +130,10 @@ export function CalendarScreen() {
               return (
                 <Pressable key={i} onPress={() => { tap(); setSelected(key); }} style={st.cell} accessibilityRole="button" accessibilityLabel={`${MONTHS[cursor.m]} ${day}${evs ? `, ${evs.length} event${evs.length > 1 ? 's' : ''}` : ''}`}>
                   <View style={[st.dayNumWrap, isToday && !isSel && st.todayRing]}>
-                    <Text style={[st.dayNum, isSel && { color: C.white, fontWeight: '800' }, isToday && !isSel && { color: C.blue, fontWeight: '800' }]}>{day}</Text>
+                    <Text style={[st.dayNum, isSel && { color: C.onBlue, fontWeight: '800' }, isToday && !isSel && { color: C.orangeText, fontWeight: '800' }]}>{day}</Text>
                   </View>
                   <View style={st.dots}>
-                    {(evs || []).slice(0, 3).map((e, n) => <View key={n} style={[st.dot, { backgroundColor: (HUES[e.color] ?? HUES.blue).solid }]} />)}
+                    {(evs || []).slice(0, 3).map((e, n) => <View key={n} style={[st.dot, { backgroundColor: isToday ? C.orange : C.blue }]} />)}
                   </View>
                 </Pressable>
               );
@@ -150,7 +150,7 @@ export function CalendarScreen() {
       {selEvents.length ? (
         <View style={{ gap: 10 }}>
           {selEvents.map((e) => (
-            <Pressable key={e.id} onPress={() => openEvent(e.id)} style={({ pressed }) => [st.evRow, pressed && { backgroundColor: C.bg, transform: [{ scale: 0.99 }] }]} accessibilityRole="button" accessibilityLabel={e.title}>
+            <Pressable key={e.id} onPress={() => openEvent(e.id)} style={({ pressed }) => [st.evRow, pressed && { backgroundColor: C.raised, transform: [{ scale: 0.99 }] }]} accessibilityRole="button" accessibilityLabel={e.title}>
               <Cover e={e} style={st.evThumb} iconSize={26} />
               <View style={{ flex: 1 }}>
                 <Text style={T.h3} numberOfLines={1}>{e.title}</Text>
@@ -173,29 +173,29 @@ export function CalendarScreen() {
 
 const st = StyleSheet.create({
   head: { marginBottom: 14 },
-  monthBar: { flexDirection: 'row', alignItems: 'center', borderRadius: 22, padding: 6, marginBottom: 14 },
-  navBtn: { width: 44, height: 44, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  monthBar: { flexDirection: 'row', alignItems: 'center', borderRadius: R.input, padding: 4, marginBottom: 14 },
+  navBtn: { width: 44, height: 44, borderRadius: R.btnSm, alignItems: 'center', justifyContent: 'center' },
   monthLabelWrap: { flex: 1, alignItems: 'center' },
-  monthLabel: { fontSize: 18, fontFamily: F.display, color: C.ink, letterSpacing: -0.4 },
-  todayHint: { fontSize: 11, fontWeight: '800', color: C.blue, letterSpacing: 0.4, textTransform: 'uppercase', marginTop: 1 },
+  monthLabel: { ...display(22) },
+  todayHint: { ...T.eyebrow, fontSize: 11, color: C.blue, marginTop: 1 },
   weekRow: { flexDirection: 'row', marginBottom: 4 },
   weekLabel: { flex: 1, textAlign: 'center', fontSize: 12, fontWeight: '800', color: C.faint },
   grid: { position: 'relative' },
   week: { flexDirection: 'row' },
   cell: { flex: 1, height: CELL_H, alignItems: 'center', justifyContent: 'center', gap: 3 },
   dayNumWrap: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  todayRing: { borderWidth: 2, borderColor: C.blue },
+  todayRing: { borderWidth: 1.5, borderColor: C.orange },
   dayNum: { fontSize: 16, fontWeight: '600', color: C.ink },
   dots: { flexDirection: 'row', gap: 3, height: 5 },
   dot: { width: 5, height: 5, borderRadius: 3 },
   lensWrap: { position: 'absolute', left: 0, top: 0, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 5 },
-  lensCircle: { width: 32, height: 32, borderRadius: 16, backgroundColor: C.blue, shadowColor: C.blue, shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } },
+  lensCircle: { width: 32, height: 32, borderRadius: 16, backgroundColor: C.blue },
   dayHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginTop: 22, marginBottom: 12 },
-  dayHeadText: { fontSize: 18, fontFamily: F.display, color: C.ink, letterSpacing: -0.3, flex: 1 },
-  dayCount: { fontSize: 13, fontWeight: '800', color: C.blue },
-  evRow: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: C.card, borderRadius: 18, padding: 12, borderWidth: 1, borderColor: C.line },
-  evThumb: { width: 54, height: 54, borderRadius: 14, overflow: 'hidden' },
+  dayHeadText: { ...T.h2, flex: 1 },
+  dayCount: { ...T.eyebrow, color: C.blue },
+  evRow: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: C.card, borderRadius: R.card, padding: 12 },
+  evThumb: { width: 54, height: 54, borderRadius: R.print, overflow: 'hidden' },
   evCount: { fontSize: 12, fontWeight: '700', color: C.blueDeep },
   empty: { alignItems: 'center', gap: 10, paddingVertical: 30, paddingHorizontal: 30 },
-  emptyText: { fontSize: 14, color: C.faint, textAlign: 'center', lineHeight: 20 },
+  emptyText: { fontSize: 14, color: C.sub, textAlign: 'center', lineHeight: 20 },
 });

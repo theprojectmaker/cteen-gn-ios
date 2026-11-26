@@ -1,28 +1,38 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, PanResponder, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 import { Tabs } from 'expo-router/js-tabs';
-import { C, IS_DARK } from './theme';
-import { Icon } from './icons';
+import { C, R, SH } from './theme';
 import { Glass } from './glass';
 import { useStore } from './store';
 
 // Browser preview only. Phones use Apple's own tab bar, which has the real Liquid Glass
-// animation. This imitates it: a clear glass lens that stretches while it slides, magnifies
-// the icons it passes over, and can be dragged with a finger.
-const ITEMS: Record<string, { label: string; icon: string }> = {
-  index: { label: 'Home', icon: 'home' },
-  events: { label: 'Events', icon: 'ticket' },
-  calendar: { label: 'Calendar', icon: 'calendar' },
-  feed: { label: 'Feed', icon: 'chat' },
-  chapter: { label: 'Chapter', icon: 'users' },
+// animation. This imitates it in the Flyer look: a dark glass capsule, a soft lens behind the
+// selected tab that stretches while it slides and can be dragged with a finger, and a fade to the
+// page color behind the bar so content dims before it reaches it.
+const ITEMS: Record<string, { label: string; icon: React.ReactNode }> = {
+  index: { label: 'Home', icon: <Path d="M3.5 10.6 12 3.5l8.5 7.1V19.5a1 1 0 0 1-1 1H15v-6H9v6H4.5a1 1 0 0 1-1-1z" /> },
+  events: { label: 'Events', icon: <><Path d="M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2.2a1.8 1.8 0 0 0 0 3.6V16a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2.2a1.8 1.8 0 0 0 0-3.6z" /><Path d="M14.5 6.5v11" strokeDasharray="2 2.4" /></> },
+  calendar: { label: 'Calendar', icon: <><Rect x="3.5" y="5.5" width="17" height="15" rx="2.5" /><Path d="M3.5 10.2h17M8 3.5v4M16 3.5v4" /></> },
+  feed: { label: 'Feed', icon: <Path d="M20.5 11.8a8.3 8.3 0 0 1-12.2 7.3L3.5 20.5l1.5-4.5a8.3 8.3 0 1 1 15.5-4.2z" /> },
+  chapter: { label: 'Chapter', icon: <><Circle cx="9.5" cy="8" r="3.3" /><Path d="M3 19.5v-1a4.5 4.5 0 0 1 4.5-4.5h4a4.5 4.5 0 0 1 4.5 4.5v1M16 4.9a3.3 3.3 0 0 1 0 6.2M21 19.5v-1a4.5 4.5 0 0 0-3-4.2" /></> },
 };
 
 type BarProps = { state: { index: number; routes: { key: string; name: string }[] }; navigation: { navigate: (name: string) => void } };
-const PAD = 6;
 const NATIVE = Platform.OS !== 'web';
+const TAB_H = 52;
+
+function TabIcon({ children, color }: { children: React.ReactNode; color: string }) {
+  return (
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
+      {children}
+    </Svg>
+  );
+}
 
 function GlassBar({ state, navigation }: BarProps) {
   const { unreadFeed, newEvents } = useStore();
+  const fadeId = 'tb' + useId().replace(/[^a-zA-Z0-9]/g, '');
   const routes = state.routes.filter((r) => ITEMS[r.name]);
   const [rowW, setRowW] = useState(0);
   const slot = rowW ? rowW / routes.length : 0;
@@ -70,34 +80,44 @@ function GlassBar({ state, navigation }: BarProps) {
     onPanResponderTerminate: () => { dragging.current = false; settle(state.index * slot); },
   }), [slot, rowW, state.index, routes]);
 
-  const lensScaleX = stretch.interpolate({ inputRange: [0, 1], outputRange: [1, 1.22] });
-  const lensScaleY = stretch.interpolate({ inputRange: [0, 1], outputRange: [1, 1.12] });
+  const lensScaleX = stretch.interpolate({ inputRange: [0, 1], outputRange: [1, 1.18] });
+  const lensScaleY = stretch.interpolate({ inputRange: [0, 1], outputRange: [1, 1.1] });
 
   return (
     <View style={st.wrap} pointerEvents="box-none">
-      <Glass style={st.bar}>
+      {/* content dims into the page color before it reaches the bar */}
+      <View style={st.scrim} pointerEvents="none">
+        <Svg width="100%" height="100%">
+          <Defs>
+            <LinearGradient id={fadeId} x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor={C.bg} stopOpacity={0} />
+              <Stop offset="0.22" stopColor={C.bg} stopOpacity={1} />
+              <Stop offset="1" stopColor={C.bg} stopOpacity={1} />
+            </LinearGradient>
+          </Defs>
+          <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${fadeId})`} />
+        </Svg>
+      </View>
+      <Glass tone="bar" style={st.bar}>
         <View style={st.row} onLayout={(e) => setRowW(e.nativeEvent.layout.width)} {...pan.panHandlers}>
-          {slot ? (
-            <Animated.View pointerEvents="none" style={[st.lens, { width: slot, transform: [{ translateX: x }, { scaleX: lensScaleX }, { scaleY: lensScaleY }] }]}>
-              <View style={st.lensShine} />
-            </Animated.View>
-          ) : null}
+          {slot ? <Animated.View pointerEvents="none" style={[st.lens, { width: slot, transform: [{ translateX: x }, { scaleX: lensScaleX }, { scaleY: lensScaleY }] }]} /> : null}
           {routes.map((r, i) => {
             const item = ITEMS[r.name];
             const on = state.index === i;
             const badge = r.name === 'feed' ? unreadFeed : r.name === 'events' ? newEvents : 0;
-            // Icons swell as the lens passes over them, like looking through a drop of water.
-            const mag = slot
-              ? x.interpolate({ inputRange: [(i - 1) * slot, i * slot, (i + 1) * slot], outputRange: [1, 1.22, 1], extrapolate: 'clamp' })
-              : 1;
+            // Icons swell a little while the lens is moving over them, like looking through a drop
+            // of water; at rest every icon is the same size.
+            const near = slot ? x.interpolate({ inputRange: [(i - 1) * slot, i * slot, (i + 1) * slot], outputRange: [0, 0.2, 0], extrapolate: 'clamp' }) : 0;
+            const mag = slot ? Animated.add(1, Animated.multiply(near as Animated.AnimatedInterpolation<number>, stretch)) : 1;
+            const tint = on ? C.blue : C.tabIcon;
             return (
               <Pressable key={r.key} onPress={() => navigation.navigate(r.name)} style={st.tab} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={badge ? `${item.label}, ${badge} new` : item.label}>
-                <Animated.View style={{ alignItems: 'center', gap: 2, transform: [{ scale: mag as any }] }}>
+                <Animated.View style={{ alignItems: 'center', gap: 4, transform: [{ scale: mag as any }] }}>
                   <View>
-                    <Icon name={item.icon} size={22} color={on ? C.blue : C.ink} stroke={on ? 2.3 : 1.8} />
+                    <TabIcon color={tint}>{item.icon}</TabIcon>
                     {badge ? <View style={st.badge}><Text style={st.badgeText}>{badge > 9 ? '9+' : badge}</Text></View> : null}
                   </View>
-                  <Text style={[st.text, on && { color: C.blue }]}>{item.label}</Text>
+                  <Text style={[st.text, { color: tint }]}>{item.label}</Text>
                 </Animated.View>
               </Pressable>
             );
@@ -110,7 +130,7 @@ function GlassBar({ state, navigation }: BarProps) {
 
 export function WebTabs() {
   return (
-    <Tabs screenOptions={{ headerShown: false, animation: 'fade' }} tabBar={(p) => <GlassBar {...(p as unknown as BarProps)} />}>
+    <Tabs screenOptions={{ headerShown: false, animation: 'fade', sceneStyle: { backgroundColor: C.bg } }} tabBar={(p) => <GlassBar {...(p as unknown as BarProps)} />}>
       <Tabs.Screen name="index" />
       <Tabs.Screen name="events" />
       <Tabs.Screen name="calendar" />
@@ -120,20 +140,16 @@ export function WebTabs() {
   );
 }
 
+// Sizes from the mockup: 18 from the sides, 26 from the bottom, 64 tall, radius 32, 6 of padding;
+// each tab 52 tall with a 22 icon, a 4 gap and a 10 pt label; the fade behind it is 112 tall.
 const st = StyleSheet.create({
-  wrap: { position: 'absolute', left: 0, right: 0, bottom: 14, alignItems: 'center', paddingHorizontal: 20 },
-  bar: { borderRadius: 36, padding: PAD, width: '100%', maxWidth: 420 },
-  row: { flexDirection: 'row' },
-  lens: {
-    position: 'absolute', left: 0, top: -2, bottom: -2, borderRadius: 30,
-    backgroundColor: IS_DARK ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.55)',
-    borderWidth: 1, borderColor: IS_DARK ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.95)',
-    shadowColor: '#0b3b66', shadowOpacity: 0.18, shadowRadius: 10, shadowOffset: { width: 0, height: 3 },
-    overflow: 'hidden',
-  },
-  lensShine: { position: 'absolute', left: 8, right: 8, top: 2, height: '42%', borderRadius: 20, backgroundColor: IS_DARK ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.6)' },
-  tab: { flex: 1, alignItems: 'center', paddingVertical: 8 },
-  text: { fontSize: 11, fontWeight: '700', color: C.ink },
-  badge: { position: 'absolute', top: -5, right: -10, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: '#E0445C', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, borderWidth: 2, borderColor: C.white },
-  badgeText: { color: C.white, fontSize: 10, fontWeight: '900' },
+  wrap: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 112, alignItems: 'center', justifyContent: 'flex-end', paddingHorizontal: 18, paddingBottom: 26 },
+  scrim: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 },
+  bar: { height: 64, borderRadius: R.tabBar, paddingHorizontal: 6, width: '100%', maxWidth: 420, justifyContent: 'center', ...SH.bar },
+  row: { flexDirection: 'row', height: TAB_H },
+  lens: { position: 'absolute', left: 0, top: 0, height: TAB_H, borderRadius: TAB_H / 2, backgroundColor: C.lens },
+  tab: { flex: 1, height: TAB_H, alignItems: 'center', justifyContent: 'center' },
+  text: { fontSize: 10, lineHeight: 10, fontWeight: '600' },
+  badge: { position: 'absolute', top: -6, right: -11, minWidth: 17, height: 17, borderRadius: 9, backgroundColor: C.orange, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, borderWidth: 1.5, borderColor: C.card },
+  badgeText: { color: C.onOrange, fontSize: 10, lineHeight: 12, fontWeight: '800' },
 });

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { C, R, T, F } from './theme';
+import { C, R, T, display, numeral } from './theme';
 import { Icon } from './icons';
 import { CHAPTER, dateLabel, open, upcoming, useShabbat, useStore } from './store';
 import { Button, Card, Cover, Field, IconTile } from './ui';
@@ -86,10 +86,10 @@ export function Chapter() {
 
       <GroupLabel text="Visit and reach us" />
       <View style={st.group}>
-        <GRow icon="pin" tile="#FF4D4F" title="Directions" sub={CHAPTER.address} onPress={() => open('https://maps.apple.com/?q=' + encodeURIComponent(CHAPTER.org + ', ' + CHAPTER.address))} chevron="right" first />
-        <GRow icon="phone" tile="#34C759" title="Call the Chabad house" value={CHAPTER.phone} onPress={() => open('tel:' + CHAPTER.phone.replace(/\D/g, ''))} />
-        <GRow icon="camera" tile="#E1306C" title="Instagram" value={CHAPTER.instagramHandle} onPress={() => open(CHAPTER.instagram)} />
-        <GRow icon="clock" tile="#5856D6" title="Shul schedule" sub="Shacharit, Mincha, Maariv" onPress={() => setShulOpen((o) => !o)} chevron={shulOpen ? 'down' : 'right'} />
+        <GRow icon="pin" title="Directions" sub={CHAPTER.address} onPress={() => open('https://maps.apple.com/?q=' + encodeURIComponent(CHAPTER.org + ', ' + CHAPTER.address))} chevron="right" first />
+        <GRow icon="phone" title="Call the Chabad house" value={CHAPTER.phone} onPress={() => open('tel:' + CHAPTER.phone.replace(/\D/g, ''))} />
+        <GRow icon="camera" title="Instagram" value={CHAPTER.instagramHandle} onPress={() => open(CHAPTER.instagram)} />
+        <GRow icon="clock" title="Shul schedule" sub="Shacharit, Mincha, Maariv" onPress={() => setShulOpen((o) => !o)} chevron={shulOpen ? 'down' : 'right'} />
         {shulOpen ? (
           <View style={st.shul}>
             {[...shul.weekday.map((r) => ({ ...r, day: 'Weekdays' })), ...shul.shabbat.map((r) => ({ ...r, day: 'Shabbat' }))].map((r, i) => {
@@ -117,10 +117,10 @@ export function Chapter() {
 
       <GroupLabel text="More" />
       <View style={st.group}>
-        <GRow icon="users" tile="#1877F2" title="Facebook" onPress={() => open(CHAPTER.facebook)} chevron="right" first />
-        <GRow icon="globe" tile={C.blue} title="CTeen portal" sub="International events, service hours" onPress={() => open(CHAPTER.portal)} chevron="right" />
-        <GRow icon="external" tile="#8E8E93" title="Chapter sign-up" onPress={() => open(CHAPTER.join)} chevron="right" />
-        <GRow icon="gift" tile={C.orange} title="Donate" onPress={() => open(CHAPTER.donate)} chevron="right" />
+        <GRow icon="users" title="Facebook" onPress={() => open(CHAPTER.facebook)} chevron="right" first />
+        <GRow icon="globe" title="CTeen portal" sub="International events, service hours" onPress={() => open(CHAPTER.portal)} chevron="right" />
+        <GRow icon="external" title="Chapter sign-up" onPress={() => open(CHAPTER.join)} chevron="right" />
+        <GRow icon="gift" title="Donate" onPress={() => open(CHAPTER.donate)} chevron="right" />
       </View>
 
       <Pressable onPress={() => setAdminOpen(true)} style={st.leaderLink} hitSlop={8} accessibilityRole="button">
@@ -136,7 +136,7 @@ function GroupLabel({ text }: { text: string }) {
 }
 
 // One row in a grouped list: a small colored icon square (like iOS Settings), title + subtitle, value or chevron.
-function GRow({ icon, tile, title, sub, value, onPress, chevron, first }: { icon?: string; tile?: string; title: string; sub?: string; value?: string; onPress?: () => void; chevron?: 'right' | 'down'; first?: boolean }) {
+function GRow({ title, sub, value, onPress, chevron, first }: { icon?: string; title: string; sub?: string; value?: string; onPress?: () => void; chevron?: 'right' | 'down'; first?: boolean }) {
   const body = (
     <>
       <View style={[st.gBody, !first && st.gRule]}>
@@ -150,14 +150,14 @@ function GRow({ icon, tile, title, sub, value, onPress, chevron, first }: { icon
     </>
   );
   if (!onPress) return <View style={st.gRow}>{body}</View>;
-  return <Pressable onPress={onPress} style={({ pressed }) => [st.gRow, pressed && { backgroundColor: C.bg }]} accessibilityRole="button">{body}</Pressable>;
+  return <Pressable onPress={onPress} style={({ pressed }) => [st.gRow, pressed && { backgroundColor: C.raised }]} accessibilityRole="button">{body}</Pressable>;
 }
 
 // A "Good to know" item: just the title until you tap it.
 function InfoRow({ icon, title, body, first }: { icon: string; title: string; body: string; first?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
-    <Pressable onPress={() => setOpen((o) => !o)} style={({ pressed }) => [st.gRow, { alignItems: 'flex-start' }, pressed && { backgroundColor: C.bg }]} accessibilityRole="button" accessibilityState={{ expanded: open }}>
+    <Pressable onPress={() => setOpen((o) => !o)} style={({ pressed }) => [st.gRow, { alignItems: 'flex-start' }, pressed && { backgroundColor: C.raised }]} accessibilityRole="button" accessibilityState={{ expanded: open }}>
       <View style={[st.gBody, !first && st.gRule, { alignItems: 'flex-start' }]}>
         <View style={{ flex: 1 }}>
           <Text style={st.gTitle}>{title}</Text>
@@ -165,16 +165,6 @@ function InfoRow({ icon, title, body, first }: { icon: string; title: string; bo
         </View>
         <View style={{ transform: [{ rotate: open ? '90deg' : '0deg' }], marginTop: 3 }}><Icon name="right" size={14} color={C.faint} stroke={2.4} /></View>
       </View>
-    </Pressable>
-  );
-}
-
-function MoreRow({ icon, title, url, first }: { icon: string; title: string; url: string; first?: boolean }) {
-  return (
-    <Pressable onPress={() => open(url)} style={({ pressed }) => [st.chInfoRow, { alignItems: 'center' }, !first && st.rule, pressed && { backgroundColor: C.bg }]} accessibilityRole="link">
-      <Icon name={icon} size={19} color={C.sub} stroke={2} />
-      <Text style={[st.chInfoTitle, { flex: 1 }]}>{title}</Text>
-      <Icon name="right" size={16} color={C.faint} stroke={2.4} />
     </Pressable>
   );
 }
@@ -222,72 +212,55 @@ function AskRabbi({ openSignal = 0 }: { openSignal?: number }) {
   );
 }
 
-function LinkRow({ icon, title, sub, url, first }: { icon: string; title: string; sub: string; url: string; first?: boolean }) {
-  return (
-    <Pressable onPress={() => open(url)} style={({ pressed }) => [st.linkRow, !first && st.rule, pressed && { backgroundColor: C.bg }]} accessibilityRole="link" accessibilityLabel={`${title}: ${sub}`}>
-      <IconTile icon={icon} size={40} />
-      <View style={{ flex: 1 }}>
-        <Text style={T.h3}>{title}</Text>
-        <Text style={T.small} numberOfLines={1}>{sub}</Text>
-      </View>
-      <Icon name="right" size={17} color={C.faint} stroke={2.4} />
-    </Pressable>
-  );
-}
-
 const st = StyleSheet.create({
   pageHead: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 2, marginBottom: 18 },
   pageLogo: { width: 31, height: 40 },
-  pageTitle: { fontSize: 27, fontFamily: F.display, color: C.ink, letterSpacing: -0.6 },
+  pageTitle: { ...display(32) },
   pageSub: { fontSize: 14, color: C.sub, marginTop: 1 },
-  shabCard: { borderRadius: 22, backgroundColor: C.card, padding: 18, shadowColor: '#0F1D2B', shadowOpacity: 0.06, shadowRadius: 16, shadowOffset: { width: 0, height: 6 } },
+  shabCard: { borderRadius: R.card, backgroundColor: C.card, padding: 18 },
   shabTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  shabEyebrow: { fontSize: 12, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase', color: C.orange },
-  shabWhen: { fontSize: 12, fontWeight: '800', color: C.orange, backgroundColor: C.orangePale, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 10, overflow: 'hidden' },
+  shabEyebrow: { ...T.eyebrow, color: C.orangeText },
+  shabWhen: { ...T.eyebrow, color: C.orangeText, backgroundColor: C.orangePale, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4, overflow: 'hidden' },
   shabMain: { flexDirection: 'row', alignItems: 'center', marginTop: 12 },
-  shabTitle: { fontSize: 22, fontFamily: F.display, color: C.ink, letterSpacing: -0.3 },
+  shabTitle: { ...display(24) },
   shabSub: { fontSize: 13, color: C.sub, marginTop: 2 },
-  shabTime: { fontSize: 26, fontFamily: F.display, color: C.ink, fontVariant: ['tabular-nums'] },
-  shabRow: { flexDirection: 'row', alignItems: 'center', marginTop: 16, paddingTop: 14, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line },
+  shabTime: { ...numeral(32, C.blue) },
+  shabRow: { flexDirection: 'row', alignItems: 'center', marginTop: 16, paddingTop: 14, borderTopWidth: 1, borderTopColor: C.line },
   shabCell: { flex: 1 },
   shabCellLabel: { fontSize: 12, color: C.sub, fontWeight: '600' },
   shabCellValue: { fontSize: 17, fontWeight: '800', color: C.ink, marginTop: 2, fontVariant: ['tabular-nums'] },
-  shabDivider: { width: StyleSheet.hairlineWidth, height: 32, backgroundColor: C.line, marginHorizontal: 14 },
-  rabbiCard: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12, padding: 14, borderRadius: 22, backgroundColor: C.card },
+  shabDivider: { width: 1, height: 32, backgroundColor: C.line, marginHorizontal: 14 },
+  rabbiCard: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12, padding: 14, borderRadius: R.card, backgroundColor: C.card },
   avatars: { flexDirection: 'row', width: 62 },
   avatar: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: C.card },
-  avatarText: { color: '#FFFFFF', fontSize: 15, fontWeight: '900' },
+  avatarText: { color: C.onBlue, fontSize: 15, fontWeight: '800' },
   avatar2: { marginLeft: -14 },
-  rabbiName: { fontSize: 16, fontWeight: '800', color: C.ink },
+  rabbiName: { ...T.h3 },
   rabbiSub: { fontSize: 13, color: C.sub, marginTop: 1 },
-  pillBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: C.bluePale, alignItems: 'center', justifyContent: 'center' },
-  pillAsk: { width: undefined, paddingHorizontal: 16, backgroundColor: C.blue },
-  pillAskText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
-  nextCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, paddingRight: 14, borderRadius: 18, backgroundColor: C.card },
-  nextImg: { width: 64, height: 64, borderRadius: 12 },
-  nextTitle: { fontSize: 16, fontWeight: '800', color: C.ink },
+  pillBtn: { width: 40, height: 40, borderRadius: R.btnSm, borderWidth: 1, borderColor: C.lineStrong, alignItems: 'center', justifyContent: 'center' },
+  pillAsk: { width: undefined, paddingHorizontal: 16, backgroundColor: C.blue, borderColor: C.blue },
+  pillAskText: { ...display(19, C.onBlue), letterSpacing: 1.1 },
+  nextCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, paddingRight: 14, borderRadius: R.card, backgroundColor: C.card },
+  nextImg: { width: 64, height: 64, borderRadius: R.print },
+  nextTitle: { ...T.h3 },
   gSub: { fontSize: 13, color: C.sub, marginTop: 1 },
-  group: { borderRadius: 18, backgroundColor: C.card, overflow: 'hidden' },
-  shul: { paddingHorizontal: 16, paddingBottom: 12, marginLeft: 16, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line, paddingLeft: 0, paddingTop: 6 },
+  group: { borderRadius: R.card, backgroundColor: C.card, overflow: 'hidden' },
+  shul: { paddingHorizontal: 16, paddingBottom: 12, marginLeft: 16, borderTopWidth: 1, borderTopColor: C.line, paddingLeft: 0, paddingTop: 6 },
   shulRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', paddingVertical: 6, gap: 10 },
   shulLabel: { flex: 1, fontSize: 14, color: C.ink },
   shulDay: { fontSize: 12, color: C.faint },
   shulTime: { fontSize: 14, color: C.ink, fontWeight: '700', fontVariant: ['tabular-nums'] },
   shulNote: { fontSize: 12, lineHeight: 17, color: C.sub, marginTop: 8 },
-  leaderLink: { flexDirection: 'row', alignItems: 'center', gap: 7, alignSelf: 'center', marginTop: 28, paddingHorizontal: 16, paddingVertical: 10, borderRadius: R.pill, backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
+  leaderLink: { flexDirection: 'row', alignItems: 'center', gap: 7, alignSelf: 'center', marginTop: 28, paddingHorizontal: 16, paddingVertical: 10, borderRadius: R.pill, borderWidth: 1, borderColor: C.lineStrong, minHeight: 44 },
   leaderText: { fontSize: 14, fontWeight: '700', color: C.ink },
   endNote: { textAlign: 'center', color: C.faint, fontSize: 13, marginTop: 14, lineHeight: 19 },
-  groupLabel: { fontSize: 13, fontWeight: '600', color: C.sub, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 28, marginBottom: 8, marginLeft: 16 },
+  groupLabel: { ...T.eyebrow, marginTop: 28, marginBottom: 8, marginLeft: 2 },
   gBody: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingRight: 14, minHeight: 52 },
-  gRule: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line },
-  gTitle: { fontSize: 16, color: C.ink },
-  gValue: { fontSize: 16, color: C.sub, fontVariant: ['tabular-nums'] },
+  gRule: { borderTopWidth: 1, borderTopColor: C.line },
+  gTitle: { fontSize: 16, fontWeight: '600', color: C.ink },
+  gValue: { fontSize: 15, fontWeight: '600', color: C.blue, fontVariant: ['tabular-nums'] },
   gRow: { flexDirection: 'row', alignItems: 'center', paddingLeft: 16 },
-  chInfoRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
-  rule: { borderTopWidth: 1, borderTopColor: C.line },
-  chInfoTitle: { fontSize: 15, fontWeight: '800', color: C.ink },
-  homeSection: { fontSize: 20, fontFamily: F.display, color: C.ink, letterSpacing: -0.3, marginTop: 32, marginBottom: 12 },
+  homeSection: { ...T.h2, marginTop: 28, marginBottom: 12 },
   askRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
-  err: { color: '#C0303F', fontWeight: '700', fontSize: 13, marginTop: 8, textAlign: 'center' },
-  linkRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12 },
+  err: { color: C.red, fontWeight: '700', fontSize: 13, marginTop: 8, textAlign: 'center' },
 });

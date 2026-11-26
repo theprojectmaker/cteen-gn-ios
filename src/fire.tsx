@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, Platform, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
-import { C, PREFS } from './theme';
+import { C, PREFS, R } from './theme';
 import { Icon } from './icons';
 
 // The streak flame is Apple's own SF Symbol (the one iOS uses), not a drawing:
@@ -48,7 +48,7 @@ export function Fire({ size = 48, lit, ignite, tint }: { size?: number; lit: boo
     }}>
       <SymbolView name="flame.fill" type="multicolor" size={size * 0.92} weight="regular"
         animationSpec={ignite ? { effect: { type: 'bounce', direction: 'up', wholeSymbol: true }, repeatCount: 2, speed: 0.8 } : undefined}
-        fallback={<Icon name="flame" size={size * 0.85} color="#FF6A1A" fill="#FF9A3C" stroke={1.6} />} />
+        fallback={<Icon name="flame" size={size * 0.85} color={C.orange} fill={C.orangeText} stroke={1.6} />} />
     </Animated.View>
   );
 }
@@ -56,10 +56,10 @@ export function Fire({ size = 48, lit, ignite, tint }: { size?: number; lit: boo
 // Small flame with the streak number (Home card).
 export function FireBadge({ lit, streak, size = 46 }: { lit: boolean; streak: number; size?: number }) {
   return (
-    <View style={[st.badge, { width: size, height: size, borderRadius: size * 0.3, backgroundColor: lit ? '#FFF1E6' : C.bg }]}>
+    <View style={[st.badge, { width: size, height: size, backgroundColor: lit ? C.orangePale : C.raised }]}>
       <Fire size={size * 0.72} lit={lit} />
       {streak > 0 ? (
-        <View style={[st.num, { backgroundColor: lit ? '#FF6A1A' : C.sub }]}>
+        <View style={[st.num, { backgroundColor: lit ? C.orange : C.sub }]}>
           <Text style={st.numText}>{streak}</Text>
         </View>
       ) : null}
@@ -68,7 +68,7 @@ export function FireBadge({ lit, streak, size = 46 }: { lit: boolean; streak: nu
 }
 
 const st = StyleSheet.create({
-  badge: { alignItems: 'center', justifyContent: 'center' },
+  badge: { alignItems: 'center', justifyContent: 'center', borderRadius: R.chip },
   num: { position: 'absolute', bottom: -4, right: -5, minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: C.card },
-  numText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900' },
+  numText: { color: C.onOrange, fontSize: 11, fontWeight: '800' },
 });

@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { C, T, F } from './theme';
+import { C, R, SP, T } from './theme';
 import { Icon } from './icons';
 import { calendarUrl, challengeFits, countdown, dateLabel, open, repeatLabel, upcoming, useStore, type EventItem } from './store';
-import { audienceLabel, Button, Card, Chips, Cover, Empty, EventCard, ScopeBadge, s as u } from './ui';
+import { audienceLabel, Button, Card, Chips, Empty, EventCard } from './ui';
+import { Label, Photo, PosterStage, eventPicture } from './look';
 import { NameGate } from './rewards';
 import { InviteCards } from './invites';
 
@@ -23,8 +24,8 @@ export function Events() {
       <Text style={T.h1}>Events</Text>
       <Text style={[T.small, { marginTop: 4, marginBottom: 14 }]}>{(() => { const all = upcoming(content.events).filter(fits); const gn = all.filter((e) => e.scope === 'gn').length; return all.length ? `${all.length} coming up${gn ? ` · ${gn} in Great Neck` : ''}` : "What's coming up in Great Neck and around CTeen"; })()}</Text>
       <InviteCards eventOnly />
-      <Chips options={EVENT_FILTERS} value={f} onChange={setF} />
-      <View style={{ gap: 26, marginTop: 18 }}>
+      <Chips tabs options={EVENT_FILTERS} value={f} onChange={setF} />
+      <View style={{ gap: 28, marginTop: 14 }}>
         {list.map((e) => <EventCard key={e.id} e={e} />)}
       </View>
       {f === 'All' && notForMe.length ? (
@@ -50,15 +51,14 @@ export function Events() {
 
 // Event details, shown in a slide-up sheet (app/event/[id].tsx).
 export function EventDetails({ e }: { e: EventItem }) {
+  const picture = eventPicture(e);
   return (
     <>
-      <View style={st.sheetImgWrap}>
-        <Cover e={e} style={u.fill} iconSize={96} />
-        {e.image ? <View style={[u.fill, { backgroundColor: 'rgba(19,32,44,0.32)' }]} /> : null}
-        <ScopeBadge scope={e.scope} style={{ position: 'absolute', left: 16, top: 16 }} />
-        <Text style={st.sheetTitle}>{e.title}</Text>
-      </View>
-      <View style={{ padding: 18, paddingBottom: 28 }}>
+      {/* the picture whole, with no text over it: a poster on its stage, a photograph edge to edge */}
+      {picture ? (picture.kind === 'poster' ? <PosterStage source={picture.source} maxHeight={440} radius={0} accessibilityLabel={e.title} /> : <Photo source={picture.source} radius={0} accessibilityLabel={e.title} />) : <View style={{ height: 52 }} />}
+      <View style={{ paddingHorizontal: SP.gutter, paddingTop: 18, paddingBottom: 28 }}>
+        <Label tone="blue">{e.scope === 'gn' ? 'Great Neck' : 'International'}</Label>
+        <Text style={[T.h1, { marginTop: 6, marginBottom: 16 }]}>{e.title}</Text>
         <Card style={{ padding: 0 }}>
           <Row icon="calendar" label="When" value={(repeatLabel(e) || dateLabel(e)) + (e.time ? ` · ${e.time}` : '')} first />
           {audienceLabel(e) ? <Row icon="users" label="For" value={audienceLabel(e)} /> : null}
@@ -121,8 +121,8 @@ function InAppSignup({ e }: { e: EventItem }) {
             disabled={busy}
             style={({ pressed }) => [st.rsvpBtn, mine && st.rsvpYes, pressed && { transform: [{ scale: 0.97 }] }]}
             accessibilityRole="button" accessibilityState={{ selected: mine }}>
-            <Icon name={mine ? 'tick' : 'check'} size={18} color={mine ? C.white : C.ink} stroke={2.4} />
-            <Text style={[st.rsvpText, mine && { color: C.white }]}>{busy && !mine ? 'Saving…' : 'Going'}</Text>
+            <Icon name={mine ? 'tick' : 'check'} size={18} color={mine ? C.onBlue : C.ink} stroke={2.4} />
+            <Text style={[st.rsvpText, mine && { color: C.onBlue }]}>{busy && !mine ? 'Saving…' : 'Going'}</Text>
           </Pressable>
           <Pressable
             onPress={() => { setDeclined(true); if (mine) run(false); }}
@@ -170,7 +170,7 @@ function Row({ icon, label, value, first }: { icon: string; label: string; value
     <View style={[st.row, !first && st.rule]}>
       <Icon name={icon} size={18} color={C.sub} />
       <Text style={[T.small, { fontSize: 14 }]}>{label}</Text>
-      <Text style={[T.h3, { fontSize: 14, flex: 1, textAlign: 'right' }]}>{value}</Text>
+      <Text style={[T.strong, { fontSize: 15, flex: 1, textAlign: 'right' }]}>{value}</Text>
     </View>
   );
 }
@@ -178,32 +178,30 @@ function Row({ icon, label, value, first }: { icon: string; label: string; value
 function Para({ title, body }: { title: string; body: string }) {
   return (
     <View style={{ marginTop: 20 }}>
-      <Text style={T.eyebrow}>{title}</Text>
+      <Label>{title}</Label>
       <Text style={[T.body, { marginTop: 6 }]}>{body}</Text>
     </View>
   );
 }
 
 const st = StyleSheet.create({
-  notApplicable: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 20, backgroundColor: C.card, borderWidth: 1, borderColor: C.line, opacity: 0.6 },
-  naIcon: { width: 42, height: 42, borderRadius: 12, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' },
-  naPill: { paddingHorizontal: 10, height: 26, borderRadius: 13, backgroundColor: C.bg, justifyContent: 'center' },
-  naText: { fontSize: 12, fontWeight: '800', color: C.sub },
-  sheetImgWrap: { aspectRatio: 16 / 9, backgroundColor: C.line, justifyContent: 'flex-end' },
-  sheetTitle: { position: 'absolute', left: 18, right: 18, bottom: 16, color: C.white, fontSize: 26, lineHeight: 30, fontFamily: F.display, letterSpacing: -0.3 },
-  rsvp: { padding: 16, borderRadius: 22, backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
+  notApplicable: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderTopWidth: 1, borderTopColor: C.line, opacity: 0.7 },
+  naIcon: { width: 42, height: 42, borderRadius: R.chip, borderWidth: 1, borderColor: C.lineStrong, alignItems: 'center', justifyContent: 'center' },
+  naPill: { paddingHorizontal: 10, height: 26, borderRadius: R.chip, borderWidth: 1, borderColor: C.lineStrong, justifyContent: 'center' },
+  naText: { fontSize: 12, fontWeight: '700', color: C.sub },
+  rsvp: { padding: 16, borderRadius: R.card, backgroundColor: C.card },
   rsvpHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  goingPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, height: 28, borderRadius: 14, backgroundColor: C.bluePale },
+  goingPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, height: 28, borderRadius: R.chip, backgroundColor: C.bluePale },
   goingPillText: { fontSize: 13, fontWeight: '800', color: C.blueDeep },
   rsvpRow: { flexDirection: 'row', gap: 10, marginTop: 14 },
-  rsvpBtn: { flex: 1, height: 50, borderRadius: 25, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: C.bg, borderWidth: 1, borderColor: C.line },
-  rsvpYes: { backgroundColor: C.green, borderColor: C.green },
+  rsvpBtn: { flex: 1, height: 50, borderRadius: R.btn, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: C.lineStrong },
+  rsvpYes: { backgroundColor: C.blue, borderColor: C.blue },
   rsvpText: { fontSize: 16, fontWeight: '800', color: C.ink },
   rsvpNo: { backgroundColor: C.inverse, borderColor: C.inverse },
   goingNames: { fontSize: 14, fontWeight: '700', color: C.ink, marginTop: 12 },
   rsvpNote: { fontSize: 13, color: C.sub, marginTop: 12, lineHeight: 18 },
-  err: { color: '#C0303F', fontWeight: '700', fontSize: 13, marginTop: 8, textAlign: 'center' },
-  intlNote: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.card, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: C.line },
+  err: { color: C.red, fontWeight: '700', fontSize: 13, marginTop: 8, textAlign: 'center' },
+  intlNote: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.card, borderRadius: R.card, padding: 14 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 14, paddingHorizontal: 16 },
   rule: { borderTopWidth: 1, borderTopColor: C.line },
 });

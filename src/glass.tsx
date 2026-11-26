@@ -1,7 +1,7 @@
 import React from 'react';
-import { Platform, View, type ViewStyle } from 'react-native';
+import { Platform, View, type StyleProp, type ViewStyle } from 'react-native';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
-import { IS_DARK } from './theme';
+import { C } from './theme';
 
 // True on iOS 26+ where the system Liquid Glass material exists.
 export const LIQUID = (() => {
@@ -12,28 +12,35 @@ export const LIQUID = (() => {
   }
 })();
 
-const webBlur = { backdropFilter: 'blur(22px) saturate(180%)', WebkitBackdropFilter: 'blur(22px) saturate(180%)' } as unknown as ViewStyle;
+const webBlur = (css: string) => ({ backdropFilter: css, WebkitBackdropFilter: css }) as unknown as ViewStyle;
 
-// A floating surface: real Liquid Glass where the system has it, a frosted
-// translucent panel everywhere else (older iOS, Android, web).
-export function Glass({ style, children, interactive }: { style?: ViewStyle | ViewStyle[]; children?: React.ReactNode; interactive?: boolean }) {
+// A floating surface: real Liquid Glass (dark) where the system has it. Everywhere else the
+// Flyer look's dark glass: a faint white film with a hairline edge, blurring what is behind it
+// in the browser, and nearly solid navy on phones that cannot blur.
+//   tone "glass" (default): the header bar and the round glass buttons.
+//   tone "bar": the darker glass of the tab bar.
+// It casts no shadow by itself (only the two floating bars add one, with SH.bar).
+export function Glass({ style, children, interactive, tone = 'glass' }: { style?: StyleProp<ViewStyle>; children?: React.ReactNode; interactive?: boolean; tone?: 'glass' | 'bar' }) {
   if (LIQUID) {
     return (
-      <GlassView glassEffectStyle="regular" colorScheme={IS_DARK ? 'dark' : 'light'} isInteractive={interactive} style={style}>
+      <GlassView glassEffectStyle="regular" colorScheme="dark" isInteractive={interactive} style={style}>
         {children}
       </GlassView>
     );
   }
-  return <View style={[style, fallback, Platform.OS === 'web' && webBlur]}>{children}</View>;
+  return <View style={[style, tone === 'bar' ? bar : glass]}>{children}</View>;
 }
 
-const fallback: ViewStyle = {
-  backgroundColor: IS_DARK ? (Platform.OS === 'web' ? 'rgba(21,31,43,0.72)' : 'rgba(21,31,43,0.94)') : Platform.OS === 'web' ? 'rgba(255,255,255,0.72)' : 'rgba(255,255,255,0.94)',
+const WEB = Platform.OS === 'web';
+const glass: ViewStyle = {
+  backgroundColor: WEB ? C.glass : C.glassSolid,
   borderWidth: 1,
-  borderColor: IS_DARK ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.7)',
-  shadowColor: '#13202C',
-  shadowOpacity: 0.12,
-  shadowRadius: 18,
-  shadowOffset: { width: 0, height: 6 },
-  elevation: 6,
+  borderColor: C.glassLine,
+  ...(WEB ? webBlur('blur(18px) saturate(160%)') : null),
+};
+const bar: ViewStyle = {
+  backgroundColor: WEB ? C.tabBar : C.glassSolid,
+  borderWidth: 1,
+  borderColor: C.tabBarLine,
+  ...(WEB ? webBlur('blur(20px)') : null),
 };

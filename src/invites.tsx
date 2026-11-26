@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { C, F } from './theme';
+import { C, R, T } from './theme';
 import { dateLabel, useStore, type Invite } from './store';
 import { scheduleInviteReminders } from './push';
 
@@ -36,11 +36,11 @@ function InviteCard({ v }: { v: Invite }) {
   return (
     <Pressable onPress={() => router.push(`/invite/${v.id}`)} style={({ pressed }) => [st.card, yes && st.cardYes, pressed && { opacity: 0.92 }]} accessibilityRole="button" accessibilityLabel={`Invitation: ${v.title}`}>
       <View style={{ flex: 1 }}>
-        <Text style={[st.kicker, yes && { color: C.green }]}>{yes ? "You're going" : 'Invitation'}</Text>
+        <Text style={[st.kicker, yes && { color: C.blue }]}>{yes ? "You're going" : 'Invitation'}</Text>
         <Text style={st.title} numberOfLines={2}>{yes ? v.title : `${firstName(name)}, you're invited`}</Text>
         <Text style={st.sub} numberOfLines={1}>{yes ? (ev ? `${dateLabel(ev)}${ev.time ? ' · ' + ev.time : ''}` : 'Tap for the details') : `${v.title}${ev ? ' · ' + dateLabel(ev) : ''}`}</Text>
       </View>
-      <Text style={[st.cta, yes && { color: C.green }]}>{yes ? 'More info' : 'Open'}</Text>
+      <Text style={[st.cta, yes && { color: C.blue }]}>{yes ? 'More info' : 'Open'}</Text>
     </Pressable>
   );
 }
@@ -73,10 +73,10 @@ export function InviteReminderSync() {
 }
 
 const st = StyleSheet.create({
-  card: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 16, borderRadius: 18, backgroundColor: C.card, borderLeftWidth: 4, borderLeftColor: C.orange },
-  cardYes: { borderLeftColor: C.green },
-  kicker: { fontSize: 11, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', color: C.orange },
-  title: { fontSize: 18, fontFamily: F.display, color: C.ink, marginTop: 3, letterSpacing: -0.2 },
-  sub: { fontSize: 13, color: C.sub, marginTop: 2 },
-  cta: { fontSize: 14, fontWeight: '800', color: C.orange },
+  card: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 16, borderRadius: R.card, backgroundColor: C.card, borderLeftWidth: 3, borderLeftColor: C.orange },
+  cardYes: { borderLeftColor: C.blue },
+  kicker: { ...T.eyebrow, color: C.orangeText },
+  title: { ...T.h3, marginTop: 4 },
+  sub: { fontSize: 13, color: C.sub, marginTop: 3 },
+  cta: { ...T.eyebrow, color: C.orangeText },
 });

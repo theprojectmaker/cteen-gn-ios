@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { Animated, Easing, Platform, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import { router } from 'expo-router';
-import { C, F, PREFS } from './theme';
+import { C, PREFS, numeral } from './theme';
 import { Icon } from './icons';
 import { doneThisPeriod, useStore } from './store';
 import { nyTime, wrapWindow, type WrapWindow } from './zmanim';
-import { Fire } from './fire';
+import { Band, Label } from './look';
 
 // Everything about "have you wrapped today, and how long is left": the live last-hour banner,
 // the countdown text, and a gentle pulse for things that want a tap.
@@ -44,7 +44,7 @@ export function leftText(ms: number) {
 }
 
 // A soft glow that breathes behind its child (off with Reduce motion).
-export function Pulse({ on, color = '#0BAFE6', radius = 22, children, style }: { on: boolean; color?: string; radius?: number; children: React.ReactNode; style?: ViewStyle }) {
+export function Pulse({ on, color = C.blue, radius = 11, children, style }: { on: boolean; color?: string; radius?: number; children: React.ReactNode; style?: ViewStyle }) {
   const a = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (!on || PREFS.reduceMotion) { a.stopAnimation(); a.setValue(0); return; }
@@ -69,31 +69,33 @@ export function Pulse({ on, color = '#0BAFE6', radius = 22, children, style }: {
   );
 }
 
-// The live banner in the last hour before sunset (Fridays: before candle lighting, then Shabbat).
+// The live banner in the last hour before sunset (Fridays: before candle lighting, then Shabbat):
+// a solid orange band with the countdown in big slanted numerals. Tap it to open the challenge.
 export function WrapBanner() {
   const w = useWrapStatus();
   if (!w || !w.lastHour) return null;
   const friday = !!w.win.friday;
   return (
-    <View style={{ marginBottom: 18 }}>
-      <Pressable onPress={() => router.push(`/challenge/${w.id}`)} style={({ pressed }) => [st.banner, friday && st.bannerFri, pressed && { opacity: 0.92 }]} accessibilityRole="button" accessibilityLiveRegion="polite"
+    <View style={st.wrap} accessibilityLiveRegion="polite">
+      <Band tone="orange" onPress={() => router.push(`/challenge/${w.id}`)}
         accessibilityLabel={`${friday ? 'Wrap tefillin before Shabbat' : 'Last hour to wrap tefillin'}, ${leftText(w.left)} left`}>
-        <View style={st.icon}><Fire size={28} lit={false} tint="#FFFFFF" /></View>
-        <View style={{ flex: 1 }}>
-          <Text style={st.title}>{friday ? 'Wrap before Shabbat' : 'Last hour to wrap'}</Text>
-          <Text style={st.sub}>{friday ? `Candle lighting at ${nyTime(w.win.set)}. Wrap, snap, then get ready for Shabbat.` : `Closes at sunset, ${nyTime(w.win.set)}. ${w.mine ? 'Snap your selfie now.' : 'Join and wrap today.'}`}</Text>
+        <View style={st.row}>
+          <Text style={st.timer}>{leftText(w.left)}</Text>
+          <View style={st.text}>
+            <Label tone="onOrange" size={13}>{friday ? 'Left to wrap before Shabbat' : 'Left to wrap today'}</Label>
+            <Text style={st.sub}>{friday ? `Candle lighting at ${nyTime(w.win.set)}. Wrap, snap, then get ready for Shabbat.` : `Closes at sunset, ${nyTime(w.win.set)}. ${w.mine ? 'Snap your selfie now.' : 'Join and wrap today.'}`}</Text>
+          </View>
+          <Icon name="right" size={18} color={C.onOrange} stroke={2.6} />
         </View>
-        <Text style={st.timer}>{leftText(w.left)}</Text>
-      </Pressable>
+      </Band>
     </View>
   );
 }
 
 const st = StyleSheet.create({
-  banner: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 22, backgroundColor: '#FF7A2F' },
-  bannerFri: { backgroundColor: '#5A3FA8' },
-  icon: { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 16, fontWeight: '900', color: '#FFFFFF' },
-  sub: { fontSize: 13, lineHeight: 17, color: 'rgba(255,255,255,0.9)', marginTop: 2 },
-  timer: { fontSize: 22, fontFamily: F.display, color: '#FFFFFF', fontVariant: ['tabular-nums'], minWidth: 64, textAlign: 'right' },
+  wrap: { marginBottom: 18 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  timer: { ...numeral(46, C.onOrange), minWidth: 104 },
+  text: { flex: 1 },
+  sub: { fontSize: 13, lineHeight: 17, fontWeight: '500', color: C.onOrange, marginTop: 3 },
 });

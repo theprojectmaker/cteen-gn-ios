@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { C, R, F } from './theme';
+import { C, R, T, display } from './theme';
 import { Icon } from './icons';
 import { tap, useStore, type Gender } from './store';
+import { Backdrop } from './look';
 
 // First-launch setup (required to use the app): one question per screen, big tap targets,
 // a progress bar, and a finish screen. Everything can be changed later from the account page.
@@ -15,33 +16,16 @@ function Progress({ step }: { step: number }) {
   return (
     <View style={st.progress} accessibilityLabel={`Step ${step} of ${STEPS}`}>
       {[...Array(STEPS)].map((_, i) => (
-        <View key={i} style={[st.seg, { backgroundColor: i < step ? C.blue : C.line }]} />
+        <View key={i} style={[st.seg, { backgroundColor: i < step ? C.blue : C.tick }]} />
       ))}
     </View>
-  );
-}
-
-function Choice({ label, sub, on, onPress, icon }: { label: string; sub?: string; on: boolean; onPress: () => void; icon?: string }) {
-  return (
-    <Pressable onPress={() => { tap(); onPress(); }} style={({ pressed }) => [st.choice, on && st.choiceOn, pressed && { transform: [{ scale: 0.985 }] }]} accessibilityRole="radio" accessibilityState={{ checked: on }} accessibilityLabel={label}>
-      {icon ? (
-        <View style={[st.choiceIcon, on && { backgroundColor: C.blue }]}>
-          <Icon name={icon} size={20} color={on ? C.white : C.blueDeep} stroke={2} />
-        </View>
-      ) : null}
-      <View style={{ flex: 1 }}>
-        <Text style={[st.choiceText, on && { color: C.blueDeep }]}>{label}</Text>
-        {sub ? <Text style={st.choiceSub}>{sub}</Text> : null}
-      </View>
-      <View style={[st.radio, on && st.radioOn]}>{on ? <Icon name="tick" size={13} color={C.white} stroke={3} /> : null}</View>
-    </Pressable>
   );
 }
 
 function Pill({ label, on, onPress }: { label: string; on: boolean; onPress: () => void }) {
   return (
     <Pressable onPress={() => { tap(); onPress(); }} style={[st.pill, on && st.pillOn]} accessibilityRole="radio" accessibilityState={{ checked: on }} accessibilityLabel={label}>
-      <Text style={[st.pillText, on && { color: C.white }]}>{label}</Text>
+      <Text style={[st.pillText, on && { color: C.night }]}>{label}</Text>
     </Pressable>
   );
 }
@@ -96,6 +80,7 @@ export function Setup() {
     return (
       <Modal visible animationType="fade" onRequestClose={() => {}} statusBarTranslucent>
         <View style={[st.welcome, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 20 }]}>
+          <Backdrop />
           <Animated.View style={[st.photos, { opacity: fade }]}>
             <Image source={require('../assets/welcome/UDxu12904575.jpg')} style={[st.ph, st.phTall]} resizeMode="cover" accessibilityLabel="CTeen Great Neck teens" />
             <View style={st.phCol}>
@@ -176,7 +161,7 @@ export function Setup() {
         <View style={st.seg2}>
           {(['boy', 'girl'] as const).map((g) => (
             <Pressable key={g} onPress={() => { tap(); setGender(g); }} style={[st.segBtn, gender === g && st.segOn]} accessibilityRole="radio" accessibilityState={{ checked: gender === g }}>
-              <Text style={[st.choiceText, gender === g && { color: C.blueDeep }]}>{g === 'boy' ? 'Boy' : 'Girl'}</Text>
+              <Text style={[st.choiceText, gender === g && { color: C.night }]}>{g === 'boy' ? 'Boy' : 'Girl'}</Text>
             </Pressable>
           ))}
         </View>
@@ -202,7 +187,7 @@ export function Setup() {
             </View>
           ))}
         </View>
-        {push === 'on' ? <Text style={[st.qSub, { color: C.green, fontWeight: '700' }]}>Notifications are on.</Text> : null}
+        {push === 'on' ? <Text style={[st.qSub, { color: C.blue, fontWeight: '700' }]}>Notifications are on.</Text> : null}
         {push === 'unsupported' ? <Text style={[st.qSub, { fontSize: 13 }]}>Notifications work in the app on your phone.</Text> : null}
       </>
     );
@@ -226,6 +211,7 @@ export function Setup() {
   return (
     <Modal visible animationType="fade" onRequestClose={() => step > 1 && step < 3 && go(step - 1)}>
       <KeyboardAvoidingView behavior={undefined} style={{ flex: 1, backgroundColor: C.bg }}>
+        <Backdrop />
         <View style={[st.top, { paddingTop: insets.top + 10 }]}>
           <Pressable onPress={() => go(step - 1)} hitSlop={10} style={st.back} accessibilityRole="button" accessibilityLabel="Back" disabled={step >= 3}>
             {step < 3 ? <Icon name="right" size={20} color={C.ink} stroke={2.4} /> : null}
@@ -257,72 +243,49 @@ const st = StyleSheet.create({
   welcome: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 20 },
   photos: { flexDirection: 'row', justifyContent: 'space-between', height: 400, width: '100%', maxWidth: 560, alignSelf: 'center' },
   phCol: { width: '48.5%', height: '100%', justifyContent: 'space-between' },
-  ph: { borderRadius: 22, backgroundColor: C.line },
+  ph: { borderRadius: R.photo, backgroundColor: C.card },
   phTall: { width: '48.5%', height: '100%' },
   phHalf: { width: '100%', height: '48.8%' },
   welcomeText: { marginTop: 26, width: '100%', maxWidth: 560, alignSelf: 'center' },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   brandLogo: { width: 36, height: 46 },
-  brandName: { fontSize: 32, fontFamily: F.display, color: C.ink, letterSpacing: -0.8 },
+  brandName: { ...display(38), flexShrink: 1 },
   welcomeLine: { fontSize: 17, lineHeight: 24, color: C.sub, marginTop: 10 },
   welcomeButtons: { marginTop: 'auto', paddingTop: 24, width: '100%', maxWidth: 560, alignSelf: 'center', gap: 10 },
-  nameBtn: { minHeight: 56, borderRadius: R.pill, backgroundColor: C.blue, alignItems: 'center', justifyContent: 'center' },
-  nameBtnText: { color: C.white, fontSize: 18, fontWeight: '800' },
+  nameBtn: { minHeight: 56, borderRadius: R.btn, backgroundColor: C.blue, alignItems: 'center', justifyContent: 'center' },
+  nameBtnText: { ...display(23, C.onBlue), letterSpacing: 1.1 },
   signInLink: { color: C.blueDeep, fontSize: 15, fontWeight: '700' },
-  hero: { flex: 1, backgroundColor: '#1186c8', paddingHorizontal: 28, justifyContent: 'space-between', overflow: 'hidden' },
-  blob: { position: 'absolute', width: 380, height: 380, borderRadius: 190, opacity: 0.45 },
-  heroInner: { marginTop: 24, maxWidth: 480, width: '100%', alignSelf: 'center' },
-  heroIcon: { width: 76, height: 76, borderRadius: 18, borderWidth: 2, borderColor: 'rgba(255,255,255,0.6)' },
-  heroEyebrow: { color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: '800', letterSpacing: 2, marginTop: 28 },
-  heroTitle: { color: C.white, fontSize: 40, lineHeight: 44, fontFamily: F.display, letterSpacing: -1, marginTop: 10 },
-  feature: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  featureIcon: { width: 40, height: 40, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
-  featureText: { flex: 1, color: C.white, fontSize: 16, fontWeight: '700' },
-  heroBottom: { alignItems: 'center', maxWidth: 480, width: '100%', alignSelf: 'center' },
-  heroBtn: { width: '100%', minHeight: 56, borderRadius: R.pill, backgroundColor: C.white, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
-  appleBtn: { width: '100%', minHeight: 56, borderRadius: R.pill, backgroundColor: '#000', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  appleLogo: { color: '#fff', fontSize: 22, marginTop: -3 },
-  appleText: { color: '#fff', fontSize: 18, fontWeight: '800' },
-  heroBtnText: { color: C.blueDeep, fontSize: 18, fontFamily: F.display },
-  heroLink: { color: C.white, fontSize: 15, fontWeight: '700', textDecorationLine: 'underline' },
+  appleBtn: { width: '100%', minHeight: 56, borderRadius: R.btn, backgroundColor: C.white, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  appleLogo: { color: C.black, fontSize: 22, marginTop: -3 },
+  appleText: { color: C.black, fontSize: 19, fontWeight: '600' },
   top: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingBottom: 6, maxWidth: 600, width: '100%', alignSelf: 'center' },
   back: { width: 44, height: 36, justifyContent: 'center', transform: [{ scaleX: -1 }] },
   progress: { flex: 1, flexDirection: 'row', gap: 6 },
-  seg: { flex: 1, height: 5, borderRadius: 3 },
-  skip: { color: C.sub, fontSize: 15, fontWeight: '700' },
+  seg: { flex: 1, height: 7, borderRadius: 1, transform: [{ skewX: '-16deg' }] },
+  skip: { color: C.sub, fontSize: 14, fontWeight: '600' },
   scroll: { paddingHorizontal: 24, paddingTop: 22, paddingBottom: 30, maxWidth: 600, width: '100%', alignSelf: 'center' },
-  q: { fontSize: 32, lineHeight: 37, fontFamily: F.display, color: C.ink, letterSpacing: -0.7 },
+  q: { ...T.h1 },
   qSub: { fontSize: 16, lineHeight: 23, color: C.sub, marginTop: 10 },
-  label: { fontSize: 13, fontWeight: '800', color: C.sub, letterSpacing: 0.6, textTransform: 'uppercase', marginTop: 30, marginBottom: 12 },
-  bigInput: { marginTop: 30, fontSize: 30, fontWeight: '800', color: C.ink, borderBottomWidth: 2, borderBottomColor: C.blue, paddingVertical: 10, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null) },
-  choice: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: C.card, borderRadius: 18, paddingHorizontal: 16, minHeight: 58, borderWidth: 2, borderColor: 'transparent' },
-  choiceOn: { borderColor: C.blue, backgroundColor: C.bluePale },
-  choiceIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: C.bluePale, alignItems: 'center', justifyContent: 'center' },
-  choiceText: { fontSize: 17, fontWeight: '800', color: C.ink },
-  choiceSub: { fontSize: 13, color: C.sub, marginTop: 2 },
-  radio: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: C.line, alignItems: 'center', justifyContent: 'center' },
-  radioOn: { backgroundColor: C.blue, borderColor: C.blue },
+  label: { ...T.eyebrow, marginTop: 28, marginBottom: 11 },
+  choiceText: { fontSize: 17, fontWeight: '600', color: C.ink },
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  pill: { minWidth: 62, height: 48, paddingHorizontal: 16, borderRadius: 16, backgroundColor: C.card, alignItems: 'center', justifyContent: 'center' },
-  pillOn: { backgroundColor: C.blue },
-  pillText: { fontSize: 17, fontWeight: '800', color: C.ink },
+  pill: { minWidth: 62, height: 48, paddingHorizontal: 16, borderRadius: R.chip, borderWidth: 1, borderColor: C.lineStrong, alignItems: 'center', justifyContent: 'center' },
+  pillOn: { backgroundColor: C.paper, borderColor: C.paper },
+  pillText: { fontSize: 17, fontWeight: '600', color: C.ink },
   appleNote: { fontSize: 13, lineHeight: 18, color: C.sub, textAlign: 'center', marginTop: 2, marginBottom: 6, paddingHorizontal: 12 },
   seg2: { flexDirection: 'row', gap: 10 },
-  segBtn: { flex: 1, height: 52, borderRadius: 16, backgroundColor: C.card, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'transparent' },
-  segOn: { borderColor: C.blue, backgroundColor: C.bluePale },
-  nameInput: { marginTop: 22, fontSize: 22, fontWeight: '700', color: C.ink, backgroundColor: C.card, borderRadius: 16, paddingHorizontal: 16, height: 56, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null) },
+  segBtn: { flex: 1, height: 52, borderRadius: R.chip, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.lineStrong },
+  segOn: { borderColor: C.paper, backgroundColor: C.paper },
+  nameInput: { marginTop: 22, fontSize: 20, fontWeight: '600', color: C.ink, backgroundColor: C.card, borderRadius: R.input, borderWidth: 1, borderColor: C.lineStrong, paddingHorizontal: 16, height: 56, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null) },
   synced: { fontSize: 13, color: C.sub, marginTop: 8 },
-  perk: { flexDirection: 'row', gap: 12, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.line },
+  perk: { flexDirection: 'row', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.line },
   perkTitle: { fontSize: 16, fontWeight: '700', color: C.ink },
   perkSub: { fontSize: 14, color: C.sub, marginTop: 2, lineHeight: 19 },
-  privacy: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', marginTop: 24, backgroundColor: C.card, borderRadius: 16, padding: 14 },
-  privacyText: { flex: 1, fontSize: 13, lineHeight: 19, color: C.sub },
-  bellWrap: { width: 120, height: 120, borderRadius: 40, backgroundColor: C.blue, alignItems: 'center', justifyContent: 'center' },
   summary: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginTop: 24, marginBottom: 16 },
-  tag: { backgroundColor: C.card, borderRadius: R.pill, paddingHorizontal: 14, paddingVertical: 8 },
-  tagText: { fontSize: 14, fontWeight: '800', color: C.ink },
+  tag: { borderRadius: R.chip, borderWidth: 1, borderColor: C.lineStrong, paddingHorizontal: 14, paddingVertical: 8 },
+  tagText: { fontSize: 14, fontWeight: '600', color: C.ink },
   footer: { paddingHorizontal: 24, paddingTop: 10, maxWidth: 600, width: '100%', alignSelf: 'center' },
-  cta: { minHeight: 56, borderRadius: R.pill, backgroundColor: C.blue, alignItems: 'center', justifyContent: 'center' },
-  ctaText: { color: C.white, fontSize: 18, fontFamily: F.display },
-  err: { color: '#C0303F', fontWeight: '700', fontSize: 14, marginTop: 14, textAlign: 'center' },
+  cta: { minHeight: 56, borderRadius: R.btn, backgroundColor: C.blue, alignItems: 'center', justifyContent: 'center' },
+  ctaText: { ...display(23, C.onBlue), letterSpacing: 1.1 },
+  err: { color: C.red, fontWeight: '700', fontSize: 14, marginTop: 14, textAlign: 'center' },
 });

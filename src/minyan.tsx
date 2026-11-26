@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { C, F } from './theme';
+import { C, R, T, display } from './theme';
 import { Icon } from './icons';
 import { CHAPTER, open, useShabbat, useStore, type Minyan, type MinyanRow } from './store';
 
@@ -56,7 +56,7 @@ export function MinyanCard() {
     <View>
       {teen ? (
         <View style={st.teen}>
-          <View style={st.teenIcon}><Icon name="book" size={24} color="#FFFFFF" stroke={2} /></View>
+          <View style={st.teenIcon}><Icon name="book" size={24} color={C.blue} stroke={2} /></View>
           <View style={{ flex: 1 }}>
             <Text style={st.teenEyebrow}>{teenDay}{shab?.parsha && teenDay === 'Shabbat morning' ? ` · ${shab.parsha}` : ''}</Text>
             <Text style={st.teenTitle}>{teen.label}</Text>
@@ -112,7 +112,7 @@ function Section({ title, rows, sh, top }: { title: string; rows: MinyanRow[]; s
           <View key={r.label + i} style={st.row}>
             <Text style={st.label}>{r.label}</Text>
             <View style={{ alignItems: 'flex-end', flexShrink: 1 }}>
-              <Text style={[st.time, !t && st.timeMissing]}>{t ? t.time : 'Call for times'}</Text>
+              <Text style={t ? st.time : st.timeMissing}>{t ? t.time : 'Call for times'}</Text>
               {t?.sub ? <Text style={st.sub}>{t.sub}</Text> : null}
             </View>
           </View>
@@ -123,28 +123,28 @@ function Section({ title, rows, sh, top }: { title: string; rows: MinyanRow[]; s
 }
 
 const st = StyleSheet.create({
-  teen: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 18, borderRadius: 24, backgroundColor: C.blue },
-  teenIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
-  teenEyebrow: { fontSize: 12, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase', color: 'rgba(255,255,255,0.85)' },
-  teenTitle: { fontSize: 20, fontFamily: F.display, color: '#FFFFFF', marginTop: 2 },
-  teenWhere: { fontSize: 13, color: 'rgba(255,255,255,0.85)', marginTop: 1 },
-  teenTime: { fontSize: 24, fontFamily: F.display, color: '#FFFFFF' },
-  special: { padding: 16, borderRadius: 22, backgroundColor: C.orangePale, borderWidth: 1, borderColor: C.orange },
-  specialEyebrow: { fontSize: 12, fontWeight: '800', letterSpacing: 0.6, color: C.orangeDeep, marginBottom: 6 },
+  teen: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderRadius: R.card, backgroundColor: C.card },
+  teenIcon: { width: 48, height: 48, borderRadius: R.chip, borderWidth: 1, borderColor: C.lineStrong, alignItems: 'center', justifyContent: 'center' },
+  teenEyebrow: { ...T.eyebrow },
+  teenTitle: { ...T.h3, marginTop: 2 },
+  teenWhere: { fontSize: 13, color: C.sub, marginTop: 1 },
+  teenTime: { ...display(26, C.blue) },
+  special: { padding: 16, borderRadius: R.card, backgroundColor: C.card },
+  specialEyebrow: { ...T.eyebrow, color: C.orangeText, marginBottom: 6 },
   specialRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingVertical: 4 },
-  specialLabel: { fontSize: 15, fontWeight: '700', color: C.ink, flex: 1 },
-  specialTime: { fontSize: 15, fontFamily: F.display, color: C.ink, textAlign: 'right' },
+  specialLabel: { fontSize: 15, fontWeight: '600', color: C.ink, flex: 1 },
+  specialTime: { ...display(20), textAlign: 'right' },
   moreRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  moreText: { fontSize: 15, fontWeight: '800', color: C.blue },
-  card: { padding: 16, borderRadius: 22, backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
-  section: { fontSize: 12, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', color: C.sub, marginBottom: 4 },
+  moreText: { ...T.eyebrow, color: C.blue },
+  card: { padding: 16, borderRadius: R.card, backgroundColor: C.card },
+  section: { ...T.eyebrow, marginBottom: 4 },
   sectionTop: { marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: C.line },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingVertical: 8 },
-  label: { fontSize: 15, fontWeight: '700', color: C.ink, flex: 1 },
-  time: { fontSize: 15, fontFamily: F.display, color: C.ink, textAlign: 'right' },
-  timeMissing: { fontFamily: undefined, fontWeight: '600', color: C.faint, fontSize: 14 },
+  label: { fontSize: 15, fontWeight: '600', color: C.ink, flex: 1 },
+  time: { ...display(20), textAlign: 'right' },
+  timeMissing: { fontSize: 14, fontWeight: '600', color: C.faint, textAlign: 'right' },
   sub: { fontSize: 11, color: C.faint, marginTop: 1 },
   note: { fontSize: 13, lineHeight: 18, color: C.sub, marginTop: 12 },
   call: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12 },
-  callText: { fontSize: 14, fontWeight: '800', color: C.blue },
+  callText: { fontSize: 14, fontWeight: '700', color: C.blue },
 });

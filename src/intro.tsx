@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Image, Platform, Pressable, StyleSheet, View } from 'react-native';
-import { C, PREFS } from './theme';
+import { C, F, PREFS } from './theme';
 
 // Opening animation (about 2 seconds, tap to skip). Plain background like a real launch screen:
 // the CTeen logo settles in, GREAT NECK rises in letter by letter over a line that draws itself,
@@ -83,11 +83,11 @@ export function Intro({ onDone }: { onDone?: () => void }) {
 }
 
 const st = StyleSheet.create({
-  root: { backgroundColor: C.card, zIndex: 1000, overflow: 'hidden' },
+  root: { backgroundColor: C.bg, zIndex: 1000, overflow: 'hidden' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   logoWrap: { width: 180, height: 190, alignItems: 'center', justifyContent: 'center' },
   logo: { width: 93, height: 120 },
   word: { flexDirection: 'row', marginTop: 18 },
-  letter: { color: C.blue, fontSize: 20, fontWeight: '900', letterSpacing: 5 },
-  line: { width: 120, height: 3, borderRadius: 2, backgroundColor: C.blue, opacity: 0.25, marginTop: 14 },
+  letter: { color: C.ink, fontSize: 30, lineHeight: 32, fontFamily: F.display, letterSpacing: 3 },
+  line: { width: 150, height: 5, borderRadius: 1, backgroundColor: C.orange, marginTop: 12, transform: [{ skewX: '-16deg' }] },
 });
