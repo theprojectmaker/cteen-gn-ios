@@ -79,7 +79,8 @@ export function Home() {
         </>
       ) : null}
       <OnTheMenu />
-      <FromRabbi afterBand={!!main} />
+      <WeeklyEvents afterBand={!!main} />
+      <FromRabbi afterBand={false} />
       <ShabbatBand />
     </>
   );
@@ -184,7 +185,7 @@ function EventPage({ e, tag, now, width, height }: { e: EventItem; tag: string; 
   let box: { w: number; h: number } | null = null;
   if (zone.w > 0) {
     const r = picture ? ratio : 0.77;
-    const w = Math.max(60, Math.min(zone.w - 24, (zone.h - 20) * r, picture ? 9999 : 230));
+    const w = Math.max(60, Math.min(zone.w, zone.h * r, picture ? 9999 : 230));
     box = { w: Math.round(w), h: Math.round(w / r) };
   }
   const open = () => openEvent(e.id);
@@ -456,6 +457,30 @@ const FromRabbi = React.memo(function FromRabbi({ afterBand }: { afterBand?: boo
   );
 });
 
+// Every event that repeats weekly, one row each: the weekday, the title, when and where, and the RSVP chip.
+const WeeklyEvents = React.memo(function WeeklyEvents({ afterBand }: { afterBand?: boolean }) {
+  const { content, fits, going, openEvent } = useStore();
+  const now = useNow();
+  const list = upcoming(content.events).filter((e) => e.repeat === 'weekly' && fits(e));
+  if (!list.length) return null;
+  return (
+    <>
+      <SectionHead title="Weekly events" top={afterBand ? 20 : SP.section} />
+      {list.map((e, i) => {
+        const { day, time } = dayAndTime(e, now);
+        const every = day.split(' ').map((w) => w.charAt(0) + w.slice(1).toLowerCase()).join(' '); // "Every Sunday"
+        const meta = [every, time, e.place].filter(Boolean).join(' · ');
+        const mine = going.includes(e.id);
+        return (
+          <Row key={e.id} title={e.title} meta={meta} metaLines={2} date={e.start} last={i === list.length - 1} onPress={() => openEvent(e.id)}
+            accessibilityLabel={`${e.title}, ${meta}`}
+            right={e.signup !== 'app' ? undefined : mine ? <Slab size="chip" kind="outline" icon="tick" label="In" /> : <Slab size="chip" kind="paper" label="RSVP" onPress={() => openEvent(e.id)} accessibilityLabel={`RSVP to ${e.title}`} />} />
+        );
+      })}
+    </>
+  );
+});
+
 // This Shabbat in Great Neck: candle lighting and when it ends, side by side, then the Teen Minyan.
 const ShabbatBand = React.memo(function ShabbatBand() {
   const sh = useShabbat();
@@ -493,16 +518,16 @@ const st = StyleSheet.create({
   bars: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   bar: { width: 10, height: 6, borderRadius: 1.5, backgroundColor: C.tick, transform: [{ skewX: '-16deg' }] },
   barOn: { width: 18, backgroundColor: C.sub },
-  markNum: { fontFamily: F.bold, fontSize: 11, lineHeight: 14, letterSpacing: 1.8, color: C.faint, minWidth: 24 },
+  markNum: { fontFamily: F.bold, fontSize: 11, lineHeight: 14, letterSpacing: 1.8, color: C.faint, textAlign: 'right', marginRight: -1.8 },
   // a flyer
-  page: { paddingHorizontal: SP.gutter, paddingTop: 12 },
-  tag: { marginTop: 2, marginLeft: 6, alignSelf: 'flex-start' },
-  title: { marginTop: 4 },
+  page: { paddingHorizontal: SP.gutter, paddingTop: 8 },
+  tag: { marginTop: 4, alignSelf: 'flex-start' },
+  title: { marginTop: 0 },
   line: { fontSize: 15, lineHeight: 20, fontWeight: '500', color: C.sub, marginTop: 6 },
   small: { marginTop: 7 },
-  btn: { marginTop: 18, marginBottom: 8 },
-  zone: { flex: 1, marginTop: 14, marginBottom: 18, alignItems: 'center', justifyContent: 'center' },
-  print: { borderRadius: R.print, backgroundColor: C.card, transform: [{ rotate: '-1.6deg' }] },
+  btn: { marginTop: 20, marginBottom: 0 },
+  zone: { flex: 1, marginTop: 20, marginBottom: 20, alignItems: 'flex-start', justifyContent: 'center' },
+  print: { borderRadius: R.print, backgroundColor: C.card },
   printClip: { flex: 1, borderRadius: R.print, overflow: 'hidden' },
   printImg: { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' },
   printEdge: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, borderRadius: R.print, borderWidth: 1, borderColor: C.printEdge },
@@ -513,7 +538,7 @@ const st = StyleSheet.create({
   emptyPage: { justifyContent: 'center', paddingBottom: 40 },
   emptyText: { ...T.body, color: C.sub, marginTop: 14 },
   emptyBtn: { marginTop: 22, alignSelf: 'flex-start' },
-  more: { height: HINT_ROW, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  more: { height: HINT_ROW, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', paddingLeft: 1 },
   moreIcon: { transform: [{ rotate: '90deg' }] },
   dim: { opacity: 0.5 },
   // the scoreboard
