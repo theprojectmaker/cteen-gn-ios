@@ -176,7 +176,7 @@ function HeaderButtons() {
             }]} />
           ) : null}
           <View style={st.chip}>
-            <Icon name={mine ? 'fire' : challengeIcon(main)} size={16} color={C.orangeText} stroke={2.2} />
+            <Icon name={challengeIcon(main)} size={17} color={C.orangeText} stroke={2.1} />
             <Text style={st.chipText}>{mine ? streak(main, checks) : 'Join'}</Text>
           </View>
         </Pressable>
