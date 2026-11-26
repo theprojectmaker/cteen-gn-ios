@@ -18,19 +18,48 @@ const doneLabel = (ch: Challenge) => (ch.every === 'day' ? 'Done for today' : 'D
 const unit = (ch: Challenge, n: number) => (ch.every === 'day' ? `day${n === 1 ? '' : 's'}` : `week${n === 1 ? '' : 's'}`);
 
 
-// Home card for a live challenge: one clear line and one clear button.
-export function ChallengeBanner({ ch }: { ch: Challenge }) {
+// SNAP on Home goes straight to the camera: it opens the challenge page and asks it to start its
+// own photo check-in (there is one check-in flow, and it lives on that page). The ask is only good
+// for a few seconds and for that one challenge.
+let snapAsk: { id: string; at: number } | null = null;
+function takeSnapAsk(id: string) {
+  const hit = !!snapAsk && snapAsk.id === id && Math.abs(Date.now() - snapAsk.at) < 5000;
+  if (hit) snapAsk = null;
+  return hit;
+}
+
+// Everything a challenge needs to say about itself right now, worked out in one place. The card
+// on the challenges list (ChallengeBanner) and the scoreboard on Home both draw from this.
+export function useChallengeCard(ch: Challenge) {
   const { checks, joined, openChallenge, counts } = useStore();
   const w = useWrapStatus();
-  const wrapNow = ch.id === 'tefillin' && !!w && w.needed;
-  const hue = HUES[ch.color] ?? HUES.blue;
+  const timed = ch.id === 'tefillin'; // sunrise to sunset, not on Shabbat
+  const wrapNow = timed && !!w && w.needed;
   const mine = joined.includes(ch.id);
   const done = doneThisPeriod(ch, checks);
   const fire = streak(ch, checks);
+  const count = counts[ch.id] ?? 0;
   const line = wrapNow && w ? (w.lastHour ? `Only ${leftText(w.left)} left to wrap today` : `${leftText(w.left)} left to wrap today`) : !mine ? 'Tap to join. Win the backpack.' : done ? `${fire} ${unit(ch, fire)} in a row. See you tomorrow.` : fire > 0 ? `${fire} ${unit(ch, fire)} in a row. Keep it alive.` : 'Start your streak today.';
   const action = !mine ? 'Join' : done ? 'Done' : ch.photo ? 'Snap' : 'Check in';
+  // Can today's check-in be done this minute? (Joined, not done yet, and inside the wrap window.)
+  const canCheck = mine && !done && (!timed || !w || w.win.state === 'open');
+  return {
+    mine, done, fire, count, line, action, timed, wrapNow, canCheck,
+    /** the wrap window (only for the Tefillin Challenge): open, before sunrise, after sunset, Shabbat */
+    wrap: timed ? w : null,
+    /** the last prize on the list: what finishing wins */
+    prize: ch.rewards.length ? ch.rewards[ch.rewards.length - 1].prize : '',
+    open: () => openChallenge(ch.id),
+    /** open the page and start today's check-in there (the camera, for a photo challenge) */
+    snap: () => { if (canCheck) snapAsk = { id: ch.id, at: Date.now() }; openChallenge(ch.id); },
+  };
+}
+
+// The card for a live challenge on the challenges list: one clear line and one clear button.
+export function ChallengeBanner({ ch }: { ch: Challenge }) {
+  const { mine, done, fire, count, line, action, open } = useChallengeCard(ch);
   return (
-    <Card style={st.bannerCard} onPress={() => openChallenge(ch.id)} label={`${ch.title}. ${line}`}>
+    <Card style={st.bannerCard} onPress={open} label={`${ch.title}. ${line}`}>
       <View style={st.banner}>
       {ch.id === 'tefillin' ? <FireBadge lit={done} streak={fire} size={50} /> : <IconTile icon={challengeIcon(ch)} color={ch.color} size={52} solid />}
       <View style={{ flex: 1 }}>
@@ -44,9 +73,9 @@ export function ChallengeBanner({ ch }: { ch: Challenge }) {
       </View>
       {mine ? (
         <View style={st.bannerFoot}>
-          <Ticks total={ch.goal} done={counts[ch.id] ?? 0} pending={!done} height={10} />
+          <Ticks total={ch.goal} done={count} pending={!done} height={10} />
           <View style={st.bannerFootRow}>
-            <Text style={st.bannerFootText}>{counts[ch.id] ?? 0} of {ch.goal} {unit(ch, ch.goal)}</Text>
+            <Text style={st.bannerFootText}>{count} of {ch.goal} {unit(ch, ch.goal)}</Text>
             {ch.rewards.length ? <Text style={st.bannerFootText} numberOfLines={1}>{ch.rewards[ch.rewards.length - 1].prize}</Text> : null}
           </View>
         </View>
@@ -212,6 +241,18 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
     setNote(r.already ? 'You already posted today.' : null);
     setReload((k) => k + 1);
   };
+
+  // Came here from SNAP on Home: start the same check-in as the big button below, once the page
+  // has slid in. (Only when today's check-in is really open; otherwise the page just opens.)
+  const startCheck = useRef(doCheck);
+  startCheck.current = doCheck;
+  const asked = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (asked.current === null) asked.current = takeSnapAsk(ch.id);
+    if (!asked.current || !mine || done || closed || !ch.active) return;
+    const t = setTimeout(() => { asked.current = false; startCheck.current(); }, 600);
+    return () => clearTimeout(t);
+  }, []);
 
   const total = wall ? wall.posts.length + wall.waiting.length : 0;
   const dayLine = !starts ? '' : today < starts ? `Starts ${niceDay(starts)}` : isSat(today) ? `Shabbat · day ${dayNum} of ${ch.goal}` : `Day ${dayNum} of ${ch.goal}`;

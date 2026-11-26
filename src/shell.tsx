@@ -5,7 +5,7 @@ import { router, useFocusEffect } from 'expo-router';
 import * as Updates from 'expo-updates';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
-import { C, F, PREFS, R, SH, SP, T, numeral } from './theme';
+import { C, F, PREFS, R, SP, T, numeral } from './theme';
 import { Icon, challengeIcon } from './icons';
 import { wrapWindow } from './zmanim';
 import { WrapBanner, useWrapStatus } from './wrap';
@@ -55,10 +55,14 @@ const BAR_H = 54;
 
 // One tab's page: the Flyer backdrop (it does not scroll), the page itself, and the glass header
 // bar pinned on top. Pull down to refresh. The first time a tab opens, the page eases in.
-export function Screen({ children }: { children: React.ReactNode }) {
+// `scoreboard`: this page shows the challenge scoreboard (Home). For a teen who is in the
+// challenge that band already carries the live "left to wrap" clock and SNAP, so the last-hour
+// banner is not drawn a second time above it; everyone else, and every other tab, still gets it.
+export function Screen({ children, scoreboard }: { children: React.ReactNode; scoreboard?: boolean }) {
   const insets = useSafeAreaInsets();
   const { refresh, liveAlert } = useStore();
   const wrap = useWrapStatus();
+  const wrapBanner = !!wrap?.lastHour && !(scoreboard && wrap.mine);
   const [refreshing, setRefreshing] = useState(false);
   const enter = useRef(new Animated.Value(PREFS.reduceMotion ? 1 : 0)).current;
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -88,7 +92,7 @@ export function Screen({ children }: { children: React.ReactNode }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.blue} colors={[C.blue]} progressViewOffset={barBottom + 8} />}>
         <View style={st.col}>
           {/* at most one banner at a time, the most urgent one */}
-          {wrap?.lastHour ? <WrapBanner /> : liveAlert ? <TopAlert alert={liveAlert} /> : <ShabbatBanner />}
+          {wrapBanner ? <WrapBanner /> : liveAlert ? <TopAlert alert={liveAlert} /> : <ShabbatBanner />}
           <Animated.View style={{ opacity: enter, transform: [{ translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }] }}>
             {children}
           </Animated.View>
@@ -319,7 +323,8 @@ const st = StyleSheet.create({
   topFade: { position: 'absolute', left: 0, right: 0, top: 0, zIndex: 19 },
   barCol: { width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 16 },
   // the header bar
-  header: { height: BAR_H, borderRadius: R.header, flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 13, paddingRight: 8, zIndex: 5, ...SH.bar },
+  // No shadow under it: on the mockup the glow of the page carries on, undimmed, right below the bar.
+  header: { height: BAR_H, borderRadius: R.header, flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 13, paddingRight: 8, zIndex: 5 },
   logo: { width: 28, height: 36 },
   topName: { flex: 1, fontFamily: F.display, fontSize: 20, lineHeight: 22, letterSpacing: 0.7, color: C.ink, textTransform: 'uppercase', paddingRight: 3 },
   hBtns: { flexDirection: 'row', alignItems: 'center', gap: 8 },

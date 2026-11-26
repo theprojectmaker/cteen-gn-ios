@@ -1,12 +1,13 @@
-import React, { useEffect } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { router } from 'expo-router';
-import { C, R, T } from './theme';
+import { C, T } from './theme';
 import { dateLabel, useStore, type Invite } from './store';
 import { scheduleInviteReminders } from './push';
+import { Band, Label, Slab, prettyTime } from './look';
 
-// Personal invitations from the rabbi: a card on Home (and Events) until you answer. Accept keeps it
-// with More info; Decline hides it. Reminders twice a day until you answer (if the rabbi turned that on).
+// Personal invitations from the rabbi: a band on Home (and Events) until you answer. YES keeps it
+// there with More info; NO hides it. Reminders twice a day until you answer (if the rabbi turned that on).
 
 export const firstName = (name: string) => name.trim().split(' ')[0] || 'friend';
 export const personal = (text: string, name: string) => text.replace(/\{name\}/gi, firstName(name));
@@ -23,25 +24,49 @@ export function useMyInvites(eventOnly?: boolean) {
     .sort((a, b) => Number(!!(answers || {})[a.id]) - Number(!!(answers || {})[b.id]));
 }
 
-export function InviteCards({ eventOnly }: { eventOnly?: boolean }) {
+// One band per invitation waiting for you. Renders nothing when there are none.
+export function InviteCards({ eventOnly, style }: { eventOnly?: boolean; style?: StyleProp<ViewStyle> }) {
   const list = useMyInvites(eventOnly);
   if (!list.length) return null;
-  return <View style={{ gap: 10, marginBottom: 18 }}>{list.map((v) => <InviteCard key={v.id} v={v} />)}</View>;
+  // more than one: the bands stack, sharing the hairline between them
+  return <View style={[st.list, style]}>{list.map((v, i) => <InviteBand key={v.id} v={v} joined={i > 0} />)}</View>;
 }
 
-function InviteCard({ v }: { v: Invite }) {
-  const { name, invites: answers, content } = useStore();
+// A band: YOU'RE INVITED, what to, the rabbi's line, and YES / NO right there (the same answer the
+// invitation page records). Tap the words to open the invitation itself.
+function InviteBand({ v, joined }: { v: Invite; joined?: boolean }) {
+  const { name, invites: answers, content, respondInvite } = useStore();
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
   const ev = v.eventId ? content.events.find((e) => e.id === v.eventId) : undefined;
   const yes = (answers || {})[v.id] === 'yes';
+  const when = ev ? `${dateLabel(ev)}${ev.time ? ' · ' + prettyTime(ev.time) : ''}` : '';
+  const line = yes ? when || 'Tap for the details' : v.message ? personal(v.message, name) : when;
+  const answer = async (a: 'yes' | 'no') => {
+    setBusy(true); setErr(null);
+    const e = await respondInvite(v.id, a);
+    setBusy(false);
+    if (e) setErr(e);
+  };
   return (
-    <Pressable onPress={() => router.push(`/invite/${v.id}`)} style={({ pressed }) => [st.card, yes && st.cardYes, pressed && { opacity: 0.92 }]} accessibilityRole="button" accessibilityLabel={`Invitation: ${v.title}`}>
-      <View style={{ flex: 1 }}>
-        <Text style={[st.kicker, yes && { color: C.blue }]}>{yes ? "You're going" : 'Invitation'}</Text>
-        <Text style={st.title} numberOfLines={2}>{yes ? v.title : `${firstName(name)}, you're invited`}</Text>
-        <Text style={st.sub} numberOfLines={1}>{yes ? (ev ? `${dateLabel(ev)}${ev.time ? ' · ' + ev.time : ''}` : 'Tap for the details') : `${v.title}${ev ? ' · ' + dateLabel(ev) : ''}`}</Text>
+    <Band style={joined && st.joined}>
+      <View style={st.row}>
+        <Pressable onPress={() => router.push(`/invite/${v.id}`)} style={({ pressed }) => [st.words, pressed && st.pressed]} accessibilityRole="button" accessibilityLabel={`Invitation: ${v.title}`}>
+          <Label tone="blue">{yes ? "You're going" : "You're invited"}</Label>
+          <Text style={[T.h3, st.title]} numberOfLines={2}>{v.title}</Text>
+          {line ? <Text style={[T.small, st.line]} numberOfLines={2}>{line}</Text> : null}
+        </Pressable>
+        {yes ? (
+          <Label tone="blue" onPress={() => router.push(`/invite/${v.id}`)} accessibilityLabel={`More info: ${v.title}`}>More info</Label>
+        ) : (
+          <View style={st.chips}>
+            <Slab size="chip" kind="paper" label="Yes" disabled={busy} onPress={() => answer('yes')} accessibilityLabel={`Yes, I'm in: ${v.title}`} />
+            <Slab size="chip" kind="ghost" label="No" disabled={busy} onPress={() => answer('no')} accessibilityLabel={`No, not this time: ${v.title}`} />
+          </View>
+        )}
       </View>
-      <Text style={[st.cta, yes && { color: C.blue }]}>{yes ? 'More info' : 'Open'}</Text>
-    </Pressable>
+      {err ? <Text style={st.err} accessibilityLiveRegion="polite">{err}</Text> : null}
+    </Band>
   );
 }
 
@@ -73,10 +98,13 @@ export function InviteReminderSync() {
 }
 
 const st = StyleSheet.create({
-  card: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 16, borderRadius: R.card, backgroundColor: C.card, borderLeftWidth: 3, borderLeftColor: C.orange },
-  cardYes: { borderLeftColor: C.blue },
-  kicker: { ...T.eyebrow, color: C.orangeText },
-  title: { ...T.h3, marginTop: 4 },
-  sub: { fontSize: 13, color: C.sub, marginTop: 3 },
-  cta: { ...T.eyebrow, color: C.orangeText },
+  list: { marginBottom: 18 },
+  joined: { marginTop: -1 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  words: { flex: 1, minWidth: 0 },
+  pressed: { opacity: 0.6 },
+  title: { marginTop: 5 },
+  line: { marginTop: 3 },
+  chips: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  err: { fontSize: 13, fontWeight: '700', color: C.red, marginTop: 8 },
 });

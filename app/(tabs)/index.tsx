@@ -4,7 +4,7 @@ import { Home } from '../../src/screens';
 
 export default function HomeTab() {
   return (
-    <Screen>
+    <Screen scoreboard>
       <Home />
     </Screen>
   );

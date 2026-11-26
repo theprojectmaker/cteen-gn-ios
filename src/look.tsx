@@ -23,13 +23,15 @@
  *                                 A whole standalone page (account, settings, challenge...):
  *                                 Backdrop + a ScrollView + the 18 pt gutter column. `top` is the
  *                                 space under the status bar (default 56, room for the back button).
- *    <Band tone? bleed? onPress? accessibilityLabel? style>
+ *    <Band tone? bleed? onPress? group? accessibilityLabel? style>
  *                                 A full-width strip that bleeds past the gutter to both screen
  *                                 edges: faint fill, hairline on top and bottom. tone "plain"
  *                                 (default: scoreboard, Shabbat, invitations, the live banner),
  *                                 "orange" (solid orange; text on it uses tone "onOrange" /
  *                                 C.onOrange), "flat" (no fill, hairlines only). Its parent must
- *                                 have the page gutter; pass bleed={0} when it does not.
+ *                                 have the page gutter; pass bleed={0} when it does not. With
+ *                                 onPress the whole band is one button; add `group` when it holds
+ *                                 buttons of its own (they are then read and pressed one by one).
  *    <Hairline strong? vertical? style>   One 1 pt rule.
  *
  *  TEXT
@@ -44,15 +46,17 @@
  *                                 under it start with their own 12 pt padding.
  *    <BrushTag label seed? size? style>   THE signature: an orange painted stroke with dark
  *                                 slanted text, tilted -2.2 degrees. AT MOST ONE PER SCREEN. It
- *                                 names the single most time-relevant thing ("TONIGHT · 6:00 PM",
+ *                                 names the single most time-relevant thing ("TONIGHT AT 6:00 PM",
  *                                 "TODAY", "DAY 10", "THIS SHABBAT"); if nothing on the screen is
  *                                 about time, there is none. `label` usually comes from
- *                                 whenTag(event). `seed` changes the stroke's shape (same seed,
+ *                                 whenTag(event); on Home from spotlight() in ./when. `seed` changes the stroke's shape (same seed,
  *                                 same stroke). `size` is the text size (22; 28 for a clock).
  *    <Stat value label size? tone? align? style>   A big slanted number or time with a Label
  *                                 under it ("4:11 PM" / "CANDLE LIGHTING"). size default 40.
- *    heroType(title)              The T.hero style, stepped down for long titles (over 22
- *                                 characters 44/41, over 34 characters 38/36).
+ *    heroType(title, width?)      The T.hero style, stepped down for long titles: the biggest of
+ *                                 51/47, 44/41, 38/36 that keeps the title to two lines inside
+ *                                 `width` (default 339, the page column); 38 may take three.
+ *    capsWidth(text, size, tracking?)   About how wide a line of 800 Italic capitals comes out.
  *
  *  BUTTONS
  *    <Slab label onPress? kind? size? height? icon? disabled? style accessibilityLabel? accessibilityState?>
@@ -90,10 +94,10 @@
  *                                 A hairline is drawn under it; pass `last` on the final row of a
  *                                 group to drop it. Extra content can go in as children (shown
  *                                 under the text, for rows that expand).
- *    <DayBlock date big? align? style>   The date at the left of a row: a cyan label (the weekday
+ *    <DayBlock date big? today? align? style>   The date at the left of a row: a cyan label (the weekday
  *                                 within 7 days, otherwise the month; "TODAY" in orange) over the
  *                                 slanted day number. 42 wide. `big` = the 64 pt version for a
- *                                 hero without a picture.
+ *                                 hero without a picture. today={false}: never say "TODAY".
  *    <TimeBlock time style>       The same shape for a time: "6:00" over "PM" (Calendar rows).
  *    <Thumb source size? radius? style>   A small square picture (56, radius 5).
  *    <Ticks total done pending? height? style>   Progress as slanted bars: `done` cyan bars, then
@@ -104,10 +108,23 @@
  *    eventPicture(event)          -> { source, kind: 'poster' | 'photo' } or null. The one place
  *                                 that decides which picture an event shows and whether it is a
  *                                 poster (a flyer, shown whole) or a photograph (may be cropped).
- *    <Print source width? tilt? onPress? accessibilityLabel? style>   A poster shown whole and
- *                                 tilted like a print taped to a wall: 128 wide (150 when the
- *                                 picture is wider than tall), height from the picture's real
- *                                 proportions, deep shadow. Pass width={52} for a small one.
+ *    <Print source width? height? crop? ratio? tilt? onPress? accessibilityLabel? style>
+ *                                 A poster shown whole and tilted like a print taped to a wall:
+ *                                 128 wide (150 when the picture is wider than tall), height from
+ *                                 the picture's real proportions, deep shadow. width={52} for a
+ *                                 small one; height={176} sizes it by height instead (the Wall).
+ *                                 crop: only for a photograph (eventPicture kind 'photo'), which
+ *                                 may be trimmed to fit; a poster never is.
+ *    printSize(ratio, { width?, height?, crop? })   -> the { width, height } a Print comes out at.
+ *    <TypePrint event tilt? style>   The print for an event with no picture, made of type: weekday,
+ *                                 the day number large, month, the title at the foot. 130 x 176.
+ *    <PosterWall events going? onOpen now? style>   THE WALL (it replaced the events carousel): a
+ *                                 row of posters you slide sideways, each a Print 176 tall (or a
+ *                                 TypePrint), a little crooked, with its caption underneath
+ *                                 (FEATURED, when, title, YOU'RE IN). Bleeds to both screen edges,
+ *                                 so its parent must have the page gutter. `events` in the order
+ *                                 to hang them; `going` = ids the teen signed up for;
+ *                                 onOpen(id) on a tap. Put a SectionHead above it.
  *    <PosterStage source maxHeight? radius? onPress? accessibilityLabel? style>   A poster shown
  *                                 large and whole, centered on a blurred matte made from itself.
  *                                 Full width; as tall as the poster needs, up to maxHeight (300).
@@ -124,12 +141,15 @@
  *
  *  HELPERS
  *    prettyTime('6:00pm')         -> '6:00 PM'. Anything it does not recognise comes back as typed.
- *    whenTag(event)               -> the text for a BrushTag or Label: "TONIGHT · 6:00 PM" (today,
- *                                 5 PM or later), "TODAY · 10:15 AM" / "TODAY", "TOMORROW · 7:30 PM",
+ *    whenTag(event)               -> the text for a BrushTag or Label: "TONIGHT AT 6:00 PM" (today,
+ *                                 5 PM or later), "TODAY AT 10:15 AM" / "TODAY", "TOMORROW AT 7:30 PM",
  *                                 "THIS SUNDAY · 10:15 AM" (within 6 days), "HAPPENING NOW" (a
  *                                 multi-day event that has started), otherwise the date
  *                                 ("DEC 10 – 11"). Weekly events use their next date.
  *    dateRange(event)             -> "DEC 10 – 11" / "NOV 29" (no year), for meta lines.
+ *    ./when                       The clock and calendar work as plain functions: spotlight()
+ *                                 (Home's day logic), isOver, whenWords, dayAndTime, clockOf,
+ *                                 startsAt, daysAway. Read the comment at its top.
  *    hebrewDate()                 -> "15 Kislev" ('' when the phone cannot work it out; after
  *                                 sunset it is tomorrow's date).
  *
@@ -145,14 +165,18 @@ import React, { useEffect, useId, useRef, useState } from 'react';
 import { Animated, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, type AccessibilityState, type ImageSourcePropType, type ScrollViewProps, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
-import { C, F, PREFS, R, SH, SP, T, display, numeral } from './theme';
+import { C, F, PREFS, R, SH, SP, T, display, numeral, upright } from './theme';
 import { brushPath } from './brush';
 import { Icon } from './icons';
 import { Glass } from './glass';
 import { IMAGES, daysUntil, withNextDate, type EventItem } from './store';
 import { nyDate, sunTimes } from './zmanim';
+import { dayAndTime, parseDay, prettyTime, whenWords } from './when';
+
+export { dateRange, prettyTime, startsAt } from './when';
 
 const ND = Platform.OS !== 'web';
+const WEB = Platform.OS === 'web';
 
 // A picture: a bundled image (require), a { uri } source, or just the address.
 export type Pic = ImageSourcePropType | string;
@@ -168,6 +192,9 @@ function useSvgId(prefix: string) {
 // The page background. radial-gradient(130% 55% at 85% -8%, bgGlow, bg 62%) from the mockup:
 // the glow only reaches the top quarter, so it is one rectangle over the top 42.3% of the page
 // (130% of that rectangle's height is 55% of the page). Then the film grain, tiled.
+// The grain is meant to be felt, not seen: on the mockup it moves a pixel by one step of 255 at
+// most. (At 0.5 it measured ten times that and read as dirt; 0.07 measures like the mockup.)
+const GRAIN = 0.07;
 export function Backdrop({ grain = true }: { grain?: boolean }) {
   const id = useSvgId('bd');
   return (
@@ -187,7 +214,7 @@ export function Backdrop({ grain = true }: { grain?: boolean }) {
 }
 const bd = StyleSheet.create({
   root: { backgroundColor: C.bg, overflow: 'hidden' },
-  grain: { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', opacity: 0.5 },
+  grain: { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', opacity: GRAIN },
 });
 
 export function Page({ children, top = 56, bottom = 40, gutter = true, scroll = true, refreshControl, keyboardShouldPersistTaps = 'handled' }: {
@@ -217,8 +244,8 @@ const pg = StyleSheet.create({
   gutter: { paddingHorizontal: SP.gutter },
 });
 
-export function Band({ children, tone = 'plain', bleed = SP.gutter, onPress, accessibilityLabel, accessibilityRole = 'button', style }: {
-  children: React.ReactNode; tone?: 'plain' | 'orange' | 'flat'; bleed?: number; onPress?: () => void;
+export function Band({ children, tone = 'plain', bleed = SP.gutter, onPress, group, accessibilityLabel, accessibilityRole = 'button', style }: {
+  children: React.ReactNode; tone?: 'plain' | 'orange' | 'flat'; bleed?: number; onPress?: () => void; group?: boolean;
   accessibilityLabel?: string; accessibilityRole?: 'button' | 'link'; style?: StyleProp<ViewStyle>;
 }) {
   const id = useSvgId('bn');
@@ -235,15 +262,18 @@ export function Band({ children, tone = 'plain', bleed = SP.gutter, onPress, acc
     </Svg>
   ) : null;
   if (!onPress) return <View style={box}>{fill}{children}</View>;
+  // A band that holds buttons of its own (`group`) still opens on a tap anywhere else, but is not
+  // one button to a screen reader: the pieces inside are read, and pressed, one by one.
   return (
-    <Pressable onPress={onPress} accessibilityRole={accessibilityRole} accessibilityLabel={accessibilityLabel} style={({ pressed }) => [box, pressed && bn.pressed]}>
+    <Pressable onPress={onPress} accessible={!group} accessibilityRole={group ? undefined : accessibilityRole} accessibilityLabel={group ? undefined : accessibilityLabel}
+      style={({ pressed }) => [box, pressed && bn.pressed]}>
       {fill}{children}
     </Pressable>
   );
 }
 const bn = StyleSheet.create({
   box: { paddingTop: 12, paddingBottom: 13 },
-  lined: { borderTopWidth: 1, borderBottomWidth: 1, borderColor: C.lineStrong },
+  lined: { borderTopWidth: 1, borderBottomWidth: 1, borderColor: C.bandLine },
   orange: { backgroundColor: C.orange },
   pressed: { opacity: 0.88 },
 });
@@ -284,37 +314,44 @@ export function SectionHead({ title, action, onAction, right, top = SP.section, 
   return (
     <View style={[sh.row, { marginTop: top }, style]}>
       <Text style={[T.h2, sh.title]} numberOfLines={1} accessibilityRole="header">{title}</Text>
-      {right ?? (action ? <Label tone="blue" onPress={onAction}>{action}</Label> : null)}
+      {right ?? (action ? <Label tone="blue" onPress={onAction} style={sh.action}>{action}</Label> : null)}
     </View>
   );
 }
 const sh = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 },
   title: { flexShrink: 1 },
+  action: { letterSpacing: 1.7 }, // the mockup tracks this link a little tighter than other labels
 });
 
-// The orange painted stroke. The label is measured, then the stroke is drawn behind it:
-// 46 wider than the text (13 before it, the frayed tails after it) and 1.62 x the text size tall.
+// The orange painted stroke, with the mockup's own measurements (given for 22 pt words; other
+// sizes scale): the words sit in a box with 12 / 14 of room left and right and 6 / 7 above and
+// below (35 tall). The stroke is painted LARGER than that box: 8 past it on the left, 21 on the
+// right (the dry streaks) and 6 above and below. So the box lines up with the page gutter and
+// the paint runs into the margin, exactly as on the mockup; leave that room around a tag.
 export function BrushTag({ label, seed = 7, size = 22, style }: { label: string; seed?: number; size?: number; style?: StyleProp<ViewStyle> }) {
-  const pad = Math.ceil(size * 0.12); // room for the slant of the last letter
-  // The box hugs the text (13 before it, 33 after it); a fair guess at its width until the
-  // real one arrives, so the stroke never pops in from nothing.
-  const [w, setW] = useState(() => Math.round(label.length * size * 0.46) + 10 + 46);
-  const h = Math.round(size * 1.62);
+  const k = size / 22;
+  const slant = Math.ceil(size * 0.12); // room for the slant of the last letter
+  const padL = Math.round(12 * k), padR = Math.max(0, Math.round(14 * k) - slant), padT = Math.round(6 * k), padB = Math.round(7 * k);
+  const outL = Math.round(8 * k), outR = Math.round(21 * k), outY = Math.round(6 * k);
+  const h = padT + size + padB;
+  // A fair guess at the width until the real one arrives, so the stroke never pops in from nothing.
+  const [w, setW] = useState(() => Math.round(capsWidth(label, size, 0.8 * k)) + padL + padR + slant);
+  const sw = w + outL + outR, sh = h + outY * 2;
   return (
-    <View accessible accessibilityRole="text" accessibilityLabel={label} style={[bt.box, { height: h, paddingRight: 33 - pad }, style]}
+    <View accessible accessibilityRole="text" accessibilityLabel={label} style={[bt.box, { height: h, paddingLeft: padL, paddingRight: padR, paddingTop: padT }, style]}
       onLayout={(e) => { const n = Math.ceil(e.nativeEvent.layout.width); if (n > 0 && n !== w) setW(n); }}>
-      <Svg width={w} height={h} style={bt.stroke}>
-        <Path d={brushPath(w, h, seed)} fill={C.orange} />
+      <Svg width={sw} height={sh} style={[bt.stroke, { left: -outL, top: -outY }]}>
+        <Path d={brushPath(sw, sh, seed)} fill={C.orange} />
       </Svg>
-      <Text numberOfLines={1} style={[bt.text, { fontSize: size, lineHeight: Math.round(size * 1.1), paddingRight: pad }]}>{label}</Text>
+      <Text numberOfLines={1} style={[bt.text, { fontSize: size, lineHeight: size, letterSpacing: 0.8 * k, paddingRight: slant }]}>{label}</Text>
     </View>
   );
 }
 const bt = StyleSheet.create({
-  box: { alignSelf: 'flex-start', justifyContent: 'center', paddingLeft: 13, transform: [{ rotate: '-2.2deg' }], transformOrigin: 'left center' },
-  stroke: { position: 'absolute', left: 0, top: 0 },
-  text: { fontFamily: F.display, letterSpacing: 0.8, color: C.onOrange, textTransform: 'uppercase' },
+  box: { alignSelf: 'flex-start', maxWidth: '100%', transform: [{ rotate: '-2.2deg' }], transformOrigin: 'left center' },
+  stroke: { position: 'absolute' },
+  text: { fontFamily: F.display, color: C.onOrange, textTransform: 'uppercase', flexShrink: 1 },
 });
 
 export function Stat({ value, label, size = 40, tone = 'ink', align = 'left', style }: {
@@ -329,10 +366,40 @@ export function Stat({ value, label, size = 40, tone = 'ink', align = 'left', st
   );
 }
 
-export function heroType(title: string): TextStyle {
-  const n = title.trim().length;
-  if (n > 34) return { ...T.hero, fontSize: 38, lineHeight: 36, paddingRight: 5 };
-  if (n > 22) return { ...T.hero, fontSize: 44, lineHeight: 41, paddingRight: 6 };
+// How wide each capital of the headline face (800 Italic) runs, in thousandths of the type size,
+// read from the font file itself. It lets a headline or a tag be sized before it is on screen.
+const CAPS: Record<string, number> = {
+  A: 493, B: 463, C: 456, D: 465, E: 428, F: 414, G: 459, H: 469, I: 228, J: 448, K: 490, L: 423, M: 541, N: 506, O: 464, P: 459, Q: 453, R: 467, S: 441, T: 470, U: 466, V: 490, W: 685, X: 475, Y: 477, Z: 406,
+  0: 443, 1: 285, 2: 438, 3: 432, 4: 493, 5: 436, 6: 437, 7: 409, 8: 433, 9: 433,
+  ' ': 194, '&': 605, '@': 737, '.': 228, ',': 216, ':': 289, ';': 238, '!': 281, '?': 448, "'": 182, '’': 204, '-': 327, '–': 372, '·': 228, '/': 431, '(': 333, ')': 333, '#': 607, '+': 424, $: 441, '%': 738,
+};
+/** About how wide a line of condensed capitals is at a size (points). Good to a few percent. */
+export function capsWidth(text: string, size: number, tracking = 0): number {
+  let w = 0;
+  for (const ch of text.toUpperCase()) w += ((CAPS[ch] ?? 470) / 1000) * size + tracking;
+  return w;
+}
+// How many lines a title takes when it wraps between words inside `width`.
+function capsLines(title: string, size: number, width: number, tracking: number): number {
+  const space = capsWidth(' ', size, tracking);
+  let lines = 1, x = 0;
+  for (const word of title.trim().split(/\s+/)) {
+    const w = capsWidth(word, size, tracking);
+    if (w > width) return 99; // one word alone is too wide at this size
+    if (x > 0 && x + space + w > width) { lines++; x = w; } else x += (x > 0 ? space : 0) + w;
+  }
+  return lines;
+}
+
+// The mockup sets its 28-letter title at the full 51 on two lines, so the step down is by fit, not
+// by counting letters: the biggest size that keeps the title to two lines; a title too long for
+// that at any size is set at 38 and may take three.
+const HERO_STEPS = [[51, 47], [44, 41], [38, 36]] as const;
+export function heroType(title: string, width = 339): TextStyle {
+  for (const [size, line] of HERO_STEPS) {
+    const pad = Math.ceil(size * 0.12);
+    if (size === 38 || capsLines(title, size, width - pad - 2, 0.2) <= 2) return size === 51 ? T.hero : { ...T.hero, fontSize: size, lineHeight: line, paddingRight: pad };
+  }
   return T.hero;
 }
 
@@ -361,11 +428,12 @@ export function Slab({ label, onPress, kind = 'cyan', size = 'lg', height, icon,
   const z = SLAB_SIZE[size];
   const k = SLAB_KIND[kind];
   const h = height ?? z.h;
-  const box: StyleProp<ViewStyle> = [sl.box, { minHeight: h, borderRadius: z.r, paddingHorizontal: z.pad, gap: z.gap }, k.box, disabled && sl.off, style];
+  const slant = Math.ceil(z.font * 0.12); // room for the slant of the last letter, taken back out of the box so the label stays centered
+  const box: StyleProp<ViewStyle> = [sl.box, { minHeight: h, borderRadius: z.r, paddingLeft: z.pad, paddingRight: z.pad - slant, gap: z.gap }, k.box, disabled && sl.off, style];
   const inside = (
     <>
       {icon ? <Icon name={icon} size={z.icon} color={k.fg} stroke={2.8} /> : null}
-      <Text numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75} style={[sl.label, { fontSize: z.font, lineHeight: Math.round(z.font * 1.1), color: k.fg }]}>{label}</Text>
+      <Text numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75} style={[sl.label, { fontSize: z.font, lineHeight: Math.round(z.font * 1.1), color: k.fg, paddingRight: slant }]}>{label}</Text>
     </>
   );
   if (!onPress) return <View accessible accessibilityRole="text" accessibilityLabel={accessibilityLabel ?? label} style={box}>{inside}</View>;
@@ -380,7 +448,7 @@ export function Slab({ label, onPress, kind = 'cyan', size = 'lg', height, icon,
 }
 const sl = StyleSheet.create({
   box: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 3 },
-  label: { fontFamily: F.display, letterSpacing: 1.1, textTransform: 'uppercase', textAlign: 'center', paddingHorizontal: 2, flexShrink: 1 },
+  label: { fontFamily: F.display, letterSpacing: 1.1, textTransform: 'uppercase', textAlign: 'center', flexShrink: 1 },
   pressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
   off: { opacity: 0.45 },
 });
@@ -424,20 +492,19 @@ const cb = StyleSheet.create({ circle: { width: 38, height: 38, borderRadius: 19
 // ───────────────────────── lists ─────────────────────────
 
 const WEEKDAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-const WEEKDAYS_LONG = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-const parseDay = (s: string) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, (m || 1) - 1, d || 1); };
 
-export function DayBlock({ date, big, align = 'center', style }: { date: string; big?: boolean; align?: 'left' | 'center' | 'right'; style?: StyleProp<ViewStyle> }) {
+export function DayBlock({ date, big, today: sayToday = true, align = 'center', style }: { date: string; big?: boolean; today?: boolean; align?: 'left' | 'center' | 'right'; style?: StyleProp<ViewStyle> }) {
   const dt = parseDay(date);
   const n = daysUntil(date);
-  const today = n === 0;
-  const label = today ? 'TODAY' : n > 0 && n < 7 ? WEEKDAYS[dt.getDay()] : MONTHS[dt.getMonth()];
+  const today = n === 0 && sayToday;
+  const label = today ? 'TODAY' : n >= 0 && n < 7 ? WEEKDAYS[dt.getDay()] : MONTHS[dt.getMonth()];
   const side = align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start';
   return (
     <View style={[big ? null : db.box, { alignItems: side }, style]} accessible accessibilityLabel={dt.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}>
-      <Text style={[big ? db.labelBig : db.label, today && db.today]} numberOfLines={1}>{label}</Text>
-      <Text style={big ? db.numBig : db.num} numberOfLines={1}>{dt.getDate()}</Text>
+      <Text style={[big ? db.labelBig : db.label, today && db.today]} numberOfLines={big ? undefined : 1}>{label}</Text>
+      {/* the big one is never cut to "1…": a day number cannot wrap, and a one-line limit would clip its slant */}
+      <Text style={big ? db.numBig : db.num} numberOfLines={big ? undefined : 1}>{dt.getDate()}</Text>
     </View>
   );
 }
@@ -447,7 +514,7 @@ const db = StyleSheet.create({
   labelBig: { fontFamily: F.bold, fontSize: 13, lineHeight: 15, letterSpacing: 2.1, color: C.blue },
   today: { color: C.orangeText },
   num: { fontFamily: F.display, fontSize: 29, lineHeight: 29, color: C.ink, marginTop: 2, paddingHorizontal: 3 },
-  numBig: { fontFamily: F.display, fontSize: 64, lineHeight: 60, color: C.ink, paddingRight: 8 },
+  numBig: { fontFamily: F.display, fontSize: 64, lineHeight: 60, color: C.ink, paddingRight: 8, marginRight: -4 },
 });
 
 export function TimeBlock({ time, style }: { time: string; style?: StyleProp<ViewStyle> }) {
@@ -577,23 +644,39 @@ export function eventPicture(e: Pick<EventItem, 'image' | 'poster' | 'cover' | '
   return null;
 }
 
-export function Print({ source, width, tilt = -3.4, onPress, accessibilityLabel, style }: {
-  source: Pic; width?: number; tilt?: number; onPress?: () => void; accessibilityLabel?: string; style?: StyleProp<ViewStyle>;
-}) {
-  const ratio = useAspect(source, 128 / 154);
-  const base = width ?? (ratio > 1.05 ? 150 : 128);
-  const k = base / (ratio > 1.05 && !width ? 150 : 128); // the 100..176 limits are for the full-size print
-  let w = base;
-  let h = w / ratio;
-  let whole = true; // the box has the picture's own shape
+// The size of a print. A poster always keeps its own shape (it is never cropped); a photograph
+// (`crop`) may be trimmed to fit.
+//   by width (the default: 128, or 150 for a picture wider than tall): as tall as the picture's
+//     shape makes it, at most 176 (then it gets narrower); a photograph is at least 100 tall.
+//   by height (the Wall: 176): as wide as the shape makes it, between 0.67 and 1.34 times the
+//     height (118 to 236). A wider poster gets shorter instead; a narrower one stays narrow.
+export function printSize(ratio: number, o: { width?: number; height?: number; crop?: boolean } = {}): { width: number; height: number } {
+  if (o.height) {
+    const min = Math.round(o.height * 0.67), max = Math.round(o.height * 1.34);
+    let w = o.height * ratio, h = o.height;
+    if (w > max) { w = max; if (!o.crop) h = max / ratio; }
+    else if (w < min && (o.crop || w > min * 0.97)) w = min;
+    return { width: Math.round(w), height: Math.round(h) };
+  }
+  const base = o.width ?? (ratio > 1.05 ? 150 : 128);
+  const k = base / (ratio > 1.05 && !o.width ? 150 : 128); // the 100..176 limits are for the full-size print
+  let w = base, h = w / ratio;
   if (h > 176 * k) { h = 176 * k; w = h * ratio; }
-  else if (h < 100 * k) { h = 100 * k; w = Math.min(h * ratio, base * 1.15); whole = Math.abs(w / h - ratio) < 0.01; }
-  const small = base < 100;
-  const box = [pr.box, small ? SH.printSmall : SH.print, { width: Math.round(w), height: Math.round(h), transform: [{ rotate: `${tilt}deg` }] }, style];
+  else if (h < 100 * k && o.crop) h = 100 * k;
+  return { width: Math.round(w), height: Math.round(h) };
+}
+
+export function Print({ source, width, height, crop, ratio, tilt = -3.4, onPress, accessibilityLabel, style }: {
+  source: Pic; width?: number; height?: number; crop?: boolean; ratio?: number; tilt?: number; onPress?: () => void; accessibilityLabel?: string; style?: StyleProp<ViewStyle>;
+}) {
+  const measured = useAspect(source, 128 / 154);
+  const size = printSize(ratio ?? measured, { width, height, crop }); // `ratio`: a caller that has already measured the picture hands its shape over
+  const small = size.width < 100 && size.height < 100;
+  const box = [pr.box, small ? SH.printSmall : SH.print, size, { transform: [{ rotate: `${tilt}deg` }] }, style];
   const inside = (
     <>
       <View style={pr.clip}>
-        <Image source={toSource(source)} style={pic.fill} resizeMode={whole ? 'cover' : 'contain'} accessibilityLabel={onPress ? undefined : accessibilityLabel} />
+        <Image source={toSource(source)} style={pic.fill} resizeMode="cover" accessibilityLabel={onPress ? undefined : accessibilityLabel} />
       </View>
       <View pointerEvents="none" style={pr.edge} />
     </>
@@ -611,6 +694,105 @@ const pr = StyleSheet.create({
   edge: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, borderRadius: R.print, borderWidth: 1, borderColor: C.printEdge },
 });
 const pic = StyleSheet.create({ fill: { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' } });
+
+// An event with no picture gets a print made of type: the date large, the title at the foot.
+// Same size, outline and shadow as a poster on the Wall (130 x 176).
+export function TypePrint({ event, tilt = 0, style }: { event: Pick<EventItem, 'start' | 'title'>; tilt?: number; style?: StyleProp<ViewStyle> }) {
+  const d = parseDay(event.start);
+  return (
+    <View style={[pr.box, SH.print, tp.box, { transform: [{ rotate: `${tilt}deg` }] }, style]}>
+      <Label tone="blue">{WEEKDAYS[d.getDay()]}</Label>
+      <Text style={tp.num} numberOfLines={1}>{d.getDate()}</Text>
+      <Label>{MONTHS[d.getMonth()]}</Label>
+      <View style={tp.gap} />
+      <View style={tp.bar} />
+      <Text style={tp.title} numberOfLines={3}>{event.title}</Text>
+      <View pointerEvents="none" style={pr.edge} />
+    </View>
+  );
+}
+const tp = StyleSheet.create({
+  box: { width: 130, height: 176, backgroundColor: C.raised, paddingHorizontal: 12, paddingTop: 12, paddingBottom: 11 },
+  num: { ...numeral(64), marginTop: 1, marginLeft: -2 },
+  gap: { flex: 1 },
+  bar: { width: 22, height: 4, borderRadius: 1, backgroundColor: C.blue, transform: [{ skewX: '-16deg' }], marginLeft: 1, marginBottom: 7 },
+  title: { ...upright(15) },
+});
+
+// ───────────────────────── the Wall ─────────────────────────
+
+const WALL_TILTS = [-2.6, 1.8, -1.2, 2.4, -2];
+const WALL_HEIGHT = 176;
+const WALL_GAP = 20;
+
+// THE WALL: upcoming events hung the way flyers hang on a wall. A row of posters you slide
+// sideways, each one whole, a little crooked, with its caption underneath.
+export function PosterWall({ events, going, onOpen, now, style }: {
+  events: readonly EventItem[]; going?: readonly string[]; onOpen: (id: string) => void; now?: number; style?: StyleProp<ViewStyle>;
+}) {
+  // Each poster reports how wide it came out (its picture decides), so the row can stop on posters.
+  const [widths, setWidths] = useState<Record<string, number>>({});
+  const stops: number[] = [];
+  let x = 0;
+  for (const e of events) { stops.push(x); x += (widths[e.id] ?? 140) + WALL_GAP; }
+  const measured = events.every((e) => widths[e.id]);
+  // Browser only: a browser keeps the poster it had stopped on in place when a new one arrives in
+  // front of it (so the row would open already slid along). Starting the row afresh whenever its
+  // first poster changes keeps it opening at the beginning, as it does on the phone.
+  return (
+    <ScrollView key={WEB ? events[0]?.id : undefined} horizontal showsHorizontalScrollIndicator={false} decelerationRate="fast" snapToOffsets={measured && events.length > 1 ? stops : undefined}
+      style={[wl.scroll, style]} contentContainerStyle={wl.row}>
+      {events.map((e, i) => (
+        <WallPoster key={e.id} event={e} tilt={WALL_TILTS[i % WALL_TILTS.length]} mine={!!going && going.includes(e.id)} now={now} onPress={() => onOpen(e.id)}
+          onWidth={(w) => setWidths((all) => (all[e.id] === w ? all : { ...all, [e.id]: w }))} />
+      ))}
+    </ScrollView>
+  );
+}
+
+function WallPoster({ event, tilt, mine, now, onPress, onWidth }: { event: EventItem; tilt: number; mine: boolean; now?: number; onPress: () => void; onWidth: (w: number) => void }) {
+  const picture = eventPicture(event);
+  const ratio = useAspect(picture?.source, 0.75);
+  const size = picture ? printSize(ratio, { height: WALL_HEIGHT, crop: picture.kind === 'photo' }) : { width: 130, height: WALL_HEIGHT };
+  const column = Math.max(size.width, Math.round(WALL_HEIGHT * 0.67)); // the caption never gets narrower than the narrowest print
+  const { day, time } = dayAndTime(event, now);
+  const both = time ? `${day} · ${time}` : day;
+  const oneLine = capsWidth(both, 11, 1.8) <= column - 2;
+  return (
+    <Pressable onPress={onPress} onLayout={(e) => onWidth(Math.round(e.nativeEvent.layout.width))} accessibilityRole="button"
+      accessibilityLabel={`${event.title}, ${both.toLowerCase()}${event.priority ? ', featured' : ''}${mine ? ", you're in" : ''}`}
+      style={({ pressed }) => [wl.item, { width: column }, pressed && wl.pressed]}>
+      <View style={wl.hang}>
+        {picture ? <Print source={picture.source} height={WALL_HEIGHT} crop={picture.kind === 'photo'} ratio={ratio} tilt={tilt} /> : <TypePrint event={event} tilt={tilt} />}
+      </View>
+      <View style={wl.caption}>
+        {event.priority ? <Label size={11} tone="orange" numberOfLines={1} style={wl.kicker}>Featured</Label> : null}
+        <Label size={11} tone="blue" numberOfLines={1}>{oneLine ? both : day}</Label>
+        {!oneLine && time ? <Label size={11} tone="blue" numberOfLines={1}>{time}</Label> : null}
+        <Text style={wl.title} numberOfLines={2}>{event.title}</Text>
+        {mine ? (
+          <View style={wl.mine}>
+            <Icon name="tick" size={12} color={C.blue} stroke={3.2} />
+            <Label size={11} tone="blue">You're in</Label>
+          </View>
+        ) : null}
+      </View>
+    </Pressable>
+  );
+}
+const wl = StyleSheet.create({
+  // bleeds to both screen edges; the first poster starts at the page gutter. The padding above
+  // keeps tilted corners from being cut; the captions below leave room for the shadows.
+  scroll: { flexGrow: 0, marginHorizontal: -SP.gutter, ...(WEB ? ({ scrollSnapType: 'x mandatory', scrollPaddingLeft: SP.gutter } as object) : null) },
+  row: { paddingHorizontal: SP.gutter, paddingTop: 14, paddingBottom: 6, gap: WALL_GAP, alignItems: 'flex-start' },
+  item: { ...(WEB ? ({ scrollSnapAlign: 'start' } as object) : null) },
+  pressed: { opacity: 0.8 },
+  hang: { height: WALL_HEIGHT, justifyContent: 'flex-end', alignItems: 'flex-start' },
+  caption: { marginTop: 14 },
+  kicker: { marginBottom: 2 },
+  title: { fontFamily: F.bold, fontSize: 17, lineHeight: 18, letterSpacing: 0.5, color: C.ink, textTransform: 'uppercase', marginTop: 4 },
+  mine: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 },
+});
 
 export function PosterStage({ source, maxHeight = 300, radius = R.photo, onPress, accessibilityLabel, style, children }: {
   source: Pic; maxHeight?: number; radius?: number; onPress?: () => void; accessibilityLabel?: string; style?: StyleProp<ViewStyle>; children?: React.ReactNode;
@@ -695,38 +877,11 @@ export function LiveDot({ color = C.red, size = 7 }: { color?: string; size?: nu
 
 // ───────────────────────── helpers ─────────────────────────
 
-// Hour and minute of a typed time ("6:00pm", "10:15 AM", "7pm"), or null when it is something else.
-function clockOf(time?: string): { h: number; m: number } | null {
-  const x = /^\s*(\d{1,2})(?::(\d{2}))?\s*([ap])\.?\s?m\.?\s*$/i.exec(time || '');
-  if (!x) return null;
-  const hour = Number(x[1]), min = Number(x[2] || 0);
-  if (hour < 1 || hour > 12 || min > 59) return null;
-  return { h: (hour % 12) + (x[3].toLowerCase() === 'p' ? 12 : 0), m: min };
-}
-
-export function prettyTime(time?: string): string {
-  const c = clockOf(time);
-  if (!c) return (time || '').trim();
-  return `${((c.h + 11) % 12) + 1}:${String(c.m).padStart(2, '0')} ${c.h < 12 ? 'AM' : 'PM'}`;
-}
-
-export function dateRange(e: Pick<EventItem, 'start' | 'end'>): string {
-  const a = parseDay(e.start), b = parseDay(e.end || e.start);
-  const left = `${MONTHS[a.getMonth()]} ${a.getDate()}`;
-  if (!e.end || e.start === e.end) return left;
-  return `${left} – ${a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear() ? b.getDate() : `${MONTHS[b.getMonth()]} ${b.getDate()}`}`;
-}
-
+// The clock and calendar work lives in ./when (plain functions, tested on their own):
+// prettyTime, startsAt and dateRange are passed on from there at the top of this file.
+// A weekly event is described on its next date.
 export function whenTag(event: EventItem): string {
-  const e = withNextDate(event);
-  const n = daysUntil(e.start);
-  const clock = clockOf(e.time);
-  const at = e.time ? ` · ${prettyTime(e.time).toUpperCase()}` : '';
-  if (n === 0) return (clock && clock.h >= 17 ? 'TONIGHT' : 'TODAY') + at;
-  if (n === 1) return 'TOMORROW' + at;
-  if (n > 1 && n <= 6) return `THIS ${WEEKDAYS_LONG[parseDay(e.start).getDay()]}${at}`;
-  if (n < 0 && daysUntil(e.end || e.start) >= 0) return 'HAPPENING NOW';
-  return dateRange(e);
+  return whenWords(withNextDate(event));
 }
 
 const HEBREW_MONTHS = /^(\d{1,2}) (Tishri|Tishrei|Heshvan|Cheshvan|Kislev|Tevet|Shevat|Shvat|Adar|Adar I|Adar II|Nisan|Iyar|Iyyar|Sivan|Tamuz|Tammuz|Av|Elul)$/;

@@ -27,7 +27,8 @@ const PALETTE = {
   mute: '#7888A0', // the Hebrew date beside the date line
   // lines
   line: 'rgba(255,255,255,0.09)', // hairlines between rows
-  lineStrong: 'rgba(255,255,255,0.14)', // band edges, input outlines
+  lineStrong: 'rgba(255,255,255,0.14)', // input outlines, ghost buttons, the rule inside a band
+  bandLine: 'rgba(255,255,255,0.1)', // the hairline along the top and bottom of a band (the mockup's value)
   tick: 'rgba(255,255,255,0.12)', // progress bars not reached yet
   track: 'rgba(255,255,255,0.16)', // the track of a switch that is off
   // cyan: do this
