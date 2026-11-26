@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, F, PREFS, R, SP, T, display, numeral } from './theme';
 import { Icon } from './icons';
 import { challengeFits, sortPosts, upcoming, useShabbat, useStore, type Challenge, type EventItem } from './store';
-import { Band, BrushTag, Hairline, Label, Row, SectionHead, Slab, Stat, Ticks, eventPicture, hebrewDate, heroType } from './look';
+import { Band, BrushTag, Hairline, Label, Row, SectionHead, Slab, Stat, Ticks, eventPicture, hebrewDate, heroType, useAspect } from './look';
 import { useChallengeCard } from './rewards';
 import { InviteCards, useMyInvites } from './invites';
 import { MINYAN_FALLBACK, minyanTime } from './minyan';
@@ -174,7 +174,11 @@ function Marker({ index, count, onNext }: { index: number; count: number; onNext
 function EventPage({ e, tag, now, width, height }: { e: EventItem; tag: string; now: number; width: number; height: number }) {
   const { openEvent, goingCount } = useStore();
   const picture = eventPicture(e);
+  const col = width - SP.gutter * 2;
   const [panelH, setPanelH] = useState(0);
+  const ratio = useAspect(picture?.source, 0.77);
+  // a poster that would nearly fill the width on its own needs no panel around it
+  const bare = !!picture && picture.kind === 'poster' && panelH > 0 && Math.min(col - 32, (panelH - 32) * ratio) > col * 0.9;
   const open = () => openEvent(e.id);
   const typed = (e.time || '').trim();
   const clock = clockOf(typed);
@@ -191,14 +195,10 @@ function EventPage({ e, tag, now, width, height }: { e: EventItem; tag: string; 
       {/* the picture panel takes all the spare height: a poster sits whole on a matte made from itself, a photograph fills it */}
       <Pressable onPress={open} onLayout={(ev) => setPanelH(Math.round(ev.nativeEvent.layout.height))} accessibilityRole="button"
         accessibilityLabel={picture ? `${e.title} poster. Opens the event` : `${e.title}, ${dayAndTime(e, now).day.toLowerCase()}. Opens the event`}
-        style={({ pressed }) => [st.panel, !picture && st.panelType, pressed && st.dim]}>
+        style={({ pressed }) => [st.panel, !picture && st.panelType, bare && st.panelBare, pressed && st.dim]}>
         {picture ? (
           picture.kind === 'photo' ? <Image source={picture.source} style={st.fill} resizeMode="cover" /> : (
-            <>
-              <Image source={picture.source} blurRadius={28} resizeMode="cover" style={st.matte} />
-              <View style={st.matteDim} />
-              <View style={[st.fill, st.posterPad]}><Image source={picture.source} style={st.fill} resizeMode="contain" /></View>
-            </>
+            <View style={[st.fill, !bare && st.posterPad]}><Image source={picture.source} style={st.fill} resizeMode="contain" /></View>
           )
         ) : (
           <View style={st.typeIn}>
@@ -206,7 +206,7 @@ function EventPage({ e, tag, now, width, height }: { e: EventItem; tag: string; 
             <View style={st.typeBar} />
           </View>
         )}
-        <View pointerEvents="none" style={st.panelEdge} />
+        {bare ? null : <View pointerEvents="none" style={st.panelEdge} />}
       </Pressable>
       <Pressable onPress={open} accessible={false} style={({ pressed }) => pressed && st.dim}>
         <Text style={[titleStyle, st.title]} numberOfLines={2} accessibilityRole="button" accessibilityLabel={`${e.title}. ${tag.toLowerCase()}.`} accessibilityHint="Opens the event">{e.title}</Text>
@@ -515,12 +515,11 @@ const st = StyleSheet.create({
   line: { fontSize: 15, lineHeight: 20, fontWeight: '500', color: C.sub, marginTop: 6 },
   small: { marginTop: 7 },
   btn: { marginTop: 20, marginBottom: 0 },
-  panel: { flex: 1, marginTop: 18, marginBottom: 18, borderRadius: R.photo, overflow: 'hidden', backgroundColor: C.card },
+  panel: { flex: 1, marginTop: 18, marginBottom: 18, borderRadius: R.photo, overflow: 'hidden', backgroundColor: C.raised },
   panelType: { backgroundColor: C.raised },
   panelEdge: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, borderRadius: R.photo, borderWidth: 1, borderColor: C.printEdge },
   fill: { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' },
-  matte: { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', opacity: 0.55, transform: [{ scale: 1.25 }] },
-  matteDim: { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', backgroundColor: 'rgba(11,18,32,0.35)' },
+  panelBare: { backgroundColor: 'transparent' },
   posterPad: { padding: 16 },
   typeIn: { flex: 1, padding: 16, justifyContent: 'space-between' },
   typeBar: { width: 28, height: 5, borderRadius: 1.5, backgroundColor: C.blue, transform: [{ skewX: '-16deg' }] },
