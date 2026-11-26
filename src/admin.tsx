@@ -61,7 +61,7 @@ function specs(key: ListKey, c: Content, isNew: boolean): Spec[] {
     { k: 'maxAge', label: 'Oldest age (optional)', t: 'text', ph: '18' },
     { k: 'who', label: "Who it's for (optional)", t: 'text' },
     { k: 'about', label: 'Details', t: 'long' },
-    { k: 'priority', label: 'Featured event (shows first and stands out)', t: 'bool' },
+    { k: 'priority', label: 'Featured event (shown first in the Home carousel, and stands out)', t: 'bool' },
   ];
   if (key === 'challenges') return [
     { k: 'title', label: 'Challenge name', t: 'text', ph: 'Tefillin Challenge' },
