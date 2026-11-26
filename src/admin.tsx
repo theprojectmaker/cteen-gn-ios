@@ -163,7 +163,7 @@ const DURATIONS = [{ l: '1 hour', h: 1 }, { l: 'Today', h: 12 }, { l: '3 days', 
 export function AdminPanel() {
   const insets = useSafeAreaInsets();
   const store = useStore();
-  const { adminOpen, setAdminOpen, leader, content, saveContent } = store;
+  const { adminOpen, setAdminOpen, leader, content, saveContent, adminTask, setAdminTask } = store;
   const [task, setTask] = useState<Task | null>(null);
   const [inSection, setInSection] = useState<Section | null>(null);
   const [editing, setEditing] = useState<{ id: string | null; draft: Draft } | null>(null);
@@ -185,6 +185,12 @@ export function AdminPanel() {
     if (inSection === 'Sign-ups') { setSignups(null); store.loadSignups().then((r) => setSignups(r ?? { signups: {}, phones: 0 })); }
     if (inSection === 'Inbox') { setInbox(null); store.loadInbox().then((r) => setInbox(r ?? [])); }
   }, [inSection, leader, adminOpen]);
+
+  // opened from another screen with a task in mind (the Events tab's NEW EVENT): go straight to that form
+  useEffect(() => {
+    if (!adminOpen || !adminTask || !leader) return;
+    setInSection(null); setTask(adminTask as Task); setAdminTask(null);
+  }, [adminOpen, adminTask, leader]);
 
   if (!adminOpen) return null;
 

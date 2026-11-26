@@ -5,7 +5,7 @@ import { C, R, SP, T } from './theme';
 import { Icon } from './icons';
 import { calendarUrl, challengeFits, countdown, dateLabel, open, repeatLabel, upcoming, useStore, type EventItem } from './store';
 import { audienceLabel, Button, Card, Chips, Empty, EventCard } from './ui';
-import { Label, Photo, PosterStage, eventPicture } from './look';
+import { Hairline, Label, Photo, Slab, PosterStage, eventPicture } from './look';
 import { NameGate } from './rewards';
 import { InviteCards } from './invites';
 
@@ -13,7 +13,7 @@ import { InviteCards } from './invites';
 const EVENT_FILTERS = ['All', 'Great Neck', 'Saved'] as const;
 
 export function Events() {
-  const { saved, content, fits, markEventsSeen, gender } = useStore();
+  const { saved, content, fits, markEventsSeen, gender, leader, setAdminOpen, setAdminTask } = useStore();
   const notForMe = content.challenges.filter((c) => c.active && !challengeFits(c, gender));
   useFocusEffect(useCallback(() => { markEventsSeen(); }, [markEventsSeen]));
   const [f, setF] = useState<(typeof EVENT_FILTERS)[number]>('All');
@@ -21,12 +21,20 @@ export function Events() {
   const list = upcoming(content.events).filter(fits).filter((e) => (f === 'All' ? true : f === 'Saved' ? saved.includes(e.id) : f === 'Great Neck' ? e.scope === 'gn' : e.scope === 'intl')).sort((a, b) => (b.priority ? 1 : 0) - (a.priority ? 1 : 0));
   return (
     <>
-      <Text style={T.h1}>Events</Text>
+      <View style={st.head}>
+        <Text style={[T.h1, { flexShrink: 1 }]}>Events</Text>
+        {leader ? <Slab kind="orange" size="md" icon="plus" label="New event" onPress={() => { setAdminTask('event'); setAdminOpen(true); }} accessibilityLabel="New event: open the event form" /> : null}
+      </View>
       <Text style={[T.small, { marginTop: 4, marginBottom: 14 }]}>{(() => { const all = upcoming(content.events).filter(fits); const gn = all.filter((e) => e.scope === 'gn').length; return all.length ? `${all.length} coming up${gn ? ` · ${gn} in Great Neck` : ''}` : "What's coming up in Great Neck and around CTeen"; })()}</Text>
       <InviteCards eventOnly />
       <Chips tabs options={EVENT_FILTERS} value={f} onChange={setF} />
-      <View style={{ gap: 28, marginTop: 14 }}>
-        {list.map((e) => <EventCard key={e.id} e={e} />)}
+      <View style={{ marginTop: 18 }}>
+        {list.map((e, i) => (
+          <View key={e.id}>
+            {i > 0 ? <Hairline strong style={{ marginTop: 28, marginBottom: 28 }} /> : null}
+            <EventCard e={e} />
+          </View>
+        ))}
       </View>
       {f === 'All' && notForMe.length ? (
         <View style={{ marginTop: 30, gap: 12 }}>
@@ -185,6 +193,7 @@ function Para({ title, body }: { title: string; body: string }) {
 }
 
 const st = StyleSheet.create({
+  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   notApplicable: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderTopWidth: 1, borderTopColor: C.line, opacity: 0.7 },
   naIcon: { width: 42, height: 42, borderRadius: R.chip, borderWidth: 1, borderColor: C.lineStrong, alignItems: 'center', justifyContent: 'center' },
   naPill: { paddingHorizontal: 10, height: 26, borderRadius: R.chip, borderWidth: 1, borderColor: C.lineStrong, justifyContent: 'center' },

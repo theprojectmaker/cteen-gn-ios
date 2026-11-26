@@ -155,6 +155,8 @@ type Ctx = Local & {
   push: PushState; turnOnPush: () => Promise<void>;
   leader: string | null; isOwner: boolean; adminOpen: boolean; setAdminOpen: (v: boolean) => void;
   composerOpen: boolean; setComposerOpen: (v: boolean) => void;
+  /** a task the leader panel should open straight into when it opens (e.g. 'event' = the new-event form) */
+  adminTask: string | null; setAdminTask: (v: string | null) => void;
   loadPeople: () => Promise<Person[] | null>; setLeaderFor: (id: string, on: boolean) => Promise<string | null>;
   leaderLogin: (code: string) => Promise<string | null>; leaderLogout: () => void;
   saveContent: (next: Content) => Promise<string | null>;
@@ -223,6 +225,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [isOwner, setIsOwner] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [adminTask, setAdminTask] = useState<string | null>(null);
   const [push, setPush] = useState<PushState>('unsupported');
   const [goingCount, setGoingCount] = useState<Record<string, number>>({});
   const [goingNames, setGoingNames] = useState<Record<string, string[]>>({});
@@ -605,7 +608,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       }
     },
     leaderLogout: () => { setLeader(null); setAdminOpen(false); },
-    composerOpen, setComposerOpen,
+    composerOpen, setComposerOpen, adminTask, setAdminTask,
     loadBroadcasts: async () => {
       try { const r = await api<{ items: Broadcast[] }>('/broadcasts'); setBroadcasts(r.items || []); return r.items || []; } catch { return null; }
     },
@@ -681,7 +684,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     removeQuestion: (id) => api('/admin/inbox/remove', { method: 'POST', body: { id }, leader }).then(() => {}).catch(() => {}),
     loadPhotos: (cid) => api<{ photos: PhotoRow[] }>(`/admin/photos?challenge=${cid}`, { leader }).then((r) => r.photos).catch(() => null),
     loadPhoto: (key) => api<{ photo: string }>(`/admin/photo?key=${encodeURIComponent(key)}`, { leader }).then((r) => r.photo).catch(() => null),
-  }), [local, content, online, leader, isOwner, adminOpen, composerOpen, push, liveAlert, googleReady, appleReady, unreadFeed, newEvents, goingCount, goingNames, postMeta, broadcasts, flip, patch, refresh, keep, openTarget, registerToken]);
+  }), [local, content, online, leader, isOwner, adminOpen, composerOpen, adminTask, push, liveAlert, googleReady, appleReady, unreadFeed, newEvents, goingCount, goingNames, postMeta, broadcasts, flip, patch, refresh, keep, openTarget, registerToken]);
 
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>;
 }

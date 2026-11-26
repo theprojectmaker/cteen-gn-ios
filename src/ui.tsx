@@ -145,11 +145,12 @@ export function EventCard({ e, width }: { e: EventItem; width?: number }) {
   const picture = eventPicture(e);
   const meta = [repeatLabel(e), e.place, e.price, audienceLabel(e)].filter(Boolean).join(' · ');
   const goingLine = mine ? `You're in${n > 1 ? ` · ${n} going` : ''}` : n > 0 ? `${n} going` : '';
+  const chip = e.signup !== 'app' ? null : mine ? <Slab size="chip" kind="outline" icon="tick" label="In" /> : <Slab size="chip" kind="paper" label="RSVP" onPress={() => openEvent(e.id)} accessibilityLabel={`RSVP to ${e.title}`} />;
+  // A self-contained unit: what and when on top, then its picture, then what you can do about it.
   return (
     <View style={{ width }}>
       <Pressable onPress={() => openEvent(e.id)} style={({ pressed }) => pressed && s.pressed} accessibilityRole="button" accessibilityLabel={e.title}>
-        {picture ? (picture.kind === 'poster' ? <PosterStage source={picture.source} maxHeight={300} /> : <Photo source={picture.source} />) : null}
-        <View style={[s.evRow, !!picture && { marginTop: 12 }]}>
+        <View style={s.evRow}>
           <DayBlock date={e.start} />
           <View style={s.evText}>
             <View style={s.evKickers}>
@@ -157,16 +158,23 @@ export function EventCard({ e, width }: { e: EventItem; width?: number }) {
               <Label size={11} tone="blue" numberOfLines={1} style={{ flexShrink: 1 }}>{whenTag(e)}</Label>
             </View>
             <Text style={s.evTitle} numberOfLines={2}>{e.title}</Text>
-            {meta ? <Text style={[T.small, { marginTop: 3 }]} numberOfLines={2}>{meta}</Text> : null}
-            {goingLine ? <Label size={11} tone={mine ? 'blue' : 'sub'} style={{ marginTop: 6 }}>{goingLine}</Label> : null}
+            {meta ? <Text style={[T.small, { marginTop: 4 }]} numberOfLines={2}>{meta}</Text> : null}
           </View>
-          <View style={s.evSide}>
-            <SaveHeart id={e.id} />
-            {e.signup !== 'app' ? null : mine ? <Slab size="chip" kind="outline" icon="tick" label="In" /> : <Slab size="chip" kind="paper" label="RSVP" onPress={() => openEvent(e.id)} accessibilityLabel={`RSVP to ${e.title}`} />}
-          </View>
+          <SaveHeart id={e.id} />
         </View>
-        {e.about ? <Text style={[T.small, { marginTop: 8 }]} numberOfLines={2}>{e.about}</Text> : null}
+        {picture ? (
+          <View style={{ marginTop: 16 }}>
+            {picture.kind === 'poster' ? <PosterStage source={picture.source} maxHeight={300} /> : <Photo source={picture.source} />}
+          </View>
+        ) : null}
       </Pressable>
+      {goingLine || chip ? (
+        <View style={s.evFoot}>
+          <Text style={[s.evGoing, mine && { color: C.blue }]}>{goingLine}</Text>
+          {chip}
+        </View>
+      ) : null}
+      {e.about ? <Text style={[T.small, { marginTop: 12 }]} numberOfLines={2}>{e.about}</Text> : null}
     </View>
   );
 }
@@ -231,7 +239,8 @@ export const s = StyleSheet.create({
   evText: { flex: 1, minWidth: 0 },
   evKickers: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 },
   evTitle: { ...display(26) },
-  evSide: { alignItems: 'flex-end', gap: 8 },
+  evFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 14 },
+  evGoing: { flex: 1, fontSize: 14, fontWeight: '600', color: C.sub },
   // a link in the old screens: a cyan label
   link: { fontFamily: F.bold, fontSize: 12, lineHeight: 15, letterSpacing: 2, color: C.blue, textTransform: 'uppercase' },
   empty: { paddingTop: 44, paddingBottom: 20 },

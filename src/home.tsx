@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, F, PREFS, R, SP, T, display, numeral } from './theme';
 import { Icon } from './icons';
 import { challengeFits, sortPosts, upcoming, useShabbat, useStore, type Challenge, type EventItem } from './store';
-import { Band, BrushTag, Hairline, Label, Row, SectionHead, Slab, Stat, Ticks, eventPicture, hebrewDate, heroType, useAspect } from './look';
+import { Band, BrushTag, DayBlock, Hairline, Label, Row, Slab, Ticks, eventPicture, hebrewDate, heroType, useAspect } from './look';
 import { useChallengeCard } from './rewards';
 import { InviteCards, useMyInvites } from './invites';
 import { MINYAN_FALLBACK, minyanTime } from './minyan';
@@ -79,8 +79,8 @@ export function Home() {
         </>
       ) : null}
       <OnTheMenu />
-      <WeeklyEvents afterBand={!!main} />
-      <FromRabbi afterBand={false} />
+      <WeeklyEvents />
+      <FromRabbi />
       <ShabbatBand />
     </>
   );
@@ -292,9 +292,33 @@ const SHABBAT_ENDS_MS = 50 * 60000;
 // The main live challenge as a scoreboard band: which day you are on, out of how many, what is
 // left of today, and the one thing to press. All of its facts come from useChallengeCard
 // (rewards.tsx); SNAP starts the challenge page's own photo check-in.
+// TEST ONLY: forces the "out" face of the scoreboard. Must stay false.
+const FORCE_OUT = false;
+const outCache: Record<string, boolean> = {};
+// Has the server put this teen out of the challenge (3 missed days)? Asked once per day while
+// the teen is in it (no polling); a failed answer counts as "not out".
+function useIsOut(ch: Challenge, mine: boolean) {
+  const { fetchWall } = useStore();
+  const day = nyDate(new Date());
+  const key = `${ch.id}|${day}`;
+  const [out, setOut] = useState(() => !!outCache[key]);
+  useEffect(() => {
+    if (!mine || !ch.photo || key in outCache) return;
+    let alive = true;
+    fetchWall(ch.id, day).then((r) => {
+      if ('error' in r) return;
+      outCache[key] = !!r.me?.out;
+      if (alive) setOut(outCache[key]);
+    });
+    return () => { alive = false; };
+  }, [ch.id, mine, day]);
+  return FORCE_OUT || (mine && out);
+}
+
 function Scoreboard({ ch, style }: { ch: Challenge; style?: StyleProp<ViewStyle> }) {
   const card = useChallengeCard(ch);
   const { mine, done, count, wrap } = card;
+  const out = useIsOut(ch, mine);
   const daily = ch.every === 'day';
   const short = ch.title.replace(/^\s*\d+[\s-]*(?:day|week)s?\s+/i, '').trim() || ch.title; // "30 Day Tefillin Challenge" -> "Tefillin Challenge"
   const complete = count >= ch.goal;
@@ -302,6 +326,21 @@ function Scoreboard({ ch, style }: { ch: Challenge; style?: StyleProp<ViewStyle>
   // today's bar is outlined while today can still be done (or has not opened yet)
   const pending = mine && !done && !complete && (state === 'open' || state === 'before');
   const number = !mine ? ch.goal : Math.min(ch.goal, pending ? count + 1 : count);
+  if (out) {
+    // put out of the challenge: a big X where the day count was, no clock and no SNAP
+    return (
+      <Band group onPress={card.open} style={style}>
+        <View style={st.outRow} accessible accessibilityRole="button" accessibilityLabel={`${ch.title}. You're out. Back in for the next one.`}>
+          <View style={st.outX}><Icon name="x" size={52} color={C.red} stroke={3.4} /></View>
+          <View style={st.outText}>
+            <Label numberOfLines={1} style={st.scoreLabel}>{short}</Label>
+            <Text style={st.outWord}>Out</Text>
+            <Text style={st.outLine}>Back in for the next one.</Text>
+          </View>
+        </View>
+      </Band>
+    );
+  }
   return (
     <Band group onPress={card.open} style={style}>
       <View style={st.scoreTop}>
@@ -412,65 +451,91 @@ function ChallengeRow({ ch, last }: { ch: Challenge; last?: boolean }) {
 }
 
 // ───────────────────────── the rest of the page ─────────────────────────
+// Every section down here has the same two levels: one condensed heading, then rows with a
+// condensed title and one readable line of system text, a hairline between rows, and plenty of air.
+
+const GAP = 44; // between sections
+
+// A section's one heading, with an optional link at its right.
+function Head({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
+  return (
+    <View style={st.head}>
+      <Text style={st.headText} numberOfLines={1} accessibilityRole="header">{title}</Text>
+      {action ? <Label tone="blue" size={13} onPress={onAction}>{action}</Label> : null}
+    </View>
+  );
+}
+
+// One row: an optional lead (a date, a picture), a title, one line under it, an optional chip.
+function Line({ lead, title, line, lines = 1, thumb, right, onPress, last, label }: {
+  lines?: number; lead?: React.ReactNode; title: string; line?: string; thumb?: string; right?: React.ReactNode; onPress: () => void; last?: boolean; label: string;
+}) {
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={({ pressed }) => [st.row, !last && st.rowRule, pressed && st.dim]}>
+      {lead}
+      <View style={st.lineText}>
+        <Text style={st.lineTitle} numberOfLines={2}>{title}</Text>
+        {line ? <Text style={st.lineSub} numberOfLines={lines}>{line}</Text> : null}
+      </View>
+      {thumb ? <Image source={{ uri: thumb }} style={st.thumb} accessibilityIgnoresInvertColors /> : null}
+      {right}
+    </Pressable>
+  );
+}
 
 // The food post, while it is fresh (4 days).
 const OnTheMenu = React.memo(function OnTheMenu() {
   const { content } = useStore();
   const food = [...content.posts].filter((p) => p.kind === 'Food' && Date.now() - new Date(p.at).getTime() < 4 * 864e5).sort((a, b) => b.at.localeCompare(a.at))[0];
   if (!food) return null;
-  const photo = food.photos?.[0];
   return (
-    <View style={st.menu}>
-      <Hairline />
-      <Row kicker="On the menu" title={food.title} meta={food.body || undefined} metaLines={1} thumb={photo} chevron={!photo}
-        onPress={() => router.push(`/post/${food.id}`)} accessibilityLabel={`On the menu: ${food.title}`} />
+    <View style={st.section}>
+      <Head title="On the menu" />
+      <Line title={food.title} line={food.body || undefined} thumb={food.photos?.[0]} last onPress={() => router.push(`/post/${food.id}`)} label={`On the menu: ${food.title}`} />
     </View>
   );
 });
 
-// The three newest posts (pinned first), as rows.
-const FromRabbi = React.memo(function FromRabbi({ afterBand }: { afterBand?: boolean }) {
-  const { content, go } = useStore();
-  const posts = sortPosts(content.posts).filter((p) => p.kind !== 'Food').slice(0, 3);
-  if (!posts.length) return null;
-  return (
-    <>
-      <SectionHead title="From Rabbi Zevy" action="See all" onAction={() => go('Feed')} top={afterBand ? 20 : SP.section} />
-      {posts.map((p, i) => {
-        return (
-          <Row key={p.id} title={p.title} meta={p.body || undefined} metaLines={1} thumb={p.photos?.[0]} last={i === posts.length - 1}
-            onPress={() => router.push(`/post/${p.id}`)} accessibilityLabel={p.title} />
-        );
-      })}
-    </>
-  );
-});
-
 // Every event that repeats weekly, one row each: the weekday, the title, when and where, and the RSVP chip.
-const WeeklyEvents = React.memo(function WeeklyEvents({ afterBand }: { afterBand?: boolean }) {
+const WeeklyEvents = React.memo(function WeeklyEvents() {
   const { content, fits, going, openEvent } = useStore();
   const now = useNow();
   const list = upcoming(content.events).filter((e) => e.repeat === 'weekly' && fits(e));
   if (!list.length) return null;
   return (
-    <>
-      <SectionHead title="Weekly events" top={afterBand ? 20 : SP.section} />
+    <View style={st.section}>
+      <Head title="Weekly events" />
       {list.map((e, i) => {
         const { day, time } = dayAndTime(e, now);
         const every = day.split(' ').map((w) => w.charAt(0) + w.slice(1).toLowerCase()).join(' '); // "Every Sunday"
-        const meta = [every, time, e.place].filter(Boolean).join(' · ');
+        const line = [every, time, e.place].filter(Boolean).join(' · ');
         const mine = going.includes(e.id);
         return (
-          <Row key={e.id} title={e.title} meta={meta} metaLines={2} date={e.start} last={i === list.length - 1} onPress={() => openEvent(e.id)}
-            accessibilityLabel={`${e.title}, ${meta}`}
+          <Line key={e.id} title={e.title} line={line} lines={2} last={i === list.length - 1} onPress={() => openEvent(e.id)} label={`${e.title}, ${line}`}
+            lead={<DayBlock date={e.start} now={now} />}
             right={e.signup !== 'app' ? undefined : mine ? <Slab size="chip" kind="outline" icon="tick" label="In" /> : <Slab size="chip" kind="paper" label="RSVP" onPress={() => openEvent(e.id)} accessibilityLabel={`RSVP to ${e.title}`} />} />
         );
       })}
-    </>
+    </View>
   );
 });
 
-// This Shabbat in Great Neck: candle lighting and when it ends, side by side, then the Teen Minyan.
+// The three newest posts (pinned first): a title and one line each.
+const FromRabbi = React.memo(function FromRabbi() {
+  const { content, go } = useStore();
+  const posts = sortPosts(content.posts).filter((p) => p.kind !== 'Food').slice(0, 3);
+  if (!posts.length) return null;
+  return (
+    <View style={st.section}>
+      <Head title="From Rabbi Zevy" action="See all" onAction={() => go('Feed')} />
+      {posts.map((p, i) => (
+        <Line key={p.id} title={p.title} line={p.body || undefined} thumb={p.photos?.[0]} last={i === posts.length - 1} onPress={() => router.push(`/post/${p.id}`)} label={p.title} />
+      ))}
+    </View>
+  );
+});
+
+// This Shabbat, compact: the two times as big as the page needs and no bigger, then the Teen Minyan.
 const ShabbatBand = React.memo(function ShabbatBand() {
   const sh = useShabbat();
   const { content } = useStore();
@@ -478,17 +543,23 @@ const ShabbatBand = React.memo(function ShabbatBand() {
   const teen = (content.minyan?.shabbat ?? MINYAN_FALLBACK.shabbat).find((r) => /teen/i.test(r.label));
   return (
     <Band style={st.shabbat}>
-      <Label>Shabbat in Great Neck{sh?.parsha ? ` · ${sh.parsha}` : ''}</Label>
+      <Text style={st.shabHead}>Shabbat{sh?.parsha ? ` · ${sh.parsha}` : ''}</Text>
       {sh ? (
         <View style={st.shabTimes}>
-          <Stat value={sh.candles ?? '—'} label="Candle lighting" size={40} style={st.shabTime} />
+          <View style={st.shabCol}>
+            <Text style={st.shabTime} numberOfLines={1}>{sh.candles ?? '—'}</Text>
+            <Text style={st.shabLabel}>Candle lighting</Text>
+          </View>
           <Hairline strong vertical />
-          <Stat value={sh.havdalah ?? '—'} label="Shabbat ends" size={40} style={[st.shabTime, st.shabSecond]} />
+          <View style={[st.shabCol, st.shabColRight]}>
+            <Text style={st.shabTime} numberOfLines={1}>{sh.havdalah ?? '—'}</Text>
+            <Text style={st.shabLabel}>Shabbat ends</Text>
+          </View>
         </View>
-      ) : <Text style={[T.small, { marginTop: 6 }]}>Loading this week's times…</Text>}
+      ) : <Text style={[T.small, { marginTop: 8 }]}>Loading this week's times…</Text>}
       {teen ? (
         <View style={st.shabTeen}>
-          <Label numberOfLines={1} style={st.shabTeenLabel}>{teen.label} · Saturday</Label>
+          <Text style={st.shabTeenLabel} numberOfLines={1}>{teen.label} · Saturday</Text>
           <Text style={st.shabTeenTime} numberOfLines={1}>{minyanTime(teen.time, sh || null).time}</Text>
         </View>
       ) : null}
@@ -496,8 +567,31 @@ const ShabbatBand = React.memo(function ShabbatBand() {
   );
 });
 
-
 const st = StyleSheet.create({
+  section: { marginTop: GAP },
+  head: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, marginBottom: 6 },
+  headText: { ...display(30), flexShrink: 1 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 18 },
+  rowRule: { borderBottomWidth: 1, borderBottomColor: C.line },
+  lineText: { flex: 1, minWidth: 0 },
+  lineTitle: { ...display(22) },
+  lineSub: { fontSize: 15, lineHeight: 21, color: C.sub, marginTop: 4 },
+  thumb: { width: 60, height: 60, borderRadius: R.print, backgroundColor: C.card },
+  shabbat: { marginTop: GAP, paddingVertical: 20 },
+  shabHead: { fontFamily: F.bold, fontSize: 14, lineHeight: 18, letterSpacing: 1.6, color: C.sub, textTransform: 'uppercase' },
+  shabTimes: { flexDirection: 'row', alignItems: 'stretch', marginTop: 14 },
+  shabCol: { flex: 1 },
+  shabColRight: { paddingLeft: SP.gutter },
+  shabTime: { ...numeral(36), color: C.ink },
+  shabLabel: { fontSize: 13, lineHeight: 17, color: C.sub, marginTop: 4 },
+  shabTeen: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 16, paddingTop: 14, borderTopWidth: 1, borderTopColor: C.line },
+  shabTeenLabel: { flex: 1, fontSize: 15, lineHeight: 20, fontWeight: '600', color: C.ink },
+  shabTeenTime: { ...display(24, C.blue) },
+  outRow: { flexDirection: 'row', alignItems: 'center', gap: 18 },
+  outX: { width: 84, height: 84, borderRadius: 42, borderWidth: 3, borderColor: C.red, alignItems: 'center', justifyContent: 'center' },
+  outText: { flex: 1, minWidth: 0 },
+  outWord: { ...display(46, C.red), marginTop: 2 },
+  outLine: { fontSize: 15, lineHeight: 21, color: C.sub, marginTop: 2 },
   invites: { marginTop: 0, marginBottom: 14 },
   dateRow: { height: DATE_ROW, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   dateLine: { flexDirection: 'row', alignItems: 'center', gap: 9 },
@@ -551,12 +645,4 @@ const st = StyleSheet.create({
   prizeDetail: { fontSize: 13, lineHeight: 17, color: C.sub, textAlign: 'right' },
   ticks: { marginTop: 11 },
   // the rest
-  menu: { marginTop: 22 },
-  shabbat: { marginTop: SP.section },
-  shabTimes: { flexDirection: 'row', alignItems: 'stretch', marginTop: 8 },
-  shabTime: { flex: 1 },
-  shabSecond: { paddingLeft: SP.gutter },
-  shabTeen: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 12, paddingTop: 11, borderTopWidth: 1, borderTopColor: C.line },
-  shabTeenLabel: { flex: 1 },
-  shabTeenTime: { ...display(20, C.blue) },
 });

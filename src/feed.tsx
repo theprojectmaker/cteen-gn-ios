@@ -1,9 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { router } from 'expo-router';
-import { C, R, T, display } from './theme';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, Animated, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
+import { C, F, R, T, display } from './theme';
 import { Icon } from './icons';
 import { CHAPTER, countdown, daysUntil, open, sortPosts, tap, upcoming, useStore, type Post, type PostComment } from './store';
+import { Hairline, Label } from './look';
 import { Button, Cover, Empty, EventMeta, s as u } from './ui';
 
 // The Feed, Instagram style: one clean card per post with big photos, a heart and comments.
@@ -20,9 +21,34 @@ export function timeAgo(iso: string) {
 }
 
 export function Feed() {
-  const { content, leader, setComposerOpen, markFeedSeen, fits, openEvent } = useStore();
-  useEffect(() => { markFeedSeen(); }, []);
-  const list = sortPosts(content.posts);
+  const { content, leader, setComposerOpen, markFeedSeen, fits, openEvent, seenPosts, seenInit, unreadFeed } = useStore();
+  // The posts you had not seen when you opened the Feed: shown in a NEW group for this visit only.
+  // Opening the Feed marks them seen (the tab badge clears at once); leaving it puts them back in
+  // their normal places. (The old code marked posts seen only when the screen was first built,
+  // from a stale copy of the count, so posts that arrived afterwards stayed "unread" for good.)
+  const [fresh, setFresh] = useState<string[]>([]);
+  const focused = useRef(false);
+  const latest = useRef({ content, seenPosts, seenInit, markFeedSeen });
+  latest.current = { content, seenPosts, seenInit, markFeedSeen };
+  const capture = useCallback(() => {
+    const l = latest.current;
+    if (!l.seenInit) return;
+    const ids = l.content.posts.filter((p) => !l.seenPosts.includes(p.id)).map((p) => p.id);
+    if (!ids.length) return;
+    setFresh((f) => [...new Set([...f, ...ids])]);
+    l.markFeedSeen();
+  }, []);
+  useFocusEffect(useCallback(() => {
+    focused.current = true;
+    capture();
+    return () => { focused.current = false; setFresh([]); };
+  }, [capture]));
+  // a post that arrives while the Feed is open joins the NEW group too
+  useEffect(() => { if (focused.current && unreadFeed > 0) capture(); }, [unreadFeed, seenInit]);
+  const sorted = sortPosts(content.posts);
+  const pinned = sorted.filter((p) => p.pinned);
+  const news = sorted.filter((p) => !p.pinned && fresh.includes(p.id)).sort((a, b) => b.at.localeCompare(a.at));
+  const list = sorted.filter((p) => !p.pinned && !fresh.includes(p.id));
   // Events in the next 3 days are pinned to the top of the Feed on their own (weekly ones too).
   const soon = upcoming(content.events).filter(fits).filter((e) => daysUntil(e.start) <= 3).slice(0, 4);
   return (
@@ -57,14 +83,22 @@ export function Feed() {
         </View>
       ) : null}
       <View style={{ gap: 16, marginTop: 18 }}>
+        {pinned.map((p) => <PostCard key={p.id} post={p} isNew={fresh.includes(p.id)} />)}
+        {news.length ? (
+          <>
+            <View style={st.newHead}><Label tone="orange" size={13}>{news.length === 1 ? 'New post' : `${news.length} new posts`}</Label></View>
+            {news.map((p) => <PostCard key={p.id} post={p} isNew />)}
+            <Hairline strong style={st.newEnd} />
+          </>
+        ) : null}
         {list.map((p) => <PostCard key={p.id} post={p} />)}
       </View>
-      {list.length === 0 ? <Empty icon="chat" title="Nothing here yet" body="Posts from the chapter show up here." /> : null}
+      {sorted.length === 0 ? <Empty icon="chat" title="Nothing here yet" body="Posts from the chapter show up here." /> : null}
     </>
   );
 }
 
-export function PostCard({ post, full, compact }: { post: Post; full?: boolean; compact?: boolean }) {
+export function PostCard({ post, full, compact, isNew }: { post: Post; full?: boolean; compact?: boolean; isNew?: boolean }) {
   const { liked, likePost, postMeta, openEvent, openChallenge, content, leader, saveContent, goingCount } = useStore();
   const on = liked.includes(post.id);
   const meta = postMeta[post.id] ?? { likes: 0, comments: 0 };
@@ -105,20 +139,31 @@ export function PostCard({ post, full, compact }: { post: Post; full?: boolean; 
     await saveContent({ ...content, posts: content.posts.map((p) => (p.id === post.id ? { ...p, pinned: !p.pinned } : p)) });
     setPinBusy(false);
   };
+  const removePost = () => {
+    const run = async () => { setPinBusy(true); await saveContent({ ...content, posts: content.posts.filter((p) => p.id !== post.id) }); setPinBusy(false); };
+    const g = globalThis as { confirm?: (m: string) => boolean };
+    if (Platform.OS === 'web') { if (g.confirm ? g.confirm(`Delete "${post.title}" for everyone?`) : false) run(); return; }
+    Alert.alert('Delete this post?', `"${post.title}" will be removed for everyone.`, [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: run }]);
+  };
   const openPost = () => { if (!full) router.push(`/post/${post.id}`); };
 
   const photos = post.photos?.length ? post.photos : null;
   const media = compact ? null : photos ? 'photos' : ev?.image ? 'event' : null;
 
   return (
-    <View style={st.card}>
+    <View style={[st.card, isNew && st.cardNew]}>
       {/* header */}
       <View style={st.head}>
         <View style={st.avatarRing}><Image source={require('../assets/mark.png')} style={st.avatar} resizeMode="contain" /></View>
         <View style={{ flex: 1 }}>
           <Text style={st.author} numberOfLines={1}>{CHAPTER.name} <Text style={st.ago}>· {timeAgo(post.at)}</Text></Text>
-          <Text style={st.kind}>{post.kind}</Text>
+          <View style={st.kindRow}>{isNew ? <Text style={st.newTag}>NEW</Text> : null}<Text style={st.kind}>{post.kind}</Text></View>
         </View>
+        {leader && !full && !compact ? (
+          <Pressable onPress={removePost} disabled={pinBusy} hitSlop={8} style={({ pressed }) => [st.delBtn, pressed && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel={`Delete post: ${post.title}`}>
+            <Text style={st.delText}>Delete</Text>
+          </Pressable>
+        ) : null}
         {leader ? (
           <Pressable onPress={togglePin} disabled={pinBusy} hitSlop={8} style={({ pressed }) => [st.pinBtn, post.pinned && st.pinOn, pressed && { opacity: 0.7 }]} accessibilityRole="button" accessibilityLabel={post.pinned ? 'Unpin post' : 'Pin post'}>
             <Icon name="pinned" size={13} color={post.pinned ? C.onBlue : C.blueDeep} stroke={2.2} />
@@ -293,7 +338,14 @@ const st = StyleSheet.create({
   avatar: { width: 22, height: 28 },
   author: { fontSize: 15, fontWeight: '800', color: C.ink },
   ago: { fontSize: 14, fontWeight: '500', color: C.faint },
-  kind: { fontSize: 12, color: C.sub, marginTop: 1 },
+  kind: { fontSize: 12, color: C.sub },
+  kindRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
+  newTag: { fontFamily: F.bold, fontSize: 11, lineHeight: 14, letterSpacing: 1.8, color: C.onOrange, backgroundColor: C.orange, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, overflow: 'hidden' },
+  cardNew: { borderWidth: 1.5, borderColor: C.orange },
+  newHead: { marginTop: 4 },
+  newEnd: { marginTop: 12, marginBottom: 12 },
+  delBtn: { minHeight: 28, justifyContent: 'center', paddingHorizontal: 4 },
+  delText: { fontSize: 13, fontWeight: '700', color: C.red },
   pinBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, height: 28, borderRadius: R.chip, backgroundColor: C.bluePale },
   pinOn: { backgroundColor: C.blue },
   pinText: { fontSize: 12, fontWeight: '800', color: C.blueDeep },
