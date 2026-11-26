@@ -2,11 +2,11 @@ import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import Constants from 'expo-constants';
-import { C, PREFS, T } from '../src/theme';
+import { C, PREFS, T, display } from '../src/theme';
 import { Icon } from '../src/icons';
 import { writePrefs } from '../src/prefs';
 import { useStore } from '../src/store';
-import { Card, IconTile, Toggle } from '../src/ui';
+import { Card, Toggle } from '../src/ui';
 import { Avatar, Page } from '../src/look';
 
 // Profile picture -> Settings: your profile, how the app feels, notifications, about.
@@ -81,10 +81,9 @@ export default function SettingsRoute() {
 function Row({ icon, title, sub, children, onPress, rule, chevron }: { icon: string; title: string; sub?: string; children?: React.ReactNode; onPress?: () => void; rule?: boolean; chevron?: boolean }) {
   return (
     <Pressable onPress={onPress} disabled={!onPress} style={({ pressed }) => [st.row, rule && st.rule, pressed && { backgroundColor: C.raised }]} accessibilityRole={onPress ? 'button' : undefined}>
-      <IconTile icon={icon} size={38} />
       <View style={{ flex: 1 }}>
-        <Text style={T.strong}>{title}</Text>
-        {sub ? <Text style={T.small}>{sub}</Text> : null}
+        <Text style={st.rowTitle}>{title}</Text>
+        {sub ? <Text style={st.rowSub}>{sub}</Text> : null}
       </View>
       {children}
       {chevron ? <Icon name="right" size={17} color={C.faint} stroke={2.4} /> : null}
@@ -94,13 +93,15 @@ function Row({ icon, title, sub, children, onPress, rule, chevron }: { icon: str
 
 const st = StyleSheet.create({
   title: { marginBottom: 18 },
-  profile: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16 },
-  section: { ...T.eyebrow, marginTop: 28, marginBottom: 10, marginLeft: 2 },
-  group: { padding: 0, overflow: 'hidden' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 13 },
+  profile: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 0, paddingVertical: 16, backgroundColor: 'transparent', shadowOpacity: 0, elevation: 0, borderRadius: 0, borderBottomWidth: 1, borderBottomColor: C.line },
+  section: { ...display(26), marginTop: 40, marginBottom: 4 },
+  rowTitle: { fontSize: 17, lineHeight: 22, fontWeight: '600', color: C.ink },
+  rowSub: { fontSize: 15, lineHeight: 21, color: C.sub, marginTop: 2 },
+  group: { padding: 0, backgroundColor: 'transparent', shadowOpacity: 0, elevation: 0, borderRadius: 0 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 0, paddingVertical: 16, minHeight: 60 },
   rule: { borderTopWidth: 1, borderTopColor: C.line },
-  err: { color: C.red, fontSize: 13, paddingHorizontal: 16, paddingBottom: 12 },
-  signOut: { alignSelf: 'center', marginTop: 28, paddingHorizontal: 18, paddingVertical: 12 },
+  err: { color: C.red, fontSize: 15, paddingBottom: 12 },
+  signOut: { alignSelf: 'flex-start', marginTop: 40, paddingVertical: 12 },
   signOutText: { color: C.red, fontWeight: '700', fontSize: 15 },
-  version: { textAlign: 'center', color: C.faint, fontSize: 12, marginTop: 10 },
+  version: { color: C.faint, fontSize: 14, marginTop: 16 },
 });

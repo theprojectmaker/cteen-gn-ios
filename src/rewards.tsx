@@ -5,7 +5,7 @@ import { challengeRules } from './challengeRules';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Fire, FireBadge } from './fire';
 import Svg, { Circle } from 'react-native-svg';
-import { C, HUES, R, T, display, numeral } from './theme';
+import { C, F, HUES, R, T, display, numeral } from './theme';
 import { Icon, challengeIcon } from './icons';
 import { nyTime, untilText, wrapWindow } from './zmanim';
 import { leftText, useWrapStatus } from './wrap';
@@ -61,7 +61,7 @@ export function ChallengeBanner({ ch }: { ch: Challenge }) {
   return (
     <Card style={st.bannerCard} onPress={open} label={`${ch.title}. ${line}`}>
       <View style={st.banner}>
-      {ch.id === 'tefillin' ? <FireBadge lit={done} streak={fire} size={50} /> : <IconTile icon={challengeIcon(ch)} color={ch.color} size={52} solid />}
+      <Icon name={challengeIcon(ch)} size={36} color={done ? C.blue : C.orangeText} stroke={2} />
       <View style={{ flex: 1 }}>
         <Text style={T.h3} numberOfLines={2}>{ch.title}</Text>
         <Text style={[T.small, { marginTop: 2 }]} numberOfLines={2}>{line}</Text>
@@ -271,45 +271,46 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
       {ch.image ? <View style={st.cover}><Image source={{ uri: ch.image }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityLabel={ch.title} /></View> : null}
       {/* title */}
       <View style={st.top}>
-        {timed ? <Fire size={58} lit={done} /> : <IconTile icon={challengeIcon(ch)} color={ch.color} size={54} solid />}
         <View style={{ flex: 1 }}>
           <Text style={st.topTitle} numberOfLines={2}>{ch.title}</Text>
           {dayLine ? <Text style={st.topSub}>{dayLine}{lastDay ? ` · ends ${niceDay(lastDay)}` : ''}</Text> : null}
         </View>
       </View>
 
+      {/* the scoreboard: the day you are on, big, and the bars */}
+      {mine ? (
+        <View style={st.score}>
+          <View style={st.scoreRow}>
+            <View style={st.prizeCountRow}>
+              <Text style={st.scoreNum}>{me.out || done ? me.count : Math.min(me.goal, me.count + 1)}</Text>
+              <Text style={st.scoreOf}>/{me.goal}</Text>
+            </View>
+            <Text style={[st.scoreState, me.out && { color: C.red }]}>{me.out ? 'Out' : left === 0 ? 'Done' : `${left} to go`}</Text>
+          </View>
+          <Ticks total={me.goal} done={me.count} pending={!done && !me.out} style={{ marginTop: 14 }} />
+        </View>
+      ) : null}
+
+      {!mine ? (
+        ch.active ? (
+          <>
+      {/* the prize */}
+      <View style={st.prize}>
+        <Text style={st.prizeEyebrow}>{prize ? `Finish all ${prize.at}, win` : `Goal: ${ch.goal}`}</Text>
+        {prize ? <Text style={st.prizeName}>{prize.prize}</Text> : null}
+        {!mine ? <Text style={st.prizeSub}>Everyone who finishes wins. No luck needed.</Text> : null}
+      </View>
+
       {/* the rules, in a decorated pop-up */}
       <Pressable onPress={() => router.push(`/challenge-rules/${ch.id}`)} style={({ pressed }) => [st.rulesBanner, pressed && { opacity: 0.85 }]} accessibilityRole="button" accessibilityLabel="Read the rules">
-        <View style={st.rulesIcon}><Icon name="book" size={19} color={C.ink} stroke={2.1} /></View>
+        <Icon name="book" size={22} color={C.blue} stroke={2.1} />
         <View style={{ flex: 1 }}>
           <Text style={st.rulesTitle}>The rules</Text>
-          <Text style={T.small}>{challengeRules(ch).length} quick rules. Tap to read.</Text>
+          <Text style={st.ruleSub}>{challengeRules(ch).length} quick rules. Tap to read.</Text>
         </View>
         <Icon name="right" size={17} color={C.faint} stroke={2.4} />
       </Pressable>
 
-      {/* the prize and your progress */}
-      <View style={st.prize}>
-        <Text style={st.prizeEyebrow}>{prize ? `Finish all ${prize.at}, win` : `Goal: ${ch.goal}`}</Text>
-        {prize ? <Text style={st.prizeName}>{prize.prize}</Text> : null}
-        {mine ? (
-          <>
-            <Ticks total={me.goal} done={me.count} pending={!done && !me.out} style={{ marginTop: 16 }} />
-            <View style={st.prizeRow}>
-              <View style={st.prizeCountRow}>
-                <Text style={st.prizeCount}>{me.count}</Text>
-                <Text style={st.prizeOf}>of {me.goal} days</Text>
-              </View>
-              <Text style={st.prizeLeft}>{me.out ? 'Out' : left === 0 ? 'Done' : `${left} to go`}</Text>
-            </View>
-          </>
-        ) : (
-          <Text style={st.prizeSub}>Everyone who finishes wins. No luck needed.</Text>
-        )}
-      </View>
-
-      {!mine ? (
-        ch.active ? (
           <View style={{ marginTop: 18 }}>
             <View style={st.steps}>
               <Step icon={challengeIcon(ch)} title={ch.id === 'tefillin' ? 'Wrap tefillin' : 'Do it'} sub={ch.every === 'day' ? "Every day. Shabbat doesn't count." : 'Once a week.'} />
@@ -322,6 +323,7 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
             </View>
             {note ? <Text style={st.note}>{note}</Text> : null}
           </View>
+          </>
         ) : <Text style={[T.body, { textAlign: 'center', marginTop: 18 }]}>This challenge has ended.</Text>
       ) : (
         <>
@@ -344,7 +346,7 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
             </View>
           ) : closed ? (
             <View style={st.stateCard}>
-              <View style={[st.stateIcon, { backgroundColor: C.line }]}><Icon name={win!.state === 'before' ? 'sun' : win!.state === 'shabbat' ? 'flame' : 'lock'} size={22} color={C.sub} stroke={2.2} /></View>
+              <View style={[st.stateIcon, { backgroundColor: C.line }]}><Icon name={win!.state === 'before' ? 'sun' : win!.state === 'shabbat' ? 'tefillin' : 'lock'} size={22} color={C.sub} stroke={2.2} /></View>
               <View style={{ flex: 1 }}>
                 <Text style={T.h3}>{win!.state === 'shabbat' ? 'Shabbat Shalom' : win!.state === 'before' ? `Opens at ${nyTime(win!.rise)}` : 'Closed for today'}</Text>
                 <Text style={T.small}>{win!.state === 'shabbat' ? "No tefillin today. It doesn't count as a miss." : win!.state === 'before' ? `Sunrise. That's in ${untilText(win!.rise - now)}.` : `Closed at sunset (${nyTime(win!.set)}). Back tomorrow at sunrise.`}</Text>
@@ -365,9 +367,26 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
           {me.strikes > 0 && !me.out ? <Text style={st.strikeNote}>{me.strikes === 1 ? 'You missed 1 day.' : `You missed ${me.strikes} days.`} A 3rd miss and you're out.</Text> : null}
           {note ? <Text style={st.note} accessibilityLiveRegion="polite">{note}</Text> : null}
 
+      {/* the prize */}
+      <View style={st.prize}>
+        <Text style={st.prizeEyebrow}>{prize ? `Finish all ${prize.at}, win` : `Goal: ${ch.goal}`}</Text>
+        {prize ? <Text style={st.prizeName}>{prize.prize}</Text> : null}
+        {!mine ? <Text style={st.prizeSub}>Everyone who finishes wins. No luck needed.</Text> : null}
+      </View>
+
+      {/* the rules, in a decorated pop-up */}
+      <Pressable onPress={() => router.push(`/challenge-rules/${ch.id}`)} style={({ pressed }) => [st.rulesBanner, pressed && { opacity: 0.85 }]} accessibilityRole="button" accessibilityLabel="Read the rules">
+        <Icon name="book" size={22} color={C.blue} stroke={2.1} />
+        <View style={{ flex: 1 }}>
+          <Text style={st.rulesTitle}>The rules</Text>
+          <Text style={st.ruleSub}>{challengeRules(ch).length} quick rules. Tap to read.</Text>
+        </View>
+        <Icon name="right" size={17} color={C.faint} stroke={2.4} />
+      </Pressable>
+
           {/* today's board */}
           {ch.photo ? (
-            <View style={{ marginTop: 28 }}>
+            <View style={{ marginTop: 40 }}>
               <View style={st.wallHead}>
                 <Text style={st.section0}>Today</Text>
                 <View style={st.liveRow}><View style={st.liveDot} /><Text style={T.small}>{wall ? `${wall.posts.length} of ${total} wrapped` : 'Live'}</Text></View>
@@ -377,7 +396,7 @@ export function ChallengePage({ ch }: { ch: Challenge }) {
             </View>
           ) : null}
 
-          <View style={{ marginTop: 30 }}>
+          <View style={{ marginTop: 40 }}>
             <ReminderPicker value={hour} ch={ch} onChange={(h) => { setHour(h); join(ch.id, h); setNote(h === null ? 'Reminder turned off.' : `Reminder set for ${hourLabel(h)}.`); }} />
           </View>
           <Pressable onPress={() => leave(ch.id)} hitSlop={8} style={{ alignSelf: 'center', marginTop: 24 }} accessibilityRole="button">
@@ -606,7 +625,13 @@ function PhotoViewer({ ch, posts, start, onClose, onChanged }: { ch: Challenge; 
 
 const st = StyleSheet.create({
   cover: { height: 170, borderRadius: R.photo, overflow: 'hidden', backgroundColor: C.card, marginBottom: 16 },
-  rulesBanner: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 14, padding: 14, borderRadius: R.card, backgroundColor: C.card },
+  rulesBanner: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 32, paddingVertical: 18, borderTopWidth: 1, borderBottomWidth: 1, borderColor: C.line },
+  ruleSub: { fontSize: 15, lineHeight: 21, color: C.sub, marginTop: 2 },
+  score: { marginTop: 24 },
+  scoreRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
+  scoreNum: { ...numeral(96, C.blue), lineHeight: 92 },
+  scoreOf: { fontFamily: F.boldItalic, fontSize: 30, lineHeight: 36, color: C.faint, paddingRight: 4 },
+  scoreState: { ...display(26), paddingBottom: 8 },
   rulesIcon: { width: 40, height: 40, borderRadius: R.chip, borderWidth: 1, borderColor: C.lineStrong, alignItems: 'center', justifyContent: 'center' },
   rulesTitle: { ...T.h3 },
   liveRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -615,8 +640,8 @@ const st = StyleSheet.create({
   squareWaiting: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', borderWidth: 1, borderStyle: 'dashed', borderColor: C.lineStrong },
   waitingInitial: { ...display(28, C.faint) },
   checkBadge: { position: 'absolute', top: 6, right: 6, width: 18, height: 18, borderRadius: 9, backgroundColor: C.blue, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: C.bg },
-  cellName: { fontSize: 13, fontWeight: '800', color: C.ink, marginTop: 6 },
-  cellTime: { fontSize: 11, fontWeight: '600', color: C.faint, marginTop: 1, fontVariant: ['tabular-nums'] },
+  cellName: { fontSize: 14, fontWeight: '700', color: C.ink, marginTop: 8 },
+  cellTime: { fontSize: 13, fontWeight: '500', color: C.faint, marginTop: 2, fontVariant: ['tabular-nums'] },
   skelLine: { height: 10, width: '60%', borderRadius: 5, backgroundColor: C.line, marginTop: 8 },
   partyNum: { ...numeral(88), marginTop: 22 },
   partyLabel: { ...T.eyebrow, fontSize: 13, color: C.orangeText },
@@ -643,30 +668,30 @@ const st = StyleSheet.create({
   snapTimer: { alignItems: 'flex-end' },
   snapTimerText: { ...numeral(26, C.onOrange) },
   snapTimerLabel: { ...T.eyebrow, fontSize: 11, color: C.onOrange },
-  top: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 4 },
-  topTitle: { ...display(30) },
-  topSub: { ...T.eyebrow, marginTop: 5 },
-  prize: { marginTop: 18, padding: 18, borderRadius: R.card, backgroundColor: C.card },
+  top: { marginTop: 4 },
+  topTitle: { ...display(36) },
+  topSub: { fontSize: 15, lineHeight: 21, color: C.sub, marginTop: 8 },
+  prize: { marginTop: 32, padding: 20, borderRadius: R.btnSm, backgroundColor: C.band, borderWidth: 1, borderColor: C.line },
   prizeEyebrow: { ...T.eyebrow, color: C.orangeText },
   prizeName: { ...display(26), marginTop: 5 },
-  prizeSub: { fontSize: 14, color: C.sub, marginTop: 8 },
+  prizeSub: { fontSize: 15, lineHeight: 21, color: C.sub, marginTop: 8 },
   prizeRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginTop: 10 },
   prizeCountRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
   prizeCount: { ...numeral(28, C.blue) },
   prizeOf: { fontSize: 14, fontWeight: '600', color: C.sub },
   prizeLeft: { ...T.eyebrow },
-  steps: { borderRadius: R.card, backgroundColor: C.card, paddingHorizontal: 16 },
+  steps: { paddingHorizontal: 0 },
   step: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14 },
   stepLine: { borderBottomWidth: 1, borderBottomColor: C.line },
-  stepIcon: { width: 40, height: 40, borderRadius: R.chip, borderWidth: 1, borderColor: C.lineStrong, alignItems: 'center', justifyContent: 'center' },
-  stateCard: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 16, padding: 16, borderRadius: R.card, backgroundColor: C.card },
+  stepIcon: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  stateCard: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 24, padding: 18, borderRadius: R.btnSm, backgroundColor: C.band, borderWidth: 1, borderColor: C.line },
   stateIcon: { width: 46, height: 46, borderRadius: R.chip, alignItems: 'center', justifyContent: 'center' },
-  snap: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 16, paddingHorizontal: 16, height: 72, borderRadius: R.btn, backgroundColor: C.orange },
+  snap: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 24, paddingHorizontal: 18, height: 76, borderRadius: R.btn, backgroundColor: C.orange },
   snapIconWrap: { width: 34, height: 44, alignItems: 'center', justifyContent: 'center' },
   snapText: { ...display(23, C.onOrange), letterSpacing: 1.1 },
   snapSub: { fontSize: 13, color: C.onOrange, marginTop: 1, fontWeight: '600' },
-  strikeNote: { fontSize: 13, color: C.orangeText, fontWeight: '700', marginTop: 10, textAlign: 'center' },
-  boardHint: { fontSize: 12, color: C.faint, marginTop: 10 },
+  strikeNote: { fontSize: 15, lineHeight: 21, color: C.orangeText, fontWeight: '600', marginTop: 14 },
+  boardHint: { fontSize: 14, lineHeight: 20, color: C.faint, marginTop: 6 },
   party: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28, maxWidth: 520, width: '100%', alignSelf: 'center' },
   partySub: { fontSize: 15, color: C.sub, marginTop: 6, textAlign: 'center' },
   partyNext: { marginTop: 14, paddingVertical: 10, paddingHorizontal: 14, borderRadius: R.chip, backgroundColor: C.bluePale, overflow: 'hidden', fontSize: 14, fontWeight: '600', color: C.ink, textAlign: 'center' },
@@ -677,12 +702,12 @@ const st = StyleSheet.create({
   sheetClose: { width: 38, height: 38, borderRadius: 19, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine, alignItems: 'center', justifyContent: 'center' },
   bigPhoto: { width: '100%', aspectRatio: 3 / 4, borderRadius: R.photo, backgroundColor: C.card },
   wallHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 },
-  section0: { ...T.h2 },
-  bannerCard: { padding: 16 },
+  section0: { ...display(30) },
+  bannerCard: { padding: 20, backgroundColor: C.band, borderWidth: 1, borderColor: C.line, shadowOpacity: 0, elevation: 0, borderRadius: R.btnSm },
   banner: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   bannerFoot: { marginTop: 14 },
   bannerFootRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, marginTop: 8 },
-  bannerFootText: { fontSize: 12, fontWeight: '700', color: C.sub, flexShrink: 1 },
+  bannerFootText: { fontSize: 14, fontWeight: '600', color: C.sub, flexShrink: 1 },
   pill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: R.btnSm, paddingHorizontal: 16, minHeight: 36, justifyContent: 'center', backgroundColor: C.orange, borderWidth: 1.5, borderColor: C.orange },
   pillDone: { backgroundColor: 'transparent', borderColor: C.blue },
   pillText: { ...display(19, C.onOrange), letterSpacing: 1.1 },

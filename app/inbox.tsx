@@ -30,7 +30,7 @@ export default function InboxRoute() {
   return (
     <Page refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} tintColor={C.blue} />}>
       <Text style={T.h1}>Inbox</Text>
-      <Text style={[T.small, { marginTop: 6, marginBottom: 14 }]}>Everything the chapter sent, so you never miss a thing.</Text>
+      <Text style={st.sub}>Everything the chapter sent, so you never miss a thing.</Text>
       {items === null ? <Text style={T.small}>Loading…</Text> : items.length === 0 ? (
         <View style={st.empty}>
           <Text style={[T.h2, { color: C.sub }]}>Nothing yet</Text>
@@ -46,11 +46,11 @@ export default function InboxRoute() {
                 <View style={{ flex: 1 }}>
                   <View style={st.meta}>
                     {isNew ? <View style={st.dot} /> : null}
-                    <Label tone={k.tone} size={11} style={{ flex: 1 }}>{k.label}</Label>
+                    <Label tone={k.tone} size={12} style={{ flex: 1 }}>{k.label}</Label>
                     <Text style={st.ago}>{timeAgo(b.at)}</Text>
                   </View>
                   <Text style={[T.h3, { marginTop: 5 }]} numberOfLines={2}>{b.title}</Text>
-                  {b.text ? <Text style={[T.small, { marginTop: 3 }]} numberOfLines={3}>{b.text}</Text> : null}
+                  {b.text ? <Text style={st.text} numberOfLines={3}>{b.text}</Text> : null}
                 </View>
                 {b.target ? <Icon name="right" size={16} color={C.faint} stroke={2.4} /> : null}
               </Pressable>
@@ -63,10 +63,12 @@ export default function InboxRoute() {
 }
 
 const st = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 20 },
+  text: { fontSize: 15, lineHeight: 21, color: C.sub, marginTop: 4 },
+  sub: { fontSize: 15, lineHeight: 21, color: C.sub, marginTop: 6, marginBottom: 20 },
   rule: { borderTopWidth: 1, borderTopColor: C.line },
   meta: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  ago: { fontSize: 12, color: C.faint, fontWeight: '600' },
+  ago: { fontSize: 14, color: C.faint, fontWeight: '500' },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: C.orange },
   empty: { paddingTop: 40 },
 });

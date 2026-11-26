@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { C, R, T, F } from './theme';
+import { C, R, T, F, display } from './theme';
 import { Icon } from './icons';
 import { router } from 'expo-router';
 import { dateLabel, repeatLabel, streak, upcoming, useStore, type Gender } from './store';
@@ -127,10 +127,9 @@ function GoogleRow() {
 function ActivityRow({ icon, title, sub, onPress, first }: { icon: string; title: string; sub: string; onPress: () => void; first?: boolean }) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [st.actRow, !first && st.actRule, pressed && { backgroundColor: C.raised }]} accessibilityRole="button" accessibilityLabel={title}>
-      <View style={st.actIcon}><Icon name={icon} size={18} color={C.ink} stroke={2} /></View>
       <View style={{ flex: 1 }}>
-        <Text style={T.h3} numberOfLines={1}>{title}</Text>
-        <Text style={T.small} numberOfLines={1}>{sub}</Text>
+        <Text style={st.actTitle} numberOfLines={1}>{title}</Text>
+        <Text style={st.actSub} numberOfLines={2}>{sub}</Text>
       </View>
       <Icon name="right" size={16} color={C.faint} stroke={2.4} />
     </Pressable>
@@ -147,10 +146,10 @@ function YourCteen() {
   return (
     <>
       <Text style={st.section}>Your CTeen</Text>
-      <Card style={{ padding: 0, overflow: 'hidden' }}>
+      <View>
         {myChallenges.map((c, i) => {
           const s = streak(c, checks), n = counts[c.id] ?? 0;
-          return <ActivityRow key={c.id} first={i === 0} icon="flame" title={c.title} sub={s > 0 ? `${s} ${c.every === 'week' ? 'week' : 'day'}${s === 1 ? '' : 's'} in a row · ${n} of ${c.goal}` : `${n} of ${c.goal} done — keep it going`} onPress={() => openChallenge(c.id)} />;
+          return <ActivityRow key={c.id} first={i === 0} icon={c.id === 'tefillin' ? 'tefillin' : 'trophy'} title={c.title} sub={s > 0 ? `${s} ${c.every === 'week' ? 'week' : 'day'}${s === 1 ? '' : 's'} in a row · ${n} of ${c.goal}` : `${n} of ${c.goal} done — keep it going`} onPress={() => openChallenge(c.id)} />;
         })}
         {myEvents.map((e, i) => (
           <ActivityRow key={e.id} first={i === 0 && !myChallenges.length} icon="check" title={e.title} sub={`Going · ${repeatLabel(e) || dateLabel(e)}`} onPress={() => openEvent(e.id)} />
@@ -158,7 +157,7 @@ function YourCteen() {
         {savedEvents.map((e) => (
           <ActivityRow key={e.id} icon="heart" title={e.title} sub={`Saved · ${repeatLabel(e) || dateLabel(e)}`} onPress={() => openEvent(e.id)} />
         ))}
-      </Card>
+      </View>
     </>
   );
 }
@@ -208,8 +207,7 @@ export function AccountPage() {
         <ProfileForm cta={saved ? 'Saved' : 'Save'} onSaved={() => setSaved(true)} />
       </Card>
       <Pressable onPress={() => router.push('/settings')} style={({ pressed }) => [st.settingsRow, pressed && { backgroundColor: C.raised }]} accessibilityRole="button" accessibilityLabel="Notifications and settings">
-        <View style={st.actIcon}><Icon name="bell" size={18} color={C.ink} stroke={2} /></View>
-        <Text style={[T.strong, { flex: 1 }]}>Notifications & settings</Text>
+        <Text style={[st.actTitle, { flex: 1 }]}>Notifications & settings</Text>
         <Icon name="right" size={16} color={C.faint} stroke={2.4} />
       </Pressable>
       <Text style={st.section}>Sign in</Text>
@@ -236,11 +234,13 @@ const st = StyleSheet.create({
   avatarCamera: { position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: 13, backgroundColor: C.orange, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: C.bg },
   avatarLetter: { color: C.white, fontSize: 38, lineHeight: 40, fontFamily: F.display, paddingHorizontal: 4 },
   title: { ...T.h1, marginTop: 14, textAlign: 'center' },
-  section: { ...T.h2, marginTop: 30, marginBottom: 12 },
-  actRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 14 },
+  section: { ...display(28), marginTop: 40, marginBottom: 6 },
+  actTitle: { fontSize: 17, lineHeight: 22, fontWeight: '600', color: C.ink },
+  actSub: { fontSize: 15, lineHeight: 21, color: C.sub, marginTop: 2 },
+  actRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 0, paddingVertical: 16 },
   actRule: { borderTopWidth: 1, borderTopColor: C.line },
   actIcon: { width: 36, height: 36, borderRadius: R.chip, borderWidth: 1, borderColor: C.lineStrong, alignItems: 'center', justifyContent: 'center' },
-  settingsRow: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: C.card, borderRadius: R.card, paddingHorizontal: 16, paddingVertical: 14, marginTop: 16 },
+  settingsRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 18, marginTop: 24, borderTopWidth: 1, borderBottomWidth: 1, borderColor: C.line },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   gButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, minHeight: 50, borderRadius: R.btn, borderWidth: 1, borderColor: C.lineStrong },
   gBadge: { width: 26, height: 26, borderRadius: 13, backgroundColor: C.paper, alignItems: 'center', justifyContent: 'center' },
