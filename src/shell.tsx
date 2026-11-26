@@ -55,14 +55,15 @@ const BAR_H = 54;
 
 // One tab's page: the Flyer backdrop (it does not scroll), the page itself, and the glass header
 // bar pinned on top. Pull down to refresh. The first time a tab opens, the page eases in.
-// `scoreboard`: this page shows the challenge scoreboard (Home). For a teen who is in the
-// challenge that band already carries the live "left to wrap" clock and SNAP, so the last-hour
-// banner is not drawn a second time above it; everyone else, and every other tab, still gets it.
+// `scoreboard`: this page shows the challenge scoreboard (Home). That band already carries the
+// last hour (the live "left to wrap" clock and SNAP for a teen in the challenge, "MIN LEFT TODAY"
+// beside JOIN for one who is not), so the solid orange last-hour banner is not drawn a second
+// time above it. Every other tab still gets it.
 export function Screen({ children, scoreboard }: { children: React.ReactNode; scoreboard?: boolean }) {
   const insets = useSafeAreaInsets();
   const { refresh, liveAlert } = useStore();
   const wrap = useWrapStatus();
-  const wrapBanner = !!wrap?.lastHour && !(scoreboard && wrap.mine);
+  const wrapBanner = !!wrap?.lastHour && !scoreboard;
   const [refreshing, setRefreshing] = useState(false);
   const enter = useRef(new Animated.Value(PREFS.reduceMotion ? 1 : 0)).current;
   const scrollY = useRef(new Animated.Value(0)).current;

@@ -25,8 +25,10 @@ export function useMyInvites(eventOnly?: boolean) {
 }
 
 // One band per invitation waiting for you. Renders nothing when there are none.
-export function InviteCards({ eventOnly, style }: { eventOnly?: boolean; style?: StyleProp<ViewStyle> }) {
-  const list = useMyInvites(eventOnly);
+// skipEventId: leave out invitations to that event (on Home's event day the event already has the
+// top of the page and its own I'M IN; the hero shows a small "You're invited" line instead).
+export function InviteCards({ eventOnly, skipEventId, style }: { eventOnly?: boolean; skipEventId?: string; style?: StyleProp<ViewStyle> }) {
+  const list = useMyInvites(eventOnly).filter((v) => !skipEventId || v.eventId !== skipEventId);
   if (!list.length) return null;
   // more than one: the bands stack, sharing the hairline between them
   return <View style={[st.list, style]}>{list.map((v, i) => <InviteBand key={v.id} v={v} joined={i > 0} />)}</View>;

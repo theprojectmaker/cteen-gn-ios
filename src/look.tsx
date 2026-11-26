@@ -94,7 +94,7 @@
  *                                 A hairline is drawn under it; pass `last` on the final row of a
  *                                 group to drop it. Extra content can go in as children (shown
  *                                 under the text, for rows that expand).
- *    <DayBlock date big? today? align? style>   The date at the left of a row: a cyan label (the weekday
+ *    <DayBlock date big? today? align? now? style>   The date at the left of a row: a cyan label (the weekday
  *                                 within 7 days, otherwise the month; "TODAY" in orange) over the
  *                                 slanted day number. 42 wide. `big` = the 64 pt version for a
  *                                 hero without a picture. today={false}: never say "TODAY".
@@ -171,7 +171,7 @@ import { Icon } from './icons';
 import { Glass } from './glass';
 import { IMAGES, daysUntil, withNextDate, type EventItem } from './store';
 import { nyDate, sunTimes } from './zmanim';
-import { dayAndTime, parseDay, prettyTime, whenWords } from './when';
+import { dayAndTime, daysAway, parseDay, prettyTime, whenWords } from './when';
 
 export { dateRange, prettyTime, startsAt } from './when';
 
@@ -494,9 +494,9 @@ const cb = StyleSheet.create({ circle: { width: 38, height: 38, borderRadius: 19
 const WEEKDAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
-export function DayBlock({ date, big, today: sayToday = true, align = 'center', style }: { date: string; big?: boolean; today?: boolean; align?: 'left' | 'center' | 'right'; style?: StyleProp<ViewStyle> }) {
+export function DayBlock({ date, big, today: sayToday = true, align = 'center', now, style }: { date: string; big?: boolean; today?: boolean; align?: 'left' | 'center' | 'right'; now?: number; style?: StyleProp<ViewStyle> }) {
   const dt = parseDay(date);
-  const n = daysUntil(date);
+  const n = now === undefined ? daysUntil(date) : daysAway(date, now); // a page that keeps its own clock hands it over
   const today = n === 0 && sayToday;
   const label = today ? 'TODAY' : n >= 0 && n < 7 ? WEEKDAYS[dt.getDay()] : MONTHS[dt.getMonth()];
   const side = align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start';
@@ -757,7 +757,8 @@ function WallPoster({ event, tilt, mine, now, onPress, onWidth }: { event: Event
   const column = Math.max(size.width, Math.round(WALL_HEIGHT * 0.67)); // the caption never gets narrower than the narrowest print
   const { day, time } = dayAndTime(event, now);
   const both = time ? `${day} · ${time}` : day;
-  const oneLine = capsWidth(both, 11, 1.8) <= column - 2;
+  // FEATURED takes one of the two label rows, so beside it the when is kept to one row
+  const oneLine = !!event.priority || capsWidth(both, 11, 1.8) <= column - 2;
   return (
     <Pressable onPress={onPress} onLayout={(e) => onWidth(Math.round(e.nativeEvent.layout.width))} accessibilityRole="button"
       accessibilityLabel={`${event.title}, ${both.toLowerCase()}${event.priority ? ', featured' : ''}${mine ? ", you're in" : ''}`}
@@ -766,10 +767,23 @@ function WallPoster({ event, tilt, mine, now, onPress, onWidth }: { event: Event
         {picture ? <Print source={picture.source} height={WALL_HEIGHT} crop={picture.kind === 'photo'} ratio={ratio} tilt={tilt} /> : <TypePrint event={event} tilt={tilt} />}
       </View>
       <View style={wl.caption}>
-        {event.priority ? <Label size={11} tone="orange" numberOfLines={1} style={wl.kicker}>Featured</Label> : null}
-        <Label size={11} tone="blue" numberOfLines={1}>{oneLine ? both : day}</Label>
-        {!oneLine && time ? <Label size={11} tone="blue" numberOfLines={1}>{time}</Label> : null}
-        <Text style={wl.title} numberOfLines={2}>{event.title}</Text>
+        {picture ? (
+          <>
+            {/* always two label rows tall, so every title along the Wall starts on the same line */}
+            <View style={wl.when}>
+              {event.priority ? <Label size={11} tone="orange" numberOfLines={1} style={wl.kicker}>Featured</Label> : null}
+              <Label size={11} tone="blue" numberOfLines={1}>{oneLine ? both : day}</Label>
+              {!oneLine && time ? <Label size={11} tone="blue" numberOfLines={1}>{time}</Label> : null}
+            </View>
+            <Text style={wl.title} numberOfLines={2}>{event.title}</Text>
+          </>
+        ) : (
+          // a type print already says its day and its title: the caption adds only what it does not
+          <>
+            {event.priority ? <Label size={11} tone="orange" numberOfLines={1} style={wl.kicker}>Featured</Label> : null}
+            {time ? <Label size={11} tone="blue" numberOfLines={1}>{time}</Label> : null}
+          </>
+        )}
         {mine ? (
           <View style={wl.mine}>
             <Icon name="tick" size={12} color={C.blue} stroke={3.2} />
@@ -789,6 +803,7 @@ const wl = StyleSheet.create({
   pressed: { opacity: 0.8 },
   hang: { height: WALL_HEIGHT, justifyContent: 'flex-end', alignItems: 'flex-start' },
   caption: { marginTop: 14 },
+  when: { minHeight: 30, justifyContent: 'flex-end' },
   kicker: { marginBottom: 2 },
   title: { fontFamily: F.bold, fontSize: 17, lineHeight: 18, letterSpacing: 0.5, color: C.ink, textTransform: 'uppercase', marginTop: 4 },
   mine: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 },

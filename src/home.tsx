@@ -1,18 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { router } from 'expo-router';
 import { AppState, Pressable, StyleSheet, Text, View, useWindowDimensions, type StyleProp, type ViewStyle } from 'react-native';
 import { C, F, SP, T, display } from './theme';
 import { Icon } from './icons';
 import { challengeFits, sortPosts, upcoming, useShabbat, useStore, type Challenge, type EventItem } from './store';
 import { audienceLabel } from './ui';
-import { Band, BrushTag, DayBlock, Hairline, Label, PosterWall, Print, Row, SectionHead, Slab, Stat, Ticks, eventPicture, hebrewDate, heroType } from './look';
+import { Band, BrushTag, DayBlock, Hairline, Label, PosterWall as PosterWallBase, Print, Row, SectionHead, Slab, Stat, Ticks, eventPicture, hebrewDate, heroType } from './look';
 import { useChallengeCard } from './rewards';
 import { timeAgo } from './feed';
 import { InviteCards, useMyInvites } from './invites';
 import { MINYAN_FALLBACK, minyanTime } from './minyan';
 import { greetingNow } from './shell';
 import { clockOf, clockText, dateRange, isOver, parseDay, prettyTime, spotlight, type Spotlight } from './when';
-import { nyTime, untilText } from './zmanim';
+import { nyDate, nyTime, untilText } from './zmanim';
 
 // ───────────────────────── Home ─────────────────────────
 // A page with two faces.
@@ -28,7 +28,12 @@ export function Home() {
   const now = useNow();
   const events = upcoming(content.events).filter(fits);
   const spot = spotlight(events, now);
-  const wall = wallEvents(events, now, spot?.event.id);
+  const hung = wallEvents(events, now, spot?.event.id);
+  // The clock ticks once a minute, but the Wall only changes when the day or what hangs on it
+  // does: it keeps the same list (and the same idea of "today") until then, so it is not redrawn.
+  const wallKey = `${nyDate(new Date(now))}|${hung.map((e) => e.id + e.start).join(',')}`;
+  const wall = useMemo(() => hung, [wallKey, content.events]);
+  const wallNow = useMemo(() => now, [wallKey]);
   const live = content.challenges.filter((c) => c.active && challengeFits(c, gender));
   const main = live.find((c) => c.id === 'tefillin') ?? live[0];
   const others = live.filter((c) => c !== main);
@@ -36,7 +41,7 @@ export function Home() {
   // it yet, so the posters lead and the invitation to join follows them.
   const wallFirst = !spot && (!main || !joined.includes(main.id));
   // An invitation band right above the scoreboard and the scoreboard stack into one, sharing a hairline.
-  const stacked = useMyInvites().length > 0 && !wallFirst;
+  const stacked = useMyInvites().filter((v) => !spot || v.eventId !== spot.event.id).length > 0 && !wallFirst;
 
   const board = main ? (
     <>
@@ -47,7 +52,7 @@ export function Home() {
   const posters = wall.length || !spot ? (
     <>
       <SectionHead title={spot ? 'Also coming up' : 'Coming up'} action="All events" onAction={() => go('Events')} top={wallFirst ? 22 : main ? 17.5 : SP.section} />
-      {wall.length ? <PosterWall events={wall} going={going} onOpen={openEvent} now={now} /> : (
+      {wall.length ? <PosterWall events={wall} going={going} onOpen={openEvent} now={wallNow} /> : (
         <View style={st.empty}>
           <Text style={[T.h2, { color: C.sub }]}>Nothing on the calendar yet</Text>
           <Text style={[T.small, { marginTop: 6 }]}>New events are on the way. Check the feed.</Text>
@@ -59,8 +64,8 @@ export function Home() {
   return (
     <>
       <DateLine now={now} />
-      {spot ? <EventHero spot={spot} /> : <Greeting now={now} />}
-      <InviteCards style={st.invites} />
+      {spot ? <EventHero spot={spot} now={now} /> : <Greeting now={now} />}
+      <InviteCards skipEventId={spot?.event.id} style={st.invites} />
       {wallFirst ? <>{posters}{board}</> : <>{board}{posters}</>}
       <OnTheMenu />
       <FromRabbi afterBand={wallFirst && !!main} />
@@ -100,6 +105,9 @@ function wallEvents(events: EventItem[], now: number, skipId?: string): EventIte
   return list.sort((a, b) => Number(!!b.priority) - Number(!!a.priority) || a.start.localeCompare(b.start)).slice(0, 6);
 }
 
+// The parts of the page that do not depend on the minute are not redrawn when it turns over.
+const PosterWall = React.memo(PosterWallBase);
+
 // "WED, NOV 25" and the Hebrew date beside it.
 function DateLine({ now }: { now: number }) {
   const d = new Date(now);
@@ -125,10 +133,12 @@ function Greeting({ now }: { now: number }) {
 
 // The event that has the page: brush tag, title, its poster, where and how much, and the one
 // button. A tap anywhere that is not a button opens the event page.
-function EventHero({ spot }: { spot: Spotlight }) {
+function EventHero({ spot, now }: { spot: Spotlight; now: number }) {
   const { openEvent } = useStore();
   const win = useWindowDimensions();
   const e = spot.event;
+  // An invitation to this very event is not a band of its own today: one line here, and the button answers it.
+  const invite = useMyInvites(true).find((v) => v.eventId === e.id);
   const picture = eventPicture(e);
   const column = Math.min(win.width, 560) - SP.gutter * 2;
   const clock = clockOf(e.time);
@@ -147,6 +157,11 @@ function EventHero({ spot }: { spot: Spotlight }) {
   );
   const facts = (
     <>
+      {invite ? (
+        <View style={st.heroInvite}>
+          <Label tone="blue" onPress={() => router.push(`/invite/${invite.id}`)} accessibilityLabel={`Your invitation: ${invite.title}`}>You're invited</Label>
+        </View>
+      ) : null}
       {lead ? <Text style={st.heroPlace} numberOfLines={2}>{lead}</Text> : null}
       {meta ? <Text style={[st.heroMeta, !lead && st.heroMetaFirst]} numberOfLines={2}>{meta}</Text> : null}
       <StartsIn spot={spot} />
@@ -174,7 +189,7 @@ function EventHero({ spot }: { spot: Spotlight }) {
               {title}
               <View style={st.heroFacts}>{facts}</View>
             </View>
-            <DayBlock date={e.start} big today={false} align="right" style={st.heroDay} />
+            <DayBlock date={e.start} big today={false} align="right" now={now} style={st.heroDay} />
           </View>
           <HeroAction e={e} />
         </>
@@ -191,15 +206,16 @@ function StartsIn({ spot }: { spot: Spotlight }) {
   if (at === null || spot.phase === 'tomorrow') return null;
   const clock = clockOf(spot.event.time);
   const left = at - now;
-  const text = spot.phase === 'now'
-    ? clock ? `${left > 0 ? 'Starts at' : 'Started at'} ${clockText(clock)}` : ''
-    : left > 0 && left < 6 * 3600000 ? `Starts in ${untilText(left)}` : '';
+  const text = left > 0
+    ? left < 6 * 3600000 ? `Starts in ${untilText(left)}` : ''
+    : spot.phase === 'now' && clock ? `Started at ${clockText(clock)}` : '';
   return text ? <Label tone="orange" style={st.heroStarts}>{text}</Label> : null;
 }
 
 // The one button of an event day, wired to the same sign-up the event page uses.
 function HeroAction({ e }: { e: EventItem }) {
-  const { going, name, signup, goingCount, openEvent } = useStore();
+  const { going, name, signup, goingCount, openEvent, invites: answers, respondInvite } = useStore();
+  const invite = useMyInvites(true).find((v) => v.eventId === e.id);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => { setErr(null); }, [e.id]);
@@ -208,7 +224,10 @@ function HeroAction({ e }: { e: EventItem }) {
   const count = e.showGoing ? goingCount[e.id] ?? 0 : 0;
   const run = async (on: boolean) => {
     setBusy(true); setErr(null);
-    setErr(await signup(e.id, on));
+    const failed = await signup(e.id, on);
+    // I'M IN is also the answer to an invitation to this event that is still waiting
+    if (on && !failed && invite && !(answers || {})[invite.id]) await respondInvite(invite.id, 'yes');
+    setErr(failed);
     setBusy(false);
   };
   return (
@@ -220,7 +239,7 @@ function HeroAction({ e }: { e: EventItem }) {
         <Slab label="I'm in" disabled={busy} onPress={() => (name ? run(true) : openEvent(e.id))} style={st.heroBtn} accessibilityLabel={`I'm in: sign up for ${e.title}`} />
       )}
       {mine ? (
-        <Pressable onPress={() => run(false)} disabled={busy} hitSlop={{ top: 12, bottom: 16, left: 24, right: 24 }} style={({ pressed }) => [st.heroQuiet, (pressed || busy) && st.dim]}
+        <Pressable onPress={() => run(false)} disabled={busy} hitSlop={{ top: 10, bottom: 16, left: 24, right: 24 }} style={({ pressed }) => [st.heroQuiet, st.heroQuietTap, (pressed || busy) && st.dim]}
           accessibilityRole="button" accessibilityLabel={`Can't make it: cancel my sign-up for ${e.title}`}>
           <Text style={st.heroCant}>Can't make it</Text>
         </Pressable>
@@ -235,6 +254,9 @@ function HeroAction({ e }: { e: EventItem }) {
 // ───────────────────────── the scoreboard ─────────────────────────
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
+// Shabbat ends at nightfall, not at sunset. 50 minutes after sunset is at or a little past the
+// time the Shabbat band prints all year, so the scoreboard never says "over" early.
+const SHABBAT_ENDS_MS = 50 * 60000;
 
 // The main live challenge as a scoreboard band: which day you are on, out of how many, what is
 // left of today, and the one thing to press. All of its facts come from useChallengeCard
@@ -280,7 +302,8 @@ function ScoreSide({ ch, card, complete }: { ch: Challenge; card: ReturnType<typ
       <>
         {prize ? (
           <>
-            <Label tone="orange">Win</Label>
+            {wrap?.lastHour ? <Label tone="orange" style={st.joinLeft}>{Math.max(1, Math.ceil(wrap.left / 60000))} min left today</Label> : null}
+            <Label tone={wrap?.lastHour ? 'sub' : 'orange'}>Win</Label>
             <Text style={st.prize} numberOfLines={2}>{prize}</Text>
             {detail ? <Text style={st.prizeDetail} numberOfLines={1}>{detail}</Text> : null}
           </>
@@ -315,7 +338,15 @@ function ScoreSide({ ch, card, complete }: { ch: Challenge; card: ReturnType<typ
   return (
     <>
       {state === 'before' ? <Label tone="ink">Opens at {nyTime(wrap!.win.rise)}</Label>
-        : state === 'shabbat' ? <Label tone="ink">Shabbat · no wrap today</Label>
+        : state === 'shabbat' ? (
+          // Saturday night: once Shabbat has ended the band stops saying it is Shabbat
+          wrap!.now > wrap!.win.set + SHABBAT_ENDS_MS ? (
+            <>
+              <Label tone="ink">Shabbat is over</Label>
+              <Label style={st.sideLabel}>Back tomorrow</Label>
+            </>
+          ) : <Label tone="ink">Shabbat · no wrap today</Label>
+        )
           : (
             <>
               <Label tone="ink">{friday ? 'Candle lighting passed' : 'Sunset passed'}</Label>
@@ -352,7 +383,7 @@ function ChallengeRow({ ch, last }: { ch: Challenge; last?: boolean }) {
 // ───────────────────────── the rest of the page ─────────────────────────
 
 // The food post, while it is fresh (4 days).
-function OnTheMenu() {
+const OnTheMenu = React.memo(function OnTheMenu() {
   const { content } = useStore();
   const food = [...content.posts].filter((p) => p.kind === 'Food' && Date.now() - new Date(p.at).getTime() < 4 * 864e5).sort((a, b) => b.at.localeCompare(a.at))[0];
   if (!food) return null;
@@ -364,10 +395,10 @@ function OnTheMenu() {
         onPress={() => router.push(`/post/${food.id}`)} accessibilityLabel={`On the menu: ${food.title}`} />
     </View>
   );
-}
+});
 
 // The three newest posts (pinned first), as rows.
-function FromRabbi({ afterBand }: { afterBand?: boolean }) {
+const FromRabbi = React.memo(function FromRabbi({ afterBand }: { afterBand?: boolean }) {
   const { content, go, postMeta } = useStore();
   const posts = sortPosts(content.posts).filter((p) => p.kind !== 'Food').slice(0, 3);
   if (!posts.length) return null;
@@ -384,10 +415,10 @@ function FromRabbi({ afterBand }: { afterBand?: boolean }) {
       })}
     </>
   );
-}
+});
 
 // This Shabbat in Great Neck: candle lighting and when it ends, side by side, then the Teen Minyan.
-function ShabbatBand() {
+const ShabbatBand = React.memo(function ShabbatBand() {
   const sh = useShabbat();
   const { content } = useStore();
   if (sh === 'error') return null;
@@ -410,7 +441,7 @@ function ShabbatBand() {
       ) : null}
     </Band>
   );
-}
+});
 
 // Sizes are the mockup's (ref/mockups.html, the rules under .d1): the page starts 128 from the
 // top, the tag sits 14 under the date line, the title 11 under the tag, the poster row 17 under
@@ -437,7 +468,9 @@ const st = StyleSheet.create({
   heroStarts: { marginTop: 6 },
   heroBtn: { marginTop: 13 },
   heroQuiet: { alignSelf: 'center', alignItems: 'center', marginTop: 11 },
-  heroCant: { fontSize: 13, lineHeight: 15, fontWeight: '600', color: C.sub },
+  heroQuietTap: { marginTop: 9.5 }, // its taller line keeps the words where the mockup has them
+  heroInvite: { alignSelf: 'flex-start', marginBottom: 5 },
+  heroCant: { fontSize: 13, lineHeight: 18, fontWeight: '600', color: C.sub },
   heroErr: { fontSize: 13, lineHeight: 17, fontWeight: '700', color: C.red, marginTop: 8, textAlign: 'center' },
   dim: { opacity: 0.5 },
   // the scoreboard
@@ -455,6 +488,7 @@ const st = StyleSheet.create({
   scoreBtn: { marginTop: 7, alignSelf: 'flex-end' },
   doneRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   doneText: { fontFamily: F.display, fontSize: 31, lineHeight: 31, letterSpacing: 0.6, color: C.blue, textTransform: 'uppercase', paddingRight: 4, marginRight: -4 },
+  joinLeft: { marginBottom: 5, textAlign: 'right' },
   prize: { fontSize: 15, lineHeight: 19, fontWeight: '600', color: C.ink, textAlign: 'right', marginTop: 3 },
   prizeDetail: { fontSize: 13, lineHeight: 17, color: C.sub, textAlign: 'right' },
   ticks: { marginTop: 11 },

@@ -8,10 +8,11 @@
 //   dayAndTime(event, now)   the two halves of a caption: "SUN, NOV 29" and "10:15 AM"
 //   clockOf / clockText / prettyTime / startsAt / daysAway / dateRange   the small parts
 import type { EventItem } from './store';
+import { nyDate } from './zmanim';
 
 const MINUTE = 60000;
 const DAY = 86400000;
-/** "Happening now" begins this long before the start time ... */
+/** The event takes the "now" phase this long before the start time ("STARTING SOON") ... */
 export const SOON_MS = 15 * MINUTE;
 /** ... and a one-day event counts as over this long after it. */
 export const LASTS_MS = 180 * MINUTE;
@@ -73,10 +74,28 @@ export function parseDay(ymd: string): Date {
   return new Date(y || 1970, (m || 1) - 1, d || 1);
 }
 
-/** Whole days from today to that date: 0 today, 1 tomorrow, -1 yesterday. */
+/**
+ * Whole days from today to that date: 0 today, 1 tomorrow, -1 yesterday. "Today" is the day it is
+ * in Great Neck (New York time), the same clock the date line, the Hebrew date and the wrap
+ * window use, so a phone set to another time zone still agrees with itself.
+ */
 export function daysAway(ymd: string, now: number = Date.now()): number {
-  const n = new Date(now);
-  return Math.round((parseDay(ymd).getTime() - new Date(n.getFullYear(), n.getMonth(), n.getDate()).getTime()) / DAY);
+  let today: Date;
+  try { today = parseDay(nyDate(new Date(now))); } catch { const n = new Date(now); today = new Date(n.getFullYear(), n.getMonth(), n.getDate()); }
+  return Math.round((parseDay(ymd).getTime() - today.getTime()) / DAY);
+}
+
+// A day and a time of day in Great Neck, as a moment. (Asks what New York's clock reads at that
+// moment in UTC and takes the difference back out; right on both sides of a clock change.)
+function nyMoment(y: number, m: number, d: number, h: number, min: number): number {
+  const utc = Date.UTC(y, m, d, h, min);
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric' }).formatToParts(new Date(utc));
+    const n = (type: string) => Number(parts.find((p) => p.type === type)?.value);
+    const there = Date.UTC(n('year'), n('month') - 1, n('day'), n('hour') % 24, n('minute'));
+    if (Number.isFinite(there)) return utc - (there - utc);
+  } catch { /* a phone without time zones: its own clock will do */ }
+  return new Date(y, m, d, h, min).getTime();
 }
 
 /** The moment an event starts, when its time can be read; otherwise null. */
@@ -84,7 +103,7 @@ export function startsAt(e: Pick<EventItem, 'start' | 'time'>): number | null {
   const c = clockOf(e.time);
   if (!c) return null;
   const d = parseDay(e.start);
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), c.h, c.m).getTime();
+  return nyMoment(d.getFullYear(), d.getMonth(), d.getDate(), c.h, c.m);
 }
 
 /** "DEC 10 – 11" / "NOV 29" (no year). */
@@ -122,7 +141,8 @@ export type Spotlight<E extends Timed = EventItem> = {
  * returns the first one that is
  *   · in progress: a multi-day event that began on an earlier day              -> HAPPENING NOW
  *   · today: skipped when it is a one-day event that started over 3 hours ago (it is over);
- *     from 15 minutes before its start until then                              -> HAPPENING NOW
+ *     in the 15 minutes before its start                                       -> STARTING SOON
+ *     from its start until then                                                -> HAPPENING NOW
  *     before that                                    -> TODAY AT 10:15 AM / TONIGHT AT 6:00 PM
  *     (TONIGHT when it starts at 5 PM or later; just TODAY when the time cannot be read)
  *   · tomorrow                                              -> TOMORROW AT 10:15 AM / TOMORROW
@@ -140,7 +160,8 @@ export function spotlight<E extends Timed>(events: readonly E[], now: number = D
       const clock = clockOf(event.time);
       if (at === null || !clock) return { event, phase: 'today', tag: 'TODAY', startsAt: null };
       if (now > at + LASTS_MS && last === 0) continue; // a one-day event that is over
-      if (now >= at - SOON_MS) return { event, phase: 'now', tag: 'HAPPENING NOW', startsAt: at };
+      // the last 15 minutes before the start already belong to it, but it has not begun: say so
+      if (now >= at - SOON_MS) return { event, phase: 'now', tag: now < at ? 'STARTING SOON' : 'HAPPENING NOW', startsAt: at };
       return { event, phase: 'today', tag: `${clock.h >= 17 ? 'TONIGHT' : 'TODAY'} AT ${clockText(clock)}`, startsAt: at };
     }
     if (first === 1) {
