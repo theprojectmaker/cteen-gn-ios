@@ -22,6 +22,7 @@ import { nyDate, nyTime } from './zmanim';
 // and this Shabbat. A waiting invitation is a band above the carousel and nothing otherwise.
 const PAGES = 3;
 const DATE_ROW = 22; // the date line and the page marker above the carousel
+const TAB_BAR = 56; // the floating tab bar, with its own margin
 const HINT_ROW = 30; // "more below" under it
 
 export function Home() {
@@ -48,7 +49,7 @@ export function Home() {
   const measure = () => wrap.current?.measureInWindow((_x, y) => { const at = Math.round(y - bandH); if (Number.isFinite(at) && Math.abs(at - startY) > 3) setStartY(at); });
   useEffect(() => { const t = setTimeout(measure, 150); return () => clearTimeout(t); }, [liveAlert, now, bandH, win.height]);
   const top = Math.max(insets.top + 58 + 16, startY);
-  const visible = Math.max(430, win.height - top - insets.bottom - 64 - (invites.length ? bandH : 0));
+  const visible = Math.max(430, win.height - top - insets.bottom - TAB_BAR - 40 - (invites.length ? bandH : 0));
   const pageH = visible - DATE_ROW - HINT_ROW;
   // which page the carousel is on (the marker beside the date changes it too)
   const scroller = useRef<ScrollView>(null);
@@ -74,7 +75,7 @@ export function Home() {
       <MoreBelow />
       {main ? (
         <>
-          <Scoreboard ch={main} style={{ marginTop: 6 }} />
+          <Scoreboard ch={main} style={{ marginTop: 32 }} />
           {others.map((c, i) => <ChallengeRow key={c.id} ch={c} last={i === others.length - 1} />)}
         </>
       ) : null}
@@ -178,7 +179,8 @@ function EventPage({ e, tag, now, width, height }: { e: EventItem; tag: string; 
   const [panelH, setPanelH] = useState(0);
   const ratio = useAspect(picture?.source, 0.77);
   // a poster that would nearly fill the width on its own needs no panel around it
-  const bare = !!picture && picture.kind === 'poster' && panelH > 0 && Math.min(col - 32, (panelH - 32) * ratio) > col * 0.9;
+  // a poster is as large as the panel's height allows (12 pt around it); the panel is only as wide as the poster
+  const hugW = picture && picture.kind === 'poster' && panelH > 0 ? Math.min(col, Math.round((panelH - 24) * ratio) + 24) : 0;
   const open = () => openEvent(e.id);
   const typed = (e.time || '').trim();
   const clock = clockOf(typed);
@@ -195,10 +197,10 @@ function EventPage({ e, tag, now, width, height }: { e: EventItem; tag: string; 
       {/* the picture panel takes all the spare height: a poster sits whole on a matte made from itself, a photograph fills it */}
       <Pressable onPress={open} onLayout={(ev) => setPanelH(Math.round(ev.nativeEvent.layout.height))} accessibilityRole="button"
         accessibilityLabel={picture ? `${e.title} poster. Opens the event` : `${e.title}, ${dayAndTime(e, now).day.toLowerCase()}. Opens the event`}
-        style={({ pressed }) => [st.panel, !picture && st.panelType, bare && st.panelBare, pressed && st.dim]}>
+        style={({ pressed }) => [st.panel, !picture && st.panelType, hugW > 0 && { width: hugW, alignSelf: 'center' }, pressed && st.dim]}>
         {picture ? (
           picture.kind === 'photo' ? <Image source={picture.source} style={st.fill} resizeMode="cover" /> : (
-            <View style={[st.fill, !bare && st.posterPad]}><Image source={picture.source} style={st.fill} resizeMode="contain" /></View>
+            <View style={[st.fill, st.posterPad]}><Image source={picture.source} style={st.fill} resizeMode="contain" /></View>
           )
         ) : (
           <View style={st.typeIn}>
@@ -206,7 +208,7 @@ function EventPage({ e, tag, now, width, height }: { e: EventItem; tag: string; 
             <View style={st.typeBar} />
           </View>
         )}
-        {bare ? null : <View pointerEvents="none" style={st.panelEdge} />}
+        <View pointerEvents="none" style={st.panelEdge} />
       </Pressable>
       <Pressable onPress={open} accessible={false} style={({ pressed }) => pressed && st.dim}>
         <Text style={[titleStyle, st.title]} numberOfLines={2} accessibilityRole="button" accessibilityLabel={`${e.title}. ${tag.toLowerCase()}.`} accessibilityHint="Opens the event">{e.title}</Text>
@@ -327,14 +329,13 @@ function Scoreboard({ ch, style }: { ch: Challenge; style?: StyleProp<ViewStyle>
   const pending = mine && !done && !complete && (state === 'open' || state === 'before');
   const number = !mine ? ch.goal : Math.min(ch.goal, pending ? count + 1 : count);
   if (out) {
-    // put out of the challenge: a big X where the day count was, no clock and no SNAP
+    // put out of the challenge (only when the server says so): one quiet row, nothing loud
     return (
       <Band group onPress={card.open} style={style}>
         <View style={st.outRow} accessible accessibilityRole="button" accessibilityLabel={`${ch.title}. You're out. Back in for the next one.`}>
-          <View style={st.outX}><Icon name="x" size={52} color={C.red} stroke={3.4} /></View>
+          <Icon name="x" size={22} color={C.sub} stroke={2.4} />
           <View style={st.outText}>
-            <Label numberOfLines={1} style={st.scoreLabel}>{short}</Label>
-            <Text style={st.outWord}>Out</Text>
+            <Text style={st.outTitle} numberOfLines={2}>Out of the {short.toLowerCase()}</Text>
             <Text style={st.outLine}>Back in for the next one.</Text>
           </View>
         </View>
@@ -587,10 +588,9 @@ const st = StyleSheet.create({
   shabTeen: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 16, paddingTop: 14, borderTopWidth: 1, borderTopColor: C.line },
   shabTeenLabel: { flex: 1, fontSize: 15, lineHeight: 20, fontWeight: '600', color: C.ink },
   shabTeenTime: { ...display(24, C.blue) },
-  outRow: { flexDirection: 'row', alignItems: 'center', gap: 18 },
-  outX: { width: 84, height: 84, borderRadius: 42, borderWidth: 3, borderColor: C.red, alignItems: 'center', justifyContent: 'center' },
+  outRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 4 },
   outText: { flex: 1, minWidth: 0 },
-  outWord: { ...display(46, C.red), marginTop: 2 },
+  outTitle: { fontSize: 17, lineHeight: 22, fontWeight: '600', color: C.ink },
   outLine: { fontSize: 15, lineHeight: 21, color: C.sub, marginTop: 2 },
   invites: { marginTop: 0, marginBottom: 14 },
   dateRow: { height: DATE_ROW, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -614,7 +614,7 @@ const st = StyleSheet.create({
   panelEdge: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, borderRadius: R.photo, borderWidth: 1, borderColor: C.printEdge },
   fill: { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' },
   panelBare: { backgroundColor: 'transparent' },
-  posterPad: { padding: 16 },
+  posterPad: { padding: 12 },
   typeIn: { flex: 1, padding: 16, justifyContent: 'space-between' },
   typeBar: { width: 28, height: 5, borderRadius: 1.5, backgroundColor: C.blue, transform: [{ skewX: '-16deg' }] },
   dateNum: { ...numeral(132), marginTop: 2, marginLeft: -3, paddingRight: 16 },

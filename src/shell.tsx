@@ -85,7 +85,7 @@ export function Screen({ children, scoreboard }: { children: React.ReactNode; sc
       <Animated.ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive"
         style={st.fill}
         contentInsetAdjustmentBehavior="never"
-        contentContainerStyle={{ paddingTop: barBottom + 16, paddingBottom: insets.bottom + (Platform.OS === 'web' ? 122 : 32) }}
+        contentContainerStyle={{ paddingTop: barBottom + 16, paddingBottom: insets.bottom + (Platform.OS === 'web' ? 122 : 49 + 40) }}
         scrollIndicatorInsets={{ top: barBottom }}
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
