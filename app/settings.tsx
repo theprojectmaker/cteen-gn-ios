@@ -12,7 +12,7 @@ import { Avatar, Page } from '../src/look';
 // Profile picture -> Settings: your profile, how the app feels, notifications, about.
 // (The Flyer look is dark only, so there is no Appearance choice here.)
 export default function SettingsRoute() {
-  const { name, grade, age, account, push, turnOnPush, setAdminOpen, leader, signOut, appleReady, signInWithApple, setPhotoAlerts, inboxUnread } = useStore();
+  const { name, grade, age, account, push, turnOnPush, setAdminOpen, leader, signOut, appleReady, signInWithApple, setPhotoAlerts, inboxUnread, shabbatOff, setShabbatReminders } = useStore();
   const [appleErr, setAppleErr] = React.useState<string | null>(null);
   const [prefs, setPrefs] = useState({ ...PREFS });
 
@@ -57,6 +57,9 @@ export default function SettingsRoute() {
         </Row>
         <Row icon="camera" title="Tefillin photo alerts" sub="When someone posts their photo" rule>
           <Toggle value={prefs.photoAlerts !== false} onChange={(v) => { update({ photoAlerts: v }); setPhotoAlerts(v); }} label="Tefillin photo alerts" />
+        </Row>
+        <Row icon="bell" title="Shabbat reminders" sub="Friday morning, and an hour before candle lighting" rule>
+          <Toggle value={!shabbatOff} onChange={(v) => setShabbatReminders(v)} label="Shabbat reminders" />
         </Row>
       </Card>
 

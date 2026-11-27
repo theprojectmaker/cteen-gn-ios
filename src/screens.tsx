@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
-import { nextOccurrence, useStore } from './store';
-import { scheduleEventReminders } from './push';
+import { nextOccurrence, useShabbat, useStore } from './store';
+import { scheduleEventReminders, scheduleShabbatReminders } from './push';
+import { shabbatReminderTimes } from './shabbatTimes';
 
 // The tab screens live in their own files; this file keeps the old import path working.
 export { Home } from './home';
@@ -8,6 +9,21 @@ export { Events, EventDetails } from './events';
 export { Chapter } from './chapter';
 // Feed and post cards live in feed.tsx.
 export { Feed, PostCard } from './feed';
+
+// The coming Shabbat's reminders (Friday 9:00 AM and an hour before candle lighting), from the same Hebcal
+// data as the Shabbat times. Only when notifications are on and the switch in Settings is on; they are
+// replaced whenever the data changes, and old ones are cleared.
+export function ShabbatReminderSync() {
+  const { push, shabbatOff } = useStore();
+  const sh = useShabbat();
+  const candlesAt = sh && sh !== 'error' ? sh.candlesAt : undefined;
+  useEffect(() => {
+    if (push !== 'on' || shabbatOff) { scheduleShabbatReminders([]); return; }
+    if (sh === null) return; // still loading: leave what is scheduled
+    scheduleShabbatReminders(shabbatReminderTimes(candlesAt, Date.now()));
+  }, [push, shabbatOff, candlesAt, sh === null]);
+  return null;
+}
 
 // Schedules a heads-up the evening before and the morning of: events the teen RSVP'd to, and the
 // next date of every weekly event they can see (so recurring events remind everyone to come).

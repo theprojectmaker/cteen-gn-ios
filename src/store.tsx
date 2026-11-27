@@ -11,7 +11,7 @@ import { enablePush, onNotificationTap, pushState, setReminder, type PushState }
 
 // ───────── content model (mirrors server/functions/api/[[path]].js) ─────────
 export type ColorKey = 'blue' | 'orange' | 'purple' | 'green' | 'pink' | 'yellow';
-export type Target = { type: 'event' | 'challenge' | 'post' | 'invite'; id: string } | null;
+export type Target = { type: 'event' | 'challenge' | 'post' | 'invite' | 'shabbat'; id: string } | null;
 export type Invite = { id: string; on: boolean; title: string; message: string; details: string; eventId: string; image: string; audience: 'all' | 'boys' | 'girls'; until: string; remind: boolean; at: string };
 export type InviteResponse = { name: string; answer: 'yes' | 'no'; at: string };
 export type EventItem = {
@@ -115,6 +115,8 @@ type Local = {
   saved: string[]; liked: string[]; going: string[]; joined: string[]; dismissed: string[];
   /** RSVPs the teen answered "I'm out" (same keys as `going`): kept on this phone only */
   out: string[];
+  /** turned the Shabbat reminders off */
+  shabbatOff?: boolean;
   checks: Record<string, string[]>; // challenge id -> period keys checked in
   counts: Record<string, number>;
   reminders: Record<string, number>; // challenge id -> hour of day
@@ -139,6 +141,10 @@ type Ctx = Local & {
   openEvent: (id: string | null) => void;
   openChallenge: (id: string | null) => void;
   openTarget: (t: Target) => void;
+  /** the Friday side panel with the Shabbat times (opened by its tab, or by tapping a Shabbat notification) */
+  shabbatOpen: boolean; setShabbatOpen: (v: boolean) => void;
+  /** Shabbat reminder notifications on (the default) or off */
+  shabbatOff?: boolean; setShabbatReminders: (on: boolean) => void;
   liveAlert: Alert | null; dismissAlert: () => void;
   /** `date`: the week a weekly event is being answered for (each week has its own list) */
   signup: (id: string, on: boolean, date?: string) => Promise<string | null>;
@@ -232,6 +238,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [adminOpen, setAdminOpen] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
   const [adminTask, setAdminTask] = useState<string | null>(null);
+  const [shabbatOpen, setShabbatOpen] = useState(false);
   const [push, setPush] = useState<PushState>('unsupported');
   const [goingCount, setGoingCount] = useState<Record<string, number>>({});
   const [goingNames, setGoingNames] = useState<Record<string, string[]>>({});
@@ -318,6 +325,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (t.type === 'event') router.push(`/event/${t.id}`);
     else if (t.type === 'post') router.push(`/post/${t.id}`);
     else if (t.type === 'invite') router.push(`/invite/${t.id}`);
+    else if (t.type === 'shabbat') { router.navigate(TAB_PATH.Chapter); setShabbatOpen(true); }
     else router.push(`/challenge/${t.id}`);
   }, []);
   useEffect(() => onNotificationTap((t) => openTarget(t as Target)), [openTarget]);
@@ -396,7 +404,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   };
 
   const value: Ctx = useMemo<Ctx>(() => ({
-    ...local, content, online, refresh, openTarget, liveAlert, push, googleReady, unreadFeed, saveProfile, newEvents, appleReady,
+    ...local, content, online, refresh, openTarget, shabbatOpen, setShabbatOpen, liveAlert, push, googleReady, unreadFeed, saveProfile, newEvents, appleReady,
     markEventsSeen: () => {
       if (!newEvents) return;
       patch((s) => ({ ...s, seenEvents: [...new Set([...s.seenEvents, ...content.events.map((e) => e.id)])].slice(-300) }));
@@ -522,6 +530,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         return msg(e);
       }
     },
+    setShabbatReminders: (on) => patch((s) => ({ ...s, shabbatOff: !on })),
     setOut: (key, on) => patch((s) => ({ ...s, out: on ? [...new Set([...(s.out ?? []), key])] : (s.out ?? []).filter((x) => x !== key) })),
     join: (id, hour) => {
       const ch = content.challenges.find((c) => c.id === id);
@@ -700,7 +709,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     removeQuestion: (id) => api('/admin/inbox/remove', { method: 'POST', body: { id }, leader }).then(() => {}).catch(() => {}),
     loadPhotos: (cid) => api<{ photos: PhotoRow[] }>(`/admin/photos?challenge=${cid}`, { leader }).then((r) => r.photos).catch(() => null),
     loadPhoto: (key) => api<{ photo: string }>(`/admin/photo?key=${encodeURIComponent(key)}`, { leader }).then((r) => r.photo).catch(() => null),
-  }), [local, content, online, leader, isOwner, adminOpen, composerOpen, adminTask, push, liveAlert, googleReady, appleReady, unreadFeed, newEvents, goingCount, goingNames, postMeta, broadcasts, flip, patch, refresh, keep, openTarget, registerToken]);
+  }), [local, content, online, leader, isOwner, adminOpen, composerOpen, adminTask, push, liveAlert, shabbatOpen, googleReady, appleReady, unreadFeed, newEvents, goingCount, goingNames, postMeta, broadcasts, flip, patch, refresh, keep, openTarget, registerToken]);
 
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>;
 }
@@ -845,14 +854,15 @@ export function streak(ch: Challenge, checks: Record<string, string[]>) {
 
 // ───────── Shabbat times for Great Neck (Hebcal, live) ─────────
 export type Shabbat = { candles?: string; havdalah?: string; parsha?: string; candlesAt?: number; havdalahAt?: number };
-export function useShabbat() {
-  const [data, setData] = useState<Shabbat | null | 'error'>(null);
-  useEffect(() => {
-    let alive = true;
-    fetch(`https://www.hebcal.com/shabbat?cfg=json&zip=${CHAPTER.zip}&M=on`)
-      .then((r) => r.json())
-      .then((j) => {
-        if (!alive) return;
+let shabbatNow: Promise<Shabbat> | null = null;
+let shabbatNowAt = 0;
+// One request, shared by the header, the Friday tab, the reminders and every page that shows the times; asked again after half an hour.
+function fetchShabbat(): Promise<Shabbat> {
+  if (shabbatNow && Date.now() - shabbatNowAt < 30 * 60000) return shabbatNow;
+  shabbatNowAt = Date.now();
+  shabbatNow = fetch(`https://www.hebcal.com/shabbat?cfg=json&zip=${CHAPTER.zip}&M=on`)
+    .then((r) => r.json())
+    .then((j) => {
         const items: { category: string; title: string; date: string }[] = j.items ?? [];
         const time = (cat: string) => {
           const m = /T(\d{2}):(\d{2})/.exec(items.find((i) => i.category === cat)?.date ?? '');
@@ -861,9 +871,16 @@ export function useShabbat() {
           return `${((h + 11) % 12) + 1}:${m[2]} ${h < 12 ? 'AM' : 'PM'}`;
         };
         const at = (cat: string) => { const d = items.find((i) => i.category === cat)?.date; return d ? new Date(d).getTime() : undefined; };
-        setData({ candles: time('candles'), havdalah: time('havdalah'), parsha: items.find((i) => i.category === 'parashat')?.title.replace(/^Parashat /, ''), candlesAt: at('candles'), havdalahAt: at('havdalah') });
-      })
-      .catch(() => alive && setData('error'));
+        return { candles: time('candles'), havdalah: time('havdalah'), parsha: items.find((i) => i.category === 'parashat')?.title.replace(/^Parashat /, ''), candlesAt: at('candles'), havdalahAt: at('havdalah') } as Shabbat;
+    })
+    .catch((e) => { shabbatNow = null; throw e; });
+  return shabbatNow;
+}
+export function useShabbat() {
+  const [data, setData] = useState<Shabbat | null | 'error'>(null);
+  useEffect(() => {
+    let alive = true;
+    fetchShabbat().then((d) => alive && setData(d)).catch(() => alive && setData('error'));
     return () => {
       alive = false;
     };
