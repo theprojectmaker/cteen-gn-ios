@@ -152,7 +152,7 @@ function Carousel({ pages, spotTag, spotId, now, width, height, scroller, index,
   };
   return (
     <View style={st.carousel}>
-      <ScrollView key={pages[0]?.id ?? "none"} ref={scroller} horizontal pagingEnabled showsHorizontalScrollIndicator={false} decelerationRate="fast" scrollEventThrottle={16} onScroll={onScroll}
+      <ScrollView key={pages[0]?.id ?? "none"} ref={scroller} horizontal pagingEnabled bounces={false} overScrollMode="never" showsHorizontalScrollIndicator={false} decelerationRate="fast" scrollEventThrottle={16} onScroll={onScroll}
         style={st.pagerScroll} contentContainerStyle={{ width: width * count }} scrollEnabled={count > 1}>
         {pages.length ? pages.map((e, i) => (
           <EventPage key={e.id} e={e} tag={i === 0 && e.id === spotId && spotTag ? spotTag : whenWords(e, now)} now={now} width={width} height={height} />
@@ -197,7 +197,8 @@ function EventPage({ e, tag, now, width, height }: { e: EventItem; tag: string; 
   const titleSize = fit ?? 26;
   const titleStyle = { ...T.hero, fontSize: titleSize, lineHeight: Math.round(titleSize * 1.02), paddingRight: Math.ceil(titleSize * 0.12) };
   // What the page needs besides the picture: the tag, the title, the info lines and the button.
-  const chrome = 48 + (fit ? 38 : 76) + 26 + 80 + 20;
+  const [rest, setRest] = useState(0); // measured: the page's height without the picture (tag, title, line, button, gaps)
+  const chrome = rest || 48 + (fit ? 38 : 76) + 26 + 66 + 20;
   const availH = Math.max(0, height - chrome); // what is left for the picture on a screen this tall
   const isPoster = !!picture && picture.kind === 'poster';
   let panelW = col, panelH = 0, imgW = 0, imgH = 0;
@@ -208,12 +209,13 @@ function EventPage({ e, tag, now, width, height }: { e: EventItem; tag: string; 
     imgH = Math.round(imgW / ratio);
     panelW = imgW + 24; panelH = imgH + 24;
   } else if (picture) {
-    panelH = Math.round(Math.min(Math.max(col / Math.max(ratio, 0.5), 180), Math.max(availH, 260)));
+    panelH = Math.round(Math.min(Math.max(availH, 260), col * 1.3)); // a photograph fills the page: taller than 16:10 when the screen has the room (cover-cropped)
   } else {
-    panelH = Math.max(200, Math.min(availH, 320));
+    panelH = Math.round(Math.min(Math.max(availH, 260), col * 1.3));
   }
   return (
     <View style={[st.page, { width, minHeight: height }]}>
+      <View onLayout={(ev) => { const r = Math.round(ev.nativeEvent.layout.height - (panelH + 20)); if (panelH > 0 && r > 0 && Math.abs(r - rest) > 1) setRest(r); }}>
       <BrushTag label={tag} style={st.tag} />
       <Pressable onPress={open} accessibilityRole="button"
         accessibilityLabel={picture ? `${e.title} poster. Opens the event` : `${e.title}, ${dayAndTime(e, now).day.toLowerCase()}. Opens the event`}
@@ -222,7 +224,7 @@ function EventPage({ e, tag, now, width, height }: { e: EventItem; tag: string; 
           isPoster ? <Image source={picture.source} style={{ width: imgW, height: imgH }} resizeMode="contain" /> : <Image source={picture.source} style={st.fill} resizeMode="cover" />
         ) : (
           <View style={st.typeIn}>
-            <DateBig date={e.start} size={Math.max(110, Math.min(240, Math.round(panelH * 0.62)))} />
+            <DateBig date={e.start} size={Math.max(110, Math.min(200, Math.round(panelH * 0.5)))} />
             <View style={st.typeBar} />
           </View>
         )}
@@ -234,6 +236,7 @@ function EventPage({ e, tag, now, width, height }: { e: EventItem; tag: string; 
         {lineText ? <Text style={st.line} numberOfLines={1}>{lineText}</Text> : null}
       </Pressable>
       <Action e={e} />
+      </View>
     </View>
   );
 }
@@ -246,7 +249,7 @@ function DateBig({ date, size }: { date: string; size: number }) {
   return (
     <View accessible={false}>
       <Label tone="blue" size={13}>{weekday}</Label>
-      <Text style={[st.dateNum, { fontSize: size, lineHeight: Math.round(size * 0.94) }]} numberOfLines={1}>{d.getDate()}</Text>
+      <Text style={[st.dateNum, { fontSize: size, lineHeight: Math.round(size * 0.94), paddingRight: Math.round(size * 0.22) }]} numberOfLines={1} ellipsizeMode="clip">{d.getDate()}</Text>
       <Label size={13}>{month}</Label>
     </View>
   );
@@ -631,8 +634,8 @@ const st = StyleSheet.create({
   invites: { marginTop: 0, marginBottom: 14 },
   dateRow: { height: DATE_ROW, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   dateLine: { flexDirection: 'row', alignItems: 'center', gap: 9 },
-  carousel: {},
-  pagerScroll: {},
+  carousel: { overflow: 'hidden' },
+  pagerScroll: { overflow: 'hidden' },
   marker: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   bars: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   bar: { width: 10, height: 6, borderRadius: 1.5, backgroundColor: C.tick, transform: [{ skewX: '-16deg' }] },
@@ -655,7 +658,7 @@ const st = StyleSheet.create({
   fill: { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' },
   panelBare: { backgroundColor: 'transparent' },
   posterPad: { padding: 12 },
-  typeIn: { flex: 1, padding: 16, justifyContent: 'space-between' },
+  typeIn: { alignSelf: 'stretch', flex: 1, padding: 18, justifyContent: 'space-between' },
   typeBar: { width: 28, height: 5, borderRadius: 1.5, backgroundColor: C.blue, transform: [{ skewX: '-16deg' }] },
   dateNum: { ...numeral(132), marginTop: 2, marginLeft: -3, paddingRight: 16 },
   err: { fontSize: 13, lineHeight: 17, fontWeight: '700', color: C.red, textAlign: 'center' },

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, F, PREFS, numeral } from './theme';
+import Svg, { Path } from 'react-native-svg';
 import { Icon } from './icons';
 import { Label, Slab } from './look';
 import { MINYAN_FALLBACK, minyanTime } from './minyan';
@@ -9,9 +10,20 @@ import { useShabbat, useStore } from './store';
 import { isFriday } from './zmanim';
 
 // FRIDAY SIDE TAB. On Fridays (until Shabbat starts, through Shabbat itself, and on Saturday until it
-// ends) a small tab sits on the right screen edge with a pulsing challah. Tapping it slides out a
+// ends) a small tab sits on the right screen edge with a pulsing candle. Tapping it slides out a
 // compact panel with this Shabbat's times; in the last hour before candle lighting the pulse is faster
 // and the panel counts down. Tapping outside, or the x, closes it. A Shabbat notification opens it too.
+
+// A drawn candle: the body in ink, the flame in orange (the glow behind the tab pulses with it).
+function Candle() {
+  return (
+    <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
+      <Path d="M9 11.500h6V20a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1z" stroke={C.ink} strokeWidth={1.9} strokeLinejoin="round" />
+      <Path d="M12 11.500V10" stroke={C.ink} strokeWidth={1.9} strokeLinecap="round" />
+      <Path d="M12 2.500c1.800 2 2.600 3.300 2.600 4.600a2.600 2.600 0 0 1-5.200 0c0-1.300.800-2.600 2.600-4.600z" fill={C.orange} stroke={C.orange} strokeWidth={1} strokeLinejoin="round" />
+    </Svg>
+  );
+}
 
 const TAB_W = 38, TAB_H = 56, PANEL_W = 262;
 const HOUR = 3600000;
@@ -115,7 +127,7 @@ export function ShabbatTab() {
         <Pressable onPress={() => setShabbatOpen(true)} style={[st.tab, { top }]} accessibilityRole="button" accessibilityLabel="Shabbat times" accessibilityHint="Opens the candle lighting time">
           <Animated.View pointerEvents="none" style={[st.glow, { opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.25, 0.8] }), transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.18] }) }] }]} />
           <Animated.View style={{ transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.1] }) }] }}>
-            <Icon name="challah" size={26} color={C.orangeText} stroke={1.9} />
+            <Candle />
           </Animated.View>
         </Pressable>
       ) : null}
