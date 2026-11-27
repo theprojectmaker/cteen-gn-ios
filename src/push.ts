@@ -122,3 +122,22 @@ export async function scheduleEventReminders(times: { id: string; at: number; ti
     }
   } catch {}
 }
+
+// The coming Shabbat: a note Friday morning and one an hour before candle lighting. Identifiers start
+// with 'shabbat-'; they are all replaced each time, so the same Shabbat never fires twice. Pass []
+// to clear them. Tapping one opens the Chapter tab with the Shabbat panel.
+export async function scheduleShabbatReminders(times: { id: string; at: number; title: string; body: string }[]) {
+  if (!NATIVE) return;
+  try {
+    const all = await Notifications.getAllScheduledNotificationsAsync();
+    await Promise.all(all.filter((n) => n.identifier.startsWith('shabbat-')).map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier).catch(() => {})));
+    for (const t of times) {
+      if (t.at <= Date.now() + 60000) continue;
+      await Notifications.scheduleNotificationAsync({
+        identifier: t.id,
+        content: { title: t.title, body: t.body, data: { target: { type: 'shabbat', id: 'candles' } } },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(t.at) },
+      });
+    }
+  } catch {}
+}

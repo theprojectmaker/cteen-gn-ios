@@ -10,6 +10,7 @@ import { Icon, challengeIcon } from './icons';
 import { wrapWindow } from './zmanim';
 import { WrapBanner, useWrapStatus } from './wrap';
 import { Glass } from './glass';
+import { ShabbatTab } from './shabbatTab';
 import { Avatar, Backdrop, Band, Hairline, Label, LiveDot, Print, Stat, eventPicture } from './look';
 import { CHAPTER, challengeFits, doneThisPeriod, open, streak, useShabbat, useStore, type Alert } from './store';
 
@@ -107,6 +108,7 @@ export function Screen({ children, scoreboard, noShabbat }: { children: React.Re
           <Header />
         </View>
       </View>
+      <ShabbatTab />
     </View>
   );
 }
