@@ -4,7 +4,7 @@ import { Chapter } from '../../src/screens';
 
 export default function ChapterTab() {
   return (
-    <Screen>
+    <Screen noShabbat>
       <Chapter />
     </Screen>
   );

@@ -244,40 +244,27 @@ const pg = StyleSheet.create({
   gutter: { paddingHorizontal: SP.gutter },
 });
 
-export function Band({ children, tone = 'plain', bleed = SP.gutter, onPress, group, accessibilityLabel, accessibilityRole = 'button', style }: {
+export function Band({ children, tone = 'plain', onPress, group, accessibilityLabel, accessibilityRole = 'button', style }: {
   children: React.ReactNode; tone?: 'plain' | 'orange' | 'flat'; bleed?: number; onPress?: () => void; group?: boolean;
   accessibilityLabel?: string; accessibilityRole?: 'button' | 'link'; style?: StyleProp<ViewStyle>;
 }) {
-  const id = useSvgId('bn');
-  // Full-bleed from the real screen width: the page column is centered (at most 560 wide) with a gutter, so
-  // the band starts `x0` left of where its parent starts and is exactly as wide as the screen.
-  const win = useWindowDimensions();
-  const x0 = bleed ? (win.width - Math.min(win.width, 560)) / 2 + bleed : 0;
-  const box = [bn.box, bleed ? { alignSelf: 'flex-start' as const, width: win.width, marginLeft: -x0, paddingHorizontal: x0 } : { paddingHorizontal: SP.gutter }, tone === 'orange' ? bn.orange : bn.lined, style];
-  const fill = tone === 'plain' ? (
-    <Svg width="100%" height="100%" style={StyleSheet.absoluteFill} pointerEvents="none">
-      <Defs>
-        <LinearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor={C.white} stopOpacity={0.06} />
-          <Stop offset="1" stopColor={C.white} stopOpacity={0.025} />
-        </LinearGradient>
-      </Defs>
-      <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${id})`} />
-    </Svg>
-  ) : null;
-  if (!onPress) return <View style={box}>{fill}{children}</View>;
+  // A flat panel inside the page gutter (same left and right edges as the content). It used to bleed to
+  // both screen edges with negative margins, which iOS does not honor on the right side.
+  const box = [bn.box, tone === 'orange' ? bn.orange : tone === 'flat' ? bn.flat : bn.panel, style];
+  if (!onPress) return <View style={box}>{children}</View>;
   // A band that holds buttons of its own (`group`) still opens on a tap anywhere else, but is not
   // one button to a screen reader: the pieces inside are read, and pressed, one by one.
   return (
     <Pressable onPress={onPress} accessible={!group} accessibilityRole={group ? undefined : accessibilityRole} accessibilityLabel={group ? undefined : accessibilityLabel}
       style={({ pressed }) => [box, pressed && bn.pressed]}>
-      {fill}{children}
+      {children}
     </Pressable>
   );
 }
 const bn = StyleSheet.create({
-  box: { paddingTop: 12, paddingBottom: 13 },
-  lined: { borderTopWidth: 1, borderBottomWidth: 1, borderColor: C.bandLine },
+  box: { paddingTop: 14, paddingBottom: 15, paddingHorizontal: SP.gutter, borderRadius: R.photo },
+  panel: { backgroundColor: C.raised, borderWidth: 1, borderColor: C.line },
+  flat: { borderWidth: 1, borderColor: C.line },
   orange: { backgroundColor: C.orange },
   pressed: { opacity: 0.88 },
 });

@@ -59,7 +59,7 @@ const BAR_H = 54;
 // last hour (the live "left to wrap" clock and SNAP for a teen in the challenge, "MIN LEFT TODAY"
 // beside JOIN for one who is not), so the solid orange last-hour banner is not drawn a second
 // time above it. Every other tab still gets it.
-export function Screen({ children, scoreboard }: { children: React.ReactNode; scoreboard?: boolean }) {
+export function Screen({ children, scoreboard, noShabbat }: { children: React.ReactNode; scoreboard?: boolean; noShabbat?: boolean }) {
   const insets = useSafeAreaInsets();
   const { refresh, liveAlert } = useStore();
   const wrap = useWrapStatus();
@@ -93,7 +93,7 @@ export function Screen({ children, scoreboard }: { children: React.ReactNode; sc
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.blue} colors={[C.blue]} progressViewOffset={barBottom + 8} />}>
         <View style={st.col}>
           {/* at most one banner at a time, the most urgent one */}
-          {wrapBanner ? <WrapBanner /> : liveAlert ? <TopAlert alert={liveAlert} /> : <ShabbatBanner />}
+          {wrapBanner ? <WrapBanner /> : liveAlert ? <TopAlert alert={liveAlert} /> : noShabbat ? null : <ShabbatBanner />}
           <Animated.View style={{ opacity: enter, transform: [{ translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }] }}>
             {children}
           </Animated.View>
@@ -215,29 +215,14 @@ function ShabbatBanner() {
   if (!(sameDay && left > 0) && !during) return null;
   const pad = (n: number) => String(n).padStart(2, '0');
   const mm = Math.floor(left / 60000), ss = Math.floor((left % 60000) / 1000);
+  // one slim line (Home and Chapter show the times themselves, so they do not show this at all)
+  const text = counting ? `Shabbat starts in ${pad(mm)}:${pad(ss)} · candle lighting ${sh.candles}`
+    : during ? `Shabbat Shalom · Shabbat ends ${sh.havdalah}`
+    : `Candle lighting tonight ${sh.candles}`;
   return (
     <View style={st.banner} accessibilityLiveRegion={counting ? 'polite' : 'none'}>
-      <Band>
-        {counting ? (
-          <>
-            <Label tone="orange">Shabbat starts in</Label>
-            <View style={st.shabRow}>
-              <Text style={numeral(46, C.orangeText)}>{pad(mm)}:{pad(ss)}</Text>
-              <Text style={[T.small, st.shabSide]}>Candle lighting at {sh.candles}</Text>
-            </View>
-          </>
-        ) : during ? (
-          <>
-            <Label tone="orange">Shabbat in Great Neck{sh.parsha ? ` · ${sh.parsha}` : ''}</Label>
-            <Text style={[T.h1, st.shabTitle]}>Shabbat Shalom</Text>
-            <Text style={[T.small, { marginTop: 4 }]}>Shabbat ends at {sh.havdalah}</Text>
-          </>
-        ) : (
-          <>
-            <Label tone="orange">Shabbat in Great Neck{sh.parsha ? ` · ${sh.parsha}` : ''}</Label>
-            <Stat value={sh.candles ?? ''} label="Candle lighting tonight" size={40} style={{ marginTop: 6 }} />
-          </>
-        )}
+      <Band style={st.slim}>
+        <Text style={st.slimText} numberOfLines={1}>{text}</Text>
       </Band>
     </View>
   );
@@ -337,6 +322,8 @@ const st = StyleSheet.create({
   tipText: { fontFamily: F.bold, fontSize: 15, lineHeight: 17, letterSpacing: 0.5, color: C.night, textTransform: 'uppercase' },
   // banners
   banner: { marginBottom: 18 },
+  slim: { paddingTop: 11, paddingBottom: 12 },
+  slimText: { fontSize: 16, lineHeight: 21, fontWeight: '600', color: C.orangeText },
   shabRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 14, marginTop: 4 },
   shabSide: { flex: 1, paddingBottom: 6 },
   shabTitle: { marginTop: 6 },

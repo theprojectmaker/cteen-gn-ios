@@ -46,6 +46,8 @@ export function Home() {
   const [startY, setStartY] = useState(0);
   const wrap = useRef<View>(null);
   const column = Math.min(win.width, 560);
+  // the carousel is exactly as wide as the page column (measured, never margin math)
+  const [cw, setCw] = useState(column - SP.gutter * 2);
   const measure = () => wrap.current?.measureInWindow((_x, y) => { const at = Math.round(y - bandH); if (Number.isFinite(at) && Math.abs(at - startY) > 3) setStartY(at); });
   useEffect(() => { const t = setTimeout(measure, 150); return () => clearTimeout(t); }, [liveAlert, now, bandH, win.height]);
   const top = Math.max(insets.top + 58 + 16, startY);
@@ -58,7 +60,7 @@ export function Home() {
   useEffect(() => { if (index > count - 1) { setIndex(0); scroller.current?.scrollTo({ x: 0, animated: false }); } }, [count]);
   // a new first page (the data arrived, or the day turned) starts the carousel afresh, at its first page
   useEffect(() => { setIndex(0); }, [pages[0]?.id]);
-  const goTo = (i: number) => { setIndex(i); scroller.current?.scrollTo({ x: i * column, animated: !PREFS.reduceMotion }); };
+  const goTo = (i: number) => { setIndex(i); scroller.current?.scrollTo({ x: i * cw, animated: !PREFS.reduceMotion }); };
 
   return (
     <>
@@ -71,7 +73,9 @@ export function Home() {
         <DateLine now={now} />
         {count > 1 ? <Marker index={index} count={count} onNext={() => goTo((index + 1) % count)} /> : null}
       </View>
-      <Carousel pages={pages} spotTag={spot?.tag} spotId={spot?.event.id} now={now} width={column} height={pageH} scroller={scroller} index={index} onIndex={setIndex} />
+      <View onLayout={(ev) => { const w = Math.round(ev.nativeEvent.layout.width); if (w > 0 && w !== cw) setCw(w); }}>
+        <Carousel pages={pages} spotTag={spot?.tag} spotId={spot?.event.id} now={now} width={cw} height={pageH} scroller={scroller} index={index} onIndex={setIndex} />
+      </View>
       <MoreBelow />
       {main ? (
         <>
@@ -147,7 +151,7 @@ function Carousel({ pages, spotTag, spotId, now, width, height, scroller, index,
     if (i !== index) onIndex(i);
   };
   return (
-    <View style={[st.carousel, { height }]}>
+    <View style={st.carousel}>
       <ScrollView key={pages[0]?.id ?? "none"} ref={scroller} horizontal pagingEnabled showsHorizontalScrollIndicator={false} decelerationRate="fast" scrollEventThrottle={16} onScroll={onScroll}
         style={st.pagerScroll} contentContainerStyle={{ width: width * count }} scrollEnabled={count > 1}>
         {pages.length ? pages.map((e, i) => (
@@ -171,58 +175,63 @@ function Marker({ index, count, onNext }: { index: number; count: number; onNext
   );
 }
 
-// One event, one calm flyer: the tag, the picture large and whole, the title, one short line, one button.
+// One event, one flyer: the tag, the picture as the hero, the title, one short line, one button. The poster is sized
+// from the screen width first (at least 62% of it), the page grows taller than the screen if it has to.
 function EventPage({ e, tag, now, width, height }: { e: EventItem; tag: string; now: number; width: number; height: number }) {
   const { openEvent, goingCount } = useStore();
+  const win = useWindowDimensions();
   const picture = eventPicture(e);
-  const col = width - SP.gutter * 2;
-  const [zone, setZone] = useState({ w: 0, h: 0 });
-  const panelH = zone.h;
+  const col = width;
   const ratio = useAspect(picture?.source, 0.77);
-  // a poster that would nearly fill the width on its own needs no panel around it
-  // a poster is as large as the panel's height allows (12 pt around it); the panel is only as wide as the poster
-  const isPoster = !!picture && picture.kind === 'poster';
-  const posterW = isPoster && panelH > 24 ? Math.min(col - 24, Math.floor((panelH - 24) * ratio)) : 0;
-  const posterH = posterW ? Math.round(posterW / ratio) : 0;
   const open = () => openEvent(e.id);
   const typed = (e.time || '').trim();
   const clock = clockOf(typed);
   const extraTime = typed && (!clock || prettyTime(typed) !== clockText(clock)) ? typed : ''; // the tag already says a plain start time
   const line = [e.place, e.price].filter(Boolean).join(' · ');
   const count = e.showGoing ? goingCount[goingKey(e)] ?? 0 : 0;
-  const small = [extraTime, audienceLabel(e), count > 0 ? `${count} going` : ''].filter(Boolean).join(' · ');
   const manyDays = !!e.end && e.end !== e.start;
-  const lineText = line || (manyDays ? dateRange(e) : '');
-  // The title takes one line when it can (the biggest of 34 / 30 / 27 / 24 that fits the column), so the poster gets the height;
-  // only a very long one goes to two lines.
-  const fit = [34, 30, 27, 24].find((n) => capsWidth(e.title, n, 0.2) <= col - Math.ceil(n * 0.12) - 4);
+  // one info line: where, how much, who for, anything the tag could not say, and how many are going
+  const lineText = [line || (manyDays ? dateRange(e) : ''), extraTime, audienceLabel(e), count > 0 ? `${count} going` : ''].filter(Boolean).join(' · ');
+  // The title takes one line when it can (the biggest of 34 / 30 / 27 / 26 that fits the column), else two lines at 26.
+  const fit = [34, 30, 27, 26].find((n) => capsWidth(e.title, n, 0.2) <= col - Math.ceil(n * 0.12) - 4);
   const titleSize = fit ?? 26;
   const titleStyle = { ...T.hero, fontSize: titleSize, lineHeight: Math.round(titleSize * 1.02), paddingRight: Math.ceil(titleSize * 0.12) };
+  // What the page needs besides the picture: the tag, the title, the info lines and the button.
+  const chrome = 48 + (fit ? 38 : 76) + 26 + 80 + 20;
+  const availH = Math.max(0, height - chrome); // what is left for the picture on a screen this tall
+  const isPoster = !!picture && picture.kind === 'poster';
+  let panelW = col, panelH = 0, imgW = 0, imgH = 0;
+  if (isPoster) {
+    // from the width first: at least 62% of the screen, as tall as the screen allows beyond that, never wider than the column
+    const byHeight = Math.floor((availH - 24) * ratio);
+    imgW = Math.min(col - 24, Math.max(byHeight, Math.round(win.width * 0.62)));
+    imgH = Math.round(imgW / ratio);
+    panelW = imgW + 24; panelH = imgH + 24;
+  } else if (picture) {
+    panelH = Math.round(Math.min(Math.max(col / Math.max(ratio, 0.5), 180), Math.max(availH, 260)));
+  } else {
+    panelH = Math.max(200, Math.min(availH, 320));
+  }
   return (
-    <View style={[st.page, { width, height }]}>
+    <View style={[st.page, { width, minHeight: height }]}>
       <BrushTag label={tag} style={st.tag} />
-      {/* the picture zone takes all the spare height. A poster sits whole in a panel exactly as big as the poster
-          plus 12 pt around it (so no strip is left over); a photograph or the date print fills the zone. */}
-      <View style={st.zone} onLayout={(ev) => { const { width: w, height: h } = ev.nativeEvent.layout; if (Math.abs(w - zone.w) > 0.5 || Math.abs(h - zone.h) > 0.5) setZone({ w, h }); }}>
-        <Pressable onPress={open} accessibilityRole="button"
-          accessibilityLabel={picture ? `${e.title} poster. Opens the event` : `${e.title}, ${dayAndTime(e, now).day.toLowerCase()}. Opens the event`}
-          style={({ pressed }) => [st.panel, !picture && st.panelType, isPoster ? { width: posterW + 24, height: posterH + 24 } : { width: '100%', height: zone.h }, pressed && st.dim]}>
-          {picture ? (
-            isPoster ? <Image source={picture.source} style={{ width: posterW, height: posterH }} resizeMode="contain" /> : <Image source={picture.source} style={st.fill} resizeMode="cover" />
-          ) : (
-            <View style={st.typeIn}>
-              <DateBig date={e.start} size={Math.max(110, Math.min(240, Math.round(panelH * 0.62)))} />
-              <View style={st.typeBar} />
-            </View>
-          )}
-          <CountChip n={galleryCount(e)} />
-          <View pointerEvents="none" style={st.panelEdge} />
-        </Pressable>
-      </View>
+      <Pressable onPress={open} accessibilityRole="button"
+        accessibilityLabel={picture ? `${e.title} poster. Opens the event` : `${e.title}, ${dayAndTime(e, now).day.toLowerCase()}. Opens the event`}
+        style={({ pressed }) => [st.panel, !picture && st.panelType, { width: panelW, height: panelH }, isPoster && { alignSelf: 'center' }, pressed && st.dim]}>
+        {picture ? (
+          isPoster ? <Image source={picture.source} style={{ width: imgW, height: imgH }} resizeMode="contain" /> : <Image source={picture.source} style={st.fill} resizeMode="cover" />
+        ) : (
+          <View style={st.typeIn}>
+            <DateBig date={e.start} size={Math.max(110, Math.min(240, Math.round(panelH * 0.62)))} />
+            <View style={st.typeBar} />
+          </View>
+        )}
+        <CountChip n={galleryCount(e)} />
+        <View pointerEvents="none" style={st.panelEdge} />
+      </Pressable>
       <Pressable onPress={open} accessible={false} style={({ pressed }) => pressed && st.dim}>
         <Text style={[titleStyle, st.title]} numberOfLines={fit ? 1 : 2} accessibilityRole="button" accessibilityLabel={`${e.title}. ${tag.toLowerCase()}.`} accessibilityHint="Opens the event">{e.title}</Text>
         {lineText ? <Text style={st.line} numberOfLines={1}>{lineText}</Text> : null}
-        {small ? <Label size={11} tone="blue" numberOfLines={1} style={st.small}>{small}</Label> : null}
       </Pressable>
       <Action e={e} />
     </View>
@@ -622,15 +631,15 @@ const st = StyleSheet.create({
   invites: { marginTop: 0, marginBottom: 14 },
   dateRow: { height: DATE_ROW, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   dateLine: { flexDirection: 'row', alignItems: 'center', gap: 9 },
-  carousel: { marginHorizontal: -SP.gutter },
-  pagerScroll: { flex: 1 },
+  carousel: {},
+  pagerScroll: {},
   marker: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   bars: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   bar: { width: 10, height: 6, borderRadius: 1.5, backgroundColor: C.tick, transform: [{ skewX: '-16deg' }] },
   barOn: { width: 18, backgroundColor: C.sub },
   markNum: { fontFamily: F.bold, fontSize: 11, lineHeight: 14, letterSpacing: 1.8, color: C.faint, textAlign: 'right', marginRight: -1.8 },
   // a flyer
-  page: { paddingHorizontal: SP.gutter, paddingTop: 8 },
+  page: { paddingTop: 8, overflow: 'hidden' },
   tag: { marginTop: 4, alignSelf: 'flex-start' },
   title: { marginTop: 0 },
   line: { fontSize: 15, lineHeight: 20, fontWeight: '500', color: C.sub, marginTop: 6 },
@@ -640,8 +649,7 @@ const st = StyleSheet.create({
   btnMain: { flex: 1 },
   btnSide: { minWidth: 112 },
   chips: { gap: 6, alignItems: 'stretch' },
-  zone: { flex: 1, marginTop: 14, marginBottom: 14, alignItems: 'center', justifyContent: 'center' },
-  panel: { borderRadius: R.photo, overflow: 'hidden', backgroundColor: C.raised, alignItems: 'center', justifyContent: 'center' },
+  panel: { marginTop: 10, marginBottom: 10, borderRadius: R.photo, overflow: 'hidden', backgroundColor: C.raised, alignItems: 'center', justifyContent: 'center' },
   panelType: { backgroundColor: C.raised },
   panelEdge: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, borderRadius: R.photo, borderWidth: 1, borderColor: C.printEdge },
   fill: { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' },

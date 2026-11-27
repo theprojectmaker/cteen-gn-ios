@@ -4,7 +4,7 @@ import { Home } from '../../src/screens';
 
 export default function HomeTab() {
   return (
-    <Screen scoreboard>
+    <Screen scoreboard noShabbat>
       <Home />
     </Screen>
   );
