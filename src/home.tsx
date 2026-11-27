@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, F, PREFS, R, SP, T, display, numeral } from './theme';
 import { Icon } from './icons';
 import { challengeFits, sortPosts, upcoming, useShabbat, useStore, type Challenge, type EventItem } from './store';
-import { Band, BrushTag, CountChip, DayBlock, Hairline, Label, Row, Slab, Ticks, eventPicture, galleryCount, hebrewDate, heroType, useAspect } from './look';
+import { Band, BrushTag, CountChip, DayBlock, Hairline, Label, Row, Slab, Ticks, eventPicture, galleryCount, hebrewDate, heroType, useAspect, capsWidth } from './look';
 import { useChallengeCard } from './rewards';
 import { InviteCards, useMyInvites } from './invites';
 import { MINYAN_FALLBACK, minyanTime } from './minyan';
@@ -23,7 +23,7 @@ import { nyDate, nyTime } from './zmanim';
 const PAGES = 3;
 const DATE_ROW = 22; // the date line and the page marker above the carousel
 const TAB_BAR = 56; // the floating tab bar, with its own margin
-const HINT_ROW = 30; // "more below" under it
+const HINT_ROW = 24; // "more below" under it
 
 export function Home() {
   const { content, fits, gender, liveAlert } = useStore();
@@ -190,7 +190,11 @@ function EventPage({ e, tag, now, width, height }: { e: EventItem; tag: string; 
   const small = [extraTime, audienceLabel(e), count > 0 ? `${count} going` : ''].filter(Boolean).join(' · ');
   const manyDays = !!e.end && e.end !== e.start;
   const lineText = line || (manyDays ? dateRange(e) : '');
-  const titleStyle = e.title.length > 34 ? { ...T.hero, fontSize: 30, lineHeight: 30, paddingRight: 4 } : { ...T.hero, fontSize: 34, lineHeight: 34, paddingRight: 4 };
+  // The title takes one line when it can (the biggest of 34 / 30 / 27 / 24 that fits the column), so the poster gets the height;
+  // only a very long one goes to two lines.
+  const fit = [34, 30, 27, 24].find((n) => capsWidth(e.title, n, 0.2) <= col - Math.ceil(n * 0.12) - 4);
+  const titleSize = fit ?? 26;
+  const titleStyle = { ...T.hero, fontSize: titleSize, lineHeight: Math.round(titleSize * 1.02), paddingRight: Math.ceil(titleSize * 0.12) };
   return (
     <View style={[st.page, { width, height }]}>
       <BrushTag label={tag} style={st.tag} />
@@ -212,7 +216,7 @@ function EventPage({ e, tag, now, width, height }: { e: EventItem; tag: string; 
         <View pointerEvents="none" style={st.panelEdge} />
       </Pressable>
       <Pressable onPress={open} accessible={false} style={({ pressed }) => pressed && st.dim}>
-        <Text style={[titleStyle, st.title]} numberOfLines={2} accessibilityRole="button" accessibilityLabel={`${e.title}. ${tag.toLowerCase()}.`} accessibilityHint="Opens the event">{e.title}</Text>
+        <Text style={[titleStyle, st.title]} numberOfLines={fit ? 1 : 2} accessibilityRole="button" accessibilityLabel={`${e.title}. ${tag.toLowerCase()}.`} accessibilityHint="Opens the event">{e.title}</Text>
         {lineText ? <Text style={st.line} numberOfLines={1}>{lineText}</Text> : null}
         {small ? <Label size={11} tone="blue" numberOfLines={1} style={st.small}>{small}</Label> : null}
       </Pressable>
@@ -330,13 +334,15 @@ function Scoreboard({ ch, style }: { ch: Challenge; style?: StyleProp<ViewStyle>
   const pending = mine && !done && !complete && (state === 'open' || state === 'before');
   const number = !mine ? ch.goal : Math.min(ch.goal, pending ? count + 1 : count);
   if (out) {
-    // put out of the challenge (only when the server says so): one quiet row, nothing loud
+    // put out of the challenge (only when the server says so): a big red X where the day count was,
+    // no clock and no SNAP. It sits below the carousel, so it never shows above the tab bar at rest.
     return (
       <Band group onPress={card.open} style={style}>
         <View style={st.outRow} accessible accessibilityRole="button" accessibilityLabel={`${ch.title}. You're out. Back in for the next one.`}>
-          <Icon name="x" size={22} color={C.sub} stroke={2.4} />
+          <View style={st.outX}><Icon name="x" size={52} color={C.red} stroke={3.4} /></View>
           <View style={st.outText}>
-            <Text style={st.outTitle} numberOfLines={2}>Out of the {short.toLowerCase()}</Text>
+            <Label numberOfLines={1} style={st.scoreLabel}>{short}</Label>
+            <Text style={st.outWord}>Out</Text>
             <Text style={st.outLine}>Back in for the next one.</Text>
           </View>
         </View>
@@ -589,9 +595,10 @@ const st = StyleSheet.create({
   shabTeen: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 16, paddingTop: 14, borderTopWidth: 1, borderTopColor: C.line },
   shabTeenLabel: { flex: 1, fontSize: 15, lineHeight: 20, fontWeight: '600', color: C.ink },
   shabTeenTime: { ...display(24, C.blue) },
-  outRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 4 },
+  outRow: { flexDirection: 'row', alignItems: 'center', gap: 18 },
+  outX: { width: 84, height: 84, borderRadius: 42, borderWidth: 3, borderColor: C.red, alignItems: 'center', justifyContent: 'center' },
   outText: { flex: 1, minWidth: 0 },
-  outTitle: { fontSize: 17, lineHeight: 22, fontWeight: '600', color: C.ink },
+  outWord: { ...display(46, C.red), marginTop: 2 },
   outLine: { fontSize: 15, lineHeight: 21, color: C.sub, marginTop: 2 },
   invites: { marginTop: 0, marginBottom: 14 },
   dateRow: { height: DATE_ROW, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -609,8 +616,8 @@ const st = StyleSheet.create({
   title: { marginTop: 0 },
   line: { fontSize: 15, lineHeight: 20, fontWeight: '500', color: C.sub, marginTop: 6 },
   small: { marginTop: 7 },
-  btn: { marginTop: 20, marginBottom: 0 },
-  panel: { flex: 1, marginTop: 18, marginBottom: 18, borderRadius: R.photo, overflow: 'hidden', backgroundColor: C.raised },
+  btn: { marginTop: 18, marginBottom: 0 },
+  panel: { flex: 1, marginTop: 14, marginBottom: 14, borderRadius: R.photo, overflow: 'hidden', backgroundColor: C.raised },
   panelType: { backgroundColor: C.raised },
   panelEdge: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, borderRadius: R.photo, borderWidth: 1, borderColor: C.printEdge },
   fill: { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' },
