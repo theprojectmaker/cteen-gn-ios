@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, R, T, F, display } from './theme';
 import { Icon } from './icons';
 import { router } from 'expo-router';
-import { dateLabel, repeatLabel, streak, upcoming, useStore, type Gender } from './store';
+import { dateLabel, goingKey, repeatLabel, streak, upcoming, useStore, type Gender } from './store';
 import { Button, Card, Field, s as u } from './ui';
 import { pickAvatar } from './photo';
 
@@ -139,8 +139,8 @@ function ActivityRow({ icon, title, sub, onPress, first }: { icon: string; title
 function YourCteen() {
   const { going, saved, joined, content, counts, checks, openEvent, openChallenge } = useStore();
   const up = upcoming(content.events);
-  const myEvents = up.filter((e) => going.includes(e.id));
-  const savedEvents = up.filter((e) => saved.includes(e.id) && !going.includes(e.id));
+  const myEvents = up.filter((e) => going.includes(goingKey(e)));
+  const savedEvents = up.filter((e) => saved.includes(e.id) && !going.includes(goingKey(e)));
   const myChallenges = content.challenges.filter((c) => joined.includes(c.id) && c.active);
   if (!myEvents.length && !savedEvents.length && !myChallenges.length) return null;
   return (

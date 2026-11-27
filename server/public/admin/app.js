@@ -256,9 +256,15 @@ VIEWS.events = async (main) => {
   const s = await api('/admin/signups').catch(() => ({ signups: {} }));
   const t = today();
   const evs = [...content.events].sort((a, b) => a.start.localeCompare(b.start));
-  const row = (e) => { const list = s.signups[e.id] || []; return `<tr><td><b>${esc(e.title)}</b>${e.scope === 'intl' ? ' <span class="tag cy">International</span>' : ''}${e.repeat === 'weekly' ? ' <span class="tag">Weekly</span>' : ''}${e.priority ? ' <span class="tag or">Featured</span>' : ''}<div class="small muted">${esc([e.time, e.place].filter(Boolean).join(' · '))}</div></td>
+  // a weekly event keeps one list per date ("<id>@<date>"): show the coming week's
+  const listFor = (e) => {
+    const wk = e.repeat === 'weekly' ? Object.keys(s.signups).filter((k) => k.startsWith(e.id + '@')).sort() : [];
+    const k = wk.find((x) => x.slice(e.id.length + 1) >= t) || wk[wk.length - 1];
+    return k ? { list: s.signups[k], date: k.slice(e.id.length + 1) } : { list: s.signups[e.id] || [], date: '' };
+  };
+  const row = (e) => { const { list, date } = listFor(e); return `<tr><td><b>${esc(e.title)}</b>${e.scope === 'intl' ? ' <span class="tag cy">International</span>' : ''}${e.repeat === 'weekly' ? ' <span class="tag">Weekly</span>' : ''}${e.priority ? ' <span class="tag or">Featured</span>' : ''}<div class="small muted">${esc([e.time, e.place].filter(Boolean).join(' · '))}</div></td>
     <td>${whenText(e)}</td><td>${e.gender === 'all' ? 'Both' : e.gender === 'boys' ? 'Boys' : 'Girls'}</td>
-    <td>${e.signup === 'app' ? `<a href="#" data-going="${esc(e.id)}">${list.length} going</a>` : '<span class="muted">CTeen site</span>'}</td>
+    <td>${e.signup === 'app' ? `<a href="#" data-going="${esc(e.id)}">${list.length} going${date ? ' on ' + esc(date) : ''}</a>` : '<span class="muted">CTeen site</span>'}</td>
     <td style="text-align:right;white-space:nowrap"><button class="btn sec sm" data-dup="${esc(e.id)}">Copy</button> <button class="btn sec sm" data-edit="${esc(e.id)}">Edit</button></td></tr>`; };
   const up = evs.filter((e) => isUp(e, t)), past = evs.filter((e) => !isUp(e, t)).reverse();
   main.innerHTML = head('Events', 'New events notify every phone. Sign-ups show here as they come in.', `<button class="btn sec" id="aiBtn">Plan with AI</button><button class="btn" id="newEv">New event</button>`) +
@@ -268,10 +274,10 @@ VIEWS.events = async (main) => {
   $('#aiBtn').onclick = aiPlan;
   main.querySelectorAll('[data-edit]').forEach((b) => (b.onclick = () => editEvent(content.events.find((e) => e.id === b.dataset.edit))));
   main.querySelectorAll('[data-dup]').forEach((b) => (b.onclick = () => { const o = content.events.find((e) => e.id === b.dataset.dup); const { id, ...rest } = o; editEvent(null, { ...rest, title: o.title, start: '', end: '' }); }));
-  main.querySelectorAll('[data-going]').forEach((a) => (a.onclick = (ev) => { ev.preventDefault(); const e = content.events.find((x) => x.id === a.dataset.going); showGoing(e, s.signups[e.id] || []); }));
+  main.querySelectorAll('[data-going]').forEach((a) => (a.onclick = (ev) => { ev.preventDefault(); const e = content.events.find((x) => x.id === a.dataset.going); const x = listFor(e); showGoing(e, x.list, x.date); }));
 };
-function showGoing(e, list) {
-  dialog(e.title + ' · ' + list.length + ' going', list.length ? `<table><thead><tr><th>Name</th><th>Grade</th><th>Age</th><th>Signed up</th></tr></thead><tbody>${list.map((r) => `<tr><td>${esc(r.name)}</td><td>${esc(r.grade ? r.grade + 'th' : '')}</td><td>${esc(r.age ?? '')}</td><td class="small muted">${esc(fmtAt(r.at))}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">Nobody yet.</div>', { ok: 'Done' });
+function showGoing(e, list, date) {
+  dialog(e.title + (date ? ' (' + date + ')' : '') + ' · ' + list.length + ' going', list.length ? `<table><thead><tr><th>Name</th><th>Grade</th><th>Age</th><th>Signed up</th></tr></thead><tbody>${list.map((r) => `<tr><td>${esc(r.name)}</td><td>${esc(r.grade ? r.grade + 'th' : '')}</td><td>${esc(r.age ?? '')}</td><td class="small muted">${esc(fmtAt(r.at))}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">Nobody yet.</div>', { ok: 'Done' });
   if (list.length) { const b = document.createElement('button'); b.className = 'btn sec'; b.type = 'button'; b.textContent = 'Download list'; b.onclick = () => csv(e.title, [['Name', 'Grade', 'Age', 'Signed up'], ...list.map((r) => [r.name, r.grade, r.age ?? '', r.at])]); $('#dlgFoot').prepend(b); }
 }
 async function editEvent(e, draft) {

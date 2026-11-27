@@ -169,7 +169,7 @@ import { C, F, PREFS, R, SH, SP, T, display, numeral, upright } from './theme';
 import { brushPath } from './brush';
 import { Icon } from './icons';
 import { Glass } from './glass';
-import { IMAGES, daysUntil, withNextDate, type EventItem } from './store';
+import { IMAGES, daysUntil, goingKey, withNextDate, type EventItem } from './store';
 import { nyDate, sunTimes } from './zmanim';
 import { dayAndTime, daysAway, parseDay, prettyTime, whenWords } from './when';
 
@@ -249,7 +249,11 @@ export function Band({ children, tone = 'plain', bleed = SP.gutter, onPress, gro
   accessibilityLabel?: string; accessibilityRole?: 'button' | 'link'; style?: StyleProp<ViewStyle>;
 }) {
   const id = useSvgId('bn');
-  const box = [bn.box, { marginHorizontal: -bleed, paddingHorizontal: bleed || SP.gutter }, tone === 'orange' ? bn.orange : bn.lined, style];
+  // Full-bleed from the real screen width: the page column is centered (at most 560 wide) with a gutter, so
+  // the band starts `x0` left of where its parent starts and is exactly as wide as the screen.
+  const win = useWindowDimensions();
+  const x0 = bleed ? (win.width - Math.min(win.width, 560)) / 2 + bleed : 0;
+  const box = [bn.box, bleed ? { alignSelf: 'flex-start' as const, width: win.width, marginLeft: -x0, paddingHorizontal: x0 } : { paddingHorizontal: SP.gutter }, tone === 'orange' ? bn.orange : bn.lined, style];
   const fill = tone === 'plain' ? (
     <Svg width="100%" height="100%" style={StyleSheet.absoluteFill} pointerEvents="none">
       <Defs>
@@ -769,7 +773,7 @@ export function PosterWall({ events, going, onOpen, now, style }: {
     <ScrollView key={WEB ? events[0]?.id : undefined} horizontal showsHorizontalScrollIndicator={false} decelerationRate="fast" snapToOffsets={measured && events.length > 1 ? stops : undefined}
       style={[wl.scroll, style]} contentContainerStyle={wl.row}>
       {events.map((e, i) => (
-        <WallPoster key={e.id} event={e} tilt={WALL_TILTS[i % WALL_TILTS.length]} mine={!!going && going.includes(e.id)} now={now} onPress={() => onOpen(e.id)}
+        <WallPoster key={e.id} event={e} tilt={WALL_TILTS[i % WALL_TILTS.length]} mine={!!going && going.includes(goingKey(e))} now={now} onPress={() => onOpen(e.id)}
           onWidth={(w) => setWidths((all) => (all[e.id] === w ? all : { ...all, [e.id]: w }))} />
       ))}
     </ScrollView>

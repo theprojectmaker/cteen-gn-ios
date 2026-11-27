@@ -9,7 +9,8 @@
 //   POST /api/auth/redeem                  { ticket, id?, token? } -> links Google to the account, or signs in
 //   POST /api/auth/apple                   { identityToken, name?, id?, token? } -> Sign in with Apple
 //   POST /api/events/:id/signup|cancel     { id, token } (or legacy { device, name, grade })
-//   GET  /api/events/counts                how many are going to each in-app event (no names)
+//   GET  /api/events/counts                how many are going to each in-app event (no names); a weekly event also has one entry per date, keyed "<id>@<YYYY-MM-DD>"
+//   (signup / cancel take an optional { date } for a weekly event: each week has its own list)
 //   GET  /api/posts/meta                   likes + comment counts per post (cached 10s at the edge)
 //   POST /api/posts/:id/like               { id, token, on } like / unlike a Feed post
 //   GET  /api/posts/:id/comments           comments on a post
@@ -642,12 +643,18 @@ export async function onRequest({ request, env, params, waitUntil }) {
       const evs = content.events.filter((x) => x.signup === 'app');
       const rows = await Promise.all(evs.map((e) => env.CTEEN.get('signups:' + e.id, 'json')));
       const names = {};
-      evs.forEach((e, i) => {
+      const put = (k, e, list) => {
         if (!e.showGoing) return; // private unless the rabbi turns on "Show who's going"
-        const list = rows[i] || [];
-        counts[e.id] = list.length;
-        names[e.id] = list.slice(-30).map((r) => String(r.name || '').split(' ')[0]).filter(Boolean);
-      });
+        counts[k] = list.length;
+        names[k] = list.slice(-30).map((r) => String(r.name || '').split(' ')[0]).filter(Boolean);
+      };
+      evs.forEach((e, i) => put(e.id, e, rows[i] || []));
+      // a weekly event: one list per date
+      for (const e of evs.filter((x) => x.repeat === 'weekly' && x.showGoing)) {
+        const ks = (await env.CTEEN.list({ prefix: 'signups:' + e.id + '@' })).keys.map((k) => k.name).slice(-12);
+        const lists = await Promise.all(ks.map((k) => env.CTEEN.get(k, 'json')));
+        ks.forEach((k, i) => put(k.slice('signups:'.length), e, lists[i] || []));
+      }
       return json({ counts, names });
     });
     // An event as a calendar file (Apple Calendar opens it with "Add to Calendar").
@@ -683,7 +690,17 @@ export async function onRequest({ request, env, params, waitUntil }) {
       if (!ev || ev.signup !== 'app') return bad('This event does not take sign-ups in the app.', 404);
       const who = await actor(env, body);
       if (who.error) return bad(who.error, 401);
-      const key = 'signups:' + id;
+      // A weekly event: the app sends the date of the week it is signing up for; each date has its own list.
+      // No date (an older app) keeps the old single list.
+      let date = '';
+      if (ev.repeat === 'weekly' && body && body.date != null && body.date !== '') {
+        date = String(body.date);
+        const t = Date.parse(date + 'T12:00:00Z'), today = Date.parse(nyDate() + 'T12:00:00Z'), first = Date.parse(ev.start + 'T12:00:00Z');
+        const ok = /^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isFinite(t) && new Date(t).getUTCDay() === new Date(first).getUTCDay()
+          && t >= today - 2 * 864e5 && t <= today + 70 * 864e5 && t >= first;
+        if (!ok) return bad('That date is not part of this event.', 400);
+      }
+      const key = 'signups:' + id + (date ? '@' + date : '');
       const rows = ((await env.CTEEN.get(key, 'json')) || []).filter((r) => r.device !== who.key);
       if (action === 'signup') {
         if (who.name.length < 2) return bad('Add your name.');
@@ -967,7 +984,14 @@ export async function onRequest({ request, env, params, waitUntil }) {
         const content = await getContent(env);
         const out = {};
         for (const e of content.events.filter((x) => x.signup === 'app')) {
-          out[e.id] = ((await env.CTEEN.get('signups:' + e.id, 'json')) || []).map((r) => ({ name: r.name, grade: r.grade, age: r.age ?? null, gender: r.gender || '', school: r.school || '', at: r.at }));
+          const row = (r) => ({ name: r.name, grade: r.grade, age: r.age ?? null, gender: r.gender || '', school: r.school || '', at: r.at });
+          out[e.id] = ((await env.CTEEN.get('signups:' + e.id, 'json')) || []).map(row);
+          if (e.repeat === 'weekly') {
+            // one entry per week, keyed "<id>@<date>"
+            for (const k of (await env.CTEEN.list({ prefix: 'signups:' + e.id + '@' })).keys.map((x) => x.name).slice(-12)) {
+              out[k.slice('signups:'.length)] = ((await env.CTEEN.get(k, 'json')) || []).map(row);
+            }
+          }
         }
         return json({ signups: out, phones: Object.keys((await env.CTEEN.get('push', 'json')) || {}).length });
       }

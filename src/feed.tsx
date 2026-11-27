@@ -3,7 +3,7 @@ import { Alert, Animated, Image, Platform, Pressable, ScrollView, StyleSheet, Te
 import { router, useFocusEffect } from 'expo-router';
 import { C, F, R, T, display } from './theme';
 import { Icon } from './icons';
-import { CHAPTER, countdown, daysUntil, open, sortPosts, tap, upcoming, useStore, type Post, type PostComment } from './store';
+import { CHAPTER, countdown, daysUntil, goingKey, open, sortPosts, tap, upcoming, useStore, withNextDate, type Post, type PostComment } from './store';
 import { Hairline, Label } from './look';
 import { Button, Cover, Empty, EventMeta, s as u } from './ui';
 
@@ -191,7 +191,7 @@ export function PostCard({ post, full, compact, isNew }: { post: Post; full?: bo
               <View style={st.mediaChip}>
                 <Text style={st.mediaChipTitle} numberOfLines={1}>{ev!.title}</Text>
                 <EventMeta e={ev!} />
-                {ev!.signup === 'app' && (goingCount[ev!.id] ?? 0) > 0 ? <Text style={st.mediaGoing}>{goingCount[ev!.id]} going</Text> : null}
+                {ev!.signup === 'app' && (goingCount[goingKey(withNextDate(ev!))] ?? 0) > 0 ? <Text style={st.mediaGoing}>{goingCount[goingKey(withNextDate(ev!))]} going</Text> : null}
               </View>
             </Pressable>
           )}
@@ -239,7 +239,7 @@ export function PostCard({ post, full, compact, isNew }: { post: Post; full?: bo
       {ev && media !== 'event' ? (
         <Pressable onPress={() => openEvent(ev.id)} style={({ pressed }) => [st.attach, pressed && u.pressed]} accessibilityRole="button" accessibilityLabel={`Open ${ev.title}`}>
           <Cover e={ev} style={st.attachImg} iconSize={22} />
-          <View style={{ flex: 1 }}><Text style={T.h3} numberOfLines={1}>{ev.title}</Text><EventMeta e={ev} />{ev.signup === 'app' && (goingCount[ev.id] ?? 0) > 0 ? <Text style={[T.small, { color: C.sub, marginTop: 2 }]}>{goingCount[ev.id]} going</Text> : null}</View>
+          <View style={{ flex: 1 }}><Text style={T.h3} numberOfLines={1}>{ev.title}</Text><EventMeta e={ev} />{ev.signup === 'app' && (goingCount[goingKey(withNextDate(ev))] ?? 0) > 0 ? <Text style={[T.small, { color: C.sub, marginTop: 2 }]}>{goingCount[goingKey(withNextDate(ev))]} going</Text> : null}</View>
           <Icon name="right" size={18} color={C.faint} stroke={2.4} />
         </Pressable>
       ) : null}

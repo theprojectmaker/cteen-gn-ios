@@ -113,11 +113,13 @@ type Local = {
   account: Account | null; onboarded: boolean; inboxSeen?: string; tourSeen?: boolean; invites?: Record<string, 'yes' | 'no'>;
   seenPosts: string[]; seenInit: boolean; seenEvents: string[]; tipSeen: boolean;
   saved: string[]; liked: string[]; going: string[]; joined: string[]; dismissed: string[];
+  /** RSVPs the teen answered "I'm out" (same keys as `going`): kept on this phone only */
+  out: string[];
   checks: Record<string, string[]>; // challenge id -> period keys checked in
   counts: Record<string, number>;
   reminders: Record<string, number>; // challenge id -> hour of day
 };
-const blank: Local = { device: '', name: '', grade: '', age: null, gender: '', school: '', account: null, onboarded: false, seenPosts: [], seenInit: false, seenEvents: [], tipSeen: false, saved: [], liked: [], going: [], joined: [], dismissed: [], checks: {}, counts: {}, reminders: {} };
+const blank: Local = { device: '', name: '', grade: '', age: null, gender: '', school: '', account: null, onboarded: false, seenPosts: [], seenInit: false, seenEvents: [], tipSeen: false, saved: [], liked: [], going: [], out: [], joined: [], dismissed: [], checks: {}, counts: {}, reminders: {} };
 const KEY = 'cteengn.v3';
 const CACHE = 'cteengn.content.v3';
 
@@ -138,7 +140,9 @@ type Ctx = Local & {
   openChallenge: (id: string | null) => void;
   openTarget: (t: Target) => void;
   liveAlert: Alert | null; dismissAlert: () => void;
-  signup: (id: string, on: boolean) => Promise<string | null>;
+  /** `date`: the week a weekly event is being answered for (each week has its own list) */
+  signup: (id: string, on: boolean, date?: string) => Promise<string | null>;
+  setOut: (key: string, on: boolean) => void;
   goingCount: Record<string, number>;
   postMeta: Record<string, { likes: number; comments: number }>;
   likePost: (id: string) => void;
@@ -499,18 +503,26 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     openChallenge: (id) => { if (id) { tap(); router.push(`/challenge/${id}`); } },
     dismissAlert: () => patch((s) => ({ ...s, dismissed: [...s.dismissed.slice(-20), a.id] })),
     goingCount,
-    signup: async (id, on) => {
+    signup: async (id, on, date) => {
       const me = ref.current;
+      const key = date ? `${id}@${date}` : id;
+      const was = me.going.includes(key);
+      // optimistic: the page answers at once; a failed call puts it back
+      let before = 0;
+      setGoingCount((c) => { before = c[key] ?? 0; return { ...c, [key]: Math.max(0, before + (on && !was ? 1 : !on && was ? -1 : 0)) }; });
+      patch((s) => ({ ...s, going: on ? [...new Set([...s.going, key])] : s.going.filter((x) => x !== key) }));
       try {
-        const r = await api<{ count: number }>(`/events/${id}/${on ? 'signup' : 'cancel'}`, { method: 'POST', body: who(me) });
-        if (typeof r.count === 'number') setGoingCount((c) => ({ ...c, [id]: r.count }));
-        patch((s) => ({ ...s, going: on ? [...new Set([...s.going, id])] : s.going.filter((x) => x !== id) }));
+        const r = await api<{ count: number }>(`/events/${id}/${on ? 'signup' : 'cancel'}`, { method: 'POST', body: { ...who(me), ...(date ? { date } : {}) } });
+        if (typeof r.count === 'number') setGoingCount((c) => ({ ...c, [key]: r.count }));
         if (on) tap(true);
         return null;
       } catch (e) {
+        setGoingCount((c) => ({ ...c, [key]: before }));
+        patch((s) => ({ ...s, going: was ? [...new Set([...s.going, key])] : s.going.filter((x) => x !== key) }));
         return msg(e);
       }
     },
+    setOut: (key, on) => patch((s) => ({ ...s, out: on ? [...new Set([...(s.out ?? []), key])] : (s.out ?? []).filter((x) => x !== key) })),
     join: (id, hour) => {
       const ch = content.challenges.find((c) => c.id === id);
       tap(true);
@@ -625,8 +637,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         const inv = (content.invites || []).find((v) => v.id === id);
         const ev = inv?.eventId ? content.events.find((e) => e.id === inv.eventId) : undefined;
         if (ev && ev.signup === 'app') {
-          await api(`/events/${ev.id}/${answer === 'yes' ? 'signup' : 'cancel'}`, { method: 'POST', body: who(me) }).catch(() => {});
-          patch((s) => ({ ...s, going: answer === 'yes' ? [...new Set([...s.going, ev.id])] : s.going.filter((x) => x !== ev.id) }));
+          const occ = withNextDate(ev);
+          const key = goingKey(occ);
+          await api(`/events/${ev.id}/${answer === 'yes' ? 'signup' : 'cancel'}`, { method: 'POST', body: { ...who(me), ...(ev.repeat === 'weekly' ? { date: occ.start } : {}) } }).catch(() => {});
+          patch((s) => ({ ...s, going: answer === 'yes' ? [...new Set([...s.going, key])] : s.going.filter((x) => x !== key) }));
         }
         return null;
       } catch (e) { return msg(e); }
@@ -756,6 +770,13 @@ export function occurrencesInRange(e: EventItem, from: string, to: string): stri
   return out;
 }
 // A weekly event as it should be shown right now: on its next date. Anything else is returned as is.
+/**
+ * The key an RSVP is kept under: the event's id, and for a weekly event also the date of the week
+ * (`id@2026-11-29`), so each week has its own sign-ups and a new week starts out not signed up.
+ * Pass the event as it is shown (its `start` is then the date of that occurrence).
+ */
+export const goingKey = (e: Pick<EventItem, 'id' | 'repeat' | 'start'>): string => (e.repeat === 'weekly' ? `${e.id}@${e.start}` : e.id);
+
 export function withNextDate(e: EventItem): EventItem {
   if (e.repeat !== 'weekly') return e;
   const d = nextOccurrence(e);
@@ -848,4 +869,39 @@ export function useShabbat() {
     };
   }, []);
   return data;
+}
+
+/**
+ * One event's RSVP: are you in, did you say you are out, how many are going, and the actions.
+ * `e` is the event as shown (a weekly event with its next date). I'M OUT cancels a sign-up for real
+ * (and puts it back if the call fails) and remembers the answer on this phone.
+ */
+export function useRsvp(e: EventItem) {
+  const { going, out, goingCount, goingNames, name, signup, setOut, openEvent } = useStore();
+  const key = goingKey(e);
+  const date = e.repeat === 'weekly' ? e.start : undefined;
+  const mine = going.includes(key);
+  const isOut = !mine && (out ?? []).includes(key);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => { setErr(null); }, [key]);
+  const run = async (skipName: boolean): Promise<boolean> => {
+    if (!name && !skipName) { openEvent(e.id); return false; } // no name on the profile yet: the event page asks for it
+    setBusy(true); setErr(null);
+    const failed = await signup(e.id, true, date);
+    if (!failed) setOut(key, false);
+    setErr(failed);
+    setBusy(false);
+    return !failed;
+  };
+  const imIn = () => run(false);
+  const imInNamed = () => run(true); // right after the name was asked for
+  const imOut = async () => {
+    setBusy(true); setErr(null);
+    const failed = mine ? await signup(e.id, false, date) : null;
+    if (!failed) setOut(key, true);
+    setErr(failed);
+    setBusy(false);
+  };
+  return { key, date, mine, isOut, busy, err, count: goingCount[key] ?? 0, names: goingNames[key] ?? [], imIn, imInNamed, imOut };
 }

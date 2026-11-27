@@ -4,7 +4,7 @@ import { AppState, Image, Pressable, ScrollView, StyleSheet, Text, View, useWind
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, F, PREFS, R, SP, T, display, numeral } from './theme';
 import { Icon } from './icons';
-import { challengeFits, sortPosts, upcoming, useShabbat, useStore, type Challenge, type EventItem } from './store';
+import { challengeFits, goingKey, sortPosts, upcoming, useRsvp, useShabbat, useStore, type Challenge, type EventItem } from './store';
 import { Band, BrushTag, CountChip, DayBlock, Hairline, Label, Row, Slab, Ticks, eventPicture, galleryCount, hebrewDate, heroType, useAspect, capsWidth } from './look';
 import { useChallengeCard } from './rewards';
 import { InviteCards, useMyInvites } from './invites';
@@ -176,17 +176,20 @@ function EventPage({ e, tag, now, width, height }: { e: EventItem; tag: string; 
   const { openEvent, goingCount } = useStore();
   const picture = eventPicture(e);
   const col = width - SP.gutter * 2;
-  const [panelH, setPanelH] = useState(0);
+  const [zone, setZone] = useState({ w: 0, h: 0 });
+  const panelH = zone.h;
   const ratio = useAspect(picture?.source, 0.77);
   // a poster that would nearly fill the width on its own needs no panel around it
   // a poster is as large as the panel's height allows (12 pt around it); the panel is only as wide as the poster
-  const hugW = picture && picture.kind === 'poster' && panelH > 0 ? Math.min(col, Math.round((panelH - 24) * ratio) + 24) : 0;
+  const isPoster = !!picture && picture.kind === 'poster';
+  const posterW = isPoster && panelH > 24 ? Math.min(col - 24, Math.floor((panelH - 24) * ratio)) : 0;
+  const posterH = posterW ? Math.round(posterW / ratio) : 0;
   const open = () => openEvent(e.id);
   const typed = (e.time || '').trim();
   const clock = clockOf(typed);
   const extraTime = typed && (!clock || prettyTime(typed) !== clockText(clock)) ? typed : ''; // the tag already says a plain start time
   const line = [e.place, e.price].filter(Boolean).join(' · ');
-  const count = e.showGoing ? goingCount[e.id] ?? 0 : 0;
+  const count = e.showGoing ? goingCount[goingKey(e)] ?? 0 : 0;
   const small = [extraTime, audienceLabel(e), count > 0 ? `${count} going` : ''].filter(Boolean).join(' · ');
   const manyDays = !!e.end && e.end !== e.start;
   const lineText = line || (manyDays ? dateRange(e) : '');
@@ -198,23 +201,24 @@ function EventPage({ e, tag, now, width, height }: { e: EventItem; tag: string; 
   return (
     <View style={[st.page, { width, height }]}>
       <BrushTag label={tag} style={st.tag} />
-      {/* the picture panel takes all the spare height: a poster sits whole on a matte made from itself, a photograph fills it */}
-      <Pressable onPress={open} onLayout={(ev) => setPanelH(Math.round(ev.nativeEvent.layout.height))} accessibilityRole="button"
-        accessibilityLabel={picture ? `${e.title} poster. Opens the event` : `${e.title}, ${dayAndTime(e, now).day.toLowerCase()}. Opens the event`}
-        style={({ pressed }) => [st.panel, !picture && st.panelType, hugW > 0 && { width: hugW, alignSelf: 'center' }, pressed && st.dim]}>
-        {picture ? (
-          picture.kind === 'photo' ? <Image source={picture.source} style={st.fill} resizeMode="cover" /> : (
-            <View style={[st.fill, st.posterPad]}><Image source={picture.source} style={st.fill} resizeMode="contain" /></View>
-          )
-        ) : (
-          <View style={st.typeIn}>
-            <DateBig date={e.start} size={Math.max(110, Math.min(240, Math.round(panelH * 0.62)))} />
-            <View style={st.typeBar} />
-          </View>
-        )}
-        <CountChip n={galleryCount(e)} />
-        <View pointerEvents="none" style={st.panelEdge} />
-      </Pressable>
+      {/* the picture zone takes all the spare height. A poster sits whole in a panel exactly as big as the poster
+          plus 12 pt around it (so no strip is left over); a photograph or the date print fills the zone. */}
+      <View style={st.zone} onLayout={(ev) => { const { width: w, height: h } = ev.nativeEvent.layout; if (Math.abs(w - zone.w) > 0.5 || Math.abs(h - zone.h) > 0.5) setZone({ w, h }); }}>
+        <Pressable onPress={open} accessibilityRole="button"
+          accessibilityLabel={picture ? `${e.title} poster. Opens the event` : `${e.title}, ${dayAndTime(e, now).day.toLowerCase()}. Opens the event`}
+          style={({ pressed }) => [st.panel, !picture && st.panelType, isPoster ? { width: posterW + 24, height: posterH + 24 } : { width: '100%', height: zone.h }, pressed && st.dim]}>
+          {picture ? (
+            isPoster ? <Image source={picture.source} style={{ width: posterW, height: posterH }} resizeMode="contain" /> : <Image source={picture.source} style={st.fill} resizeMode="cover" />
+          ) : (
+            <View style={st.typeIn}>
+              <DateBig date={e.start} size={Math.max(110, Math.min(240, Math.round(panelH * 0.62)))} />
+              <View style={st.typeBar} />
+            </View>
+          )}
+          <CountChip n={galleryCount(e)} />
+          <View pointerEvents="none" style={st.panelEdge} />
+        </Pressable>
+      </View>
       <Pressable onPress={open} accessible={false} style={({ pressed }) => pressed && st.dim}>
         <Text style={[titleStyle, st.title]} numberOfLines={fit ? 1 : 2} accessibilityRole="button" accessibilityLabel={`${e.title}. ${tag.toLowerCase()}.`} accessibilityHint="Opens the event">{e.title}</Text>
         {lineText ? <Text style={st.line} numberOfLines={1}>{lineText}</Text> : null}
@@ -239,31 +243,34 @@ function DateBig({ date, size }: { date: string; size: number }) {
   );
 }
 
-// The one button, wired to the same sign-up the event page uses. Cancelling happens on the event page.
+// The sign-up: I'M IN (or YOU'RE IN) with I'M OUT beside it, wired to the same sign-up the event page uses.
+// I'M OUT really cancels (and puts it back if the call fails); after it the page says YOU'RE OUT and offers I'M IN again.
 function Action({ e }: { e: EventItem }) {
-  const { going, name, signup, openEvent, invites: answers, respondInvite } = useStore();
+  const { openEvent, invites: answers, respondInvite } = useStore();
   const invite = useMyInvites(true).find((v) => v.eventId === e.id);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  useEffect(() => { setErr(null); }, [e.id]);
+  const r = useRsvp(e);
   if (e.signup !== 'app') return <Slab label="Details" onPress={() => openEvent(e.id)} style={st.btn} accessibilityLabel={`Details: ${e.title}`} />;
-  const run = async () => {
-    setBusy(true); setErr(null);
-    const failed = await signup(e.id, true);
+  const join = async () => {
     // I'M IN is also the answer to an invitation to this event that is still waiting
-    if (!failed && invite && !(answers || {})[invite.id]) await respondInvite(invite.id, 'yes');
-    setErr(failed);
-    setBusy(false);
+    if ((await r.imIn()) && invite && !(answers || {})[invite.id]) await respondInvite(invite.id, 'yes');
   };
   return (
     <View style={st.btn}>
-      {going.includes(e.id) ? (
-        <Slab kind="outline" icon="tick" label="You're in" onPress={() => openEvent(e.id)} accessibilityLabel={`You're in: signed up for ${e.title}. Opens the event`} />
-      ) : (
-        // no name on the profile yet: the event page asks for it first
-        <Slab label="I'm in" disabled={busy} onPress={() => (name ? run() : openEvent(e.id))} accessibilityLabel={`I'm in: sign up for ${e.title}`} />
-      )}
-      {err ? <Text style={st.err} accessibilityLiveRegion="polite">{err}</Text> : null}
+      <View style={st.btnRow}>
+        {r.mine ? (
+          <Slab kind="outline" icon="tick" label="You're in" onPress={() => openEvent(e.id)} style={st.btnMain} accessibilityLabel={`You're in: signed up for ${e.title}. Opens the event`} />
+        ) : r.isOut ? (
+          <Slab kind="ghost" label="You're out" onPress={() => openEvent(e.id)} style={st.btnMain} accessibilityLabel={`You're out of ${e.title}. Opens the event`} />
+        ) : (
+          <Slab label="I'm in" disabled={r.busy} onPress={join} style={st.btnMain} accessibilityLabel={`I'm in: sign up for ${e.title}`} />
+        )}
+        {r.isOut ? (
+          <Slab label="I'm in" disabled={r.busy} onPress={join} style={st.btnSide} accessibilityLabel={`I'm in after all: sign up for ${e.title}`} />
+        ) : (
+          <Slab kind="ghost" label="I'm out" disabled={r.busy} onPress={r.imOut} style={st.btnSide} accessibilityLabel={`I'm out: not coming to ${e.title}`} />
+        )}
+      </View>
+      {r.err ? <Text style={st.err} accessibilityLiveRegion="polite">{r.err}</Text> : null}
     </View>
   );
 }
@@ -462,7 +469,7 @@ function ChallengeRow({ ch, last }: { ch: Challenge; last?: boolean }) {
 // Every section down here has the same two levels: one condensed heading, then rows with a
 // condensed title and one readable line of system text, a hairline between rows, and plenty of air.
 
-const GAP = 44; // between sections
+const GAP = 36; // between sections
 
 // A section's one heading, with an optional link at its right.
 function Head({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
@@ -479,7 +486,7 @@ function Line({ lead, title, line, lines = 1, thumb, right, onPress, last, label
   lines?: number; lead?: React.ReactNode; title: string; line?: string; thumb?: string; right?: React.ReactNode; onPress: () => void; last?: boolean; label: string;
 }) {
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={({ pressed }) => [st.row, !last && st.rowRule, pressed && st.dim]}>
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={({ pressed }) => [st.row, !last && st.rowRule, last && st.rowLast, pressed && st.dim]}>
       {lead}
       <View style={st.lineText}>
         <Text style={st.lineTitle} numberOfLines={2}>{title}</Text>
@@ -504,29 +511,40 @@ const OnTheMenu = React.memo(function OnTheMenu() {
   );
 });
 
-// Every event that repeats weekly, one row each: the weekday, the title, when and where, and the RSVP chip.
+// Every event that repeats weekly, one row each: the weekday, the title, when and where, and the RSVP chips
+// (each week has its own sign-up; a new week starts out not signed up).
 const WeeklyEvents = React.memo(function WeeklyEvents() {
-  const { content, fits, going, openEvent } = useStore();
+  const { content, fits } = useStore();
   const now = useNow();
   const list = upcoming(content.events).filter((e) => e.repeat === 'weekly' && fits(e));
   if (!list.length) return null;
   return (
     <View style={st.section}>
       <Head title="Weekly events" />
-      {list.map((e, i) => {
-        const { day, time } = dayAndTime(e, now);
-        const every = day.split(' ').map((w) => w.charAt(0) + w.slice(1).toLowerCase()).join(' '); // "Every Sunday"
-        const line = [every, time, e.place].filter(Boolean).join(' · ');
-        const mine = going.includes(e.id);
-        return (
-          <Line key={e.id} title={e.title} line={line} lines={2} last={i === list.length - 1} onPress={() => openEvent(e.id)} label={`${e.title}, ${line}`}
-            lead={<DayBlock date={e.start} now={now} />}
-            right={e.signup !== 'app' ? undefined : mine ? <Slab size="chip" kind="outline" icon="tick" label="In" /> : <Slab size="chip" kind="paper" label="RSVP" onPress={() => openEvent(e.id)} accessibilityLabel={`RSVP to ${e.title}`} />} />
-        );
-      })}
+      {list.map((e, i) => <WeeklyRow key={e.id} e={e} now={now} last={i === list.length - 1} />)}
     </View>
   );
 });
+
+function WeeklyRow({ e, now, last }: { e: EventItem; now: number; last: boolean }) {
+  const { openEvent } = useStore();
+  const r = useRsvp(e);
+  const { day, time } = dayAndTime(e, now);
+  const every = day.split(' ').map((w) => w.charAt(0) + w.slice(1).toLowerCase()).join(' '); // "Every Sunday"
+  const line = [every, time, e.place].filter(Boolean).join(' · ');
+  const chips = e.signup !== 'app' ? undefined : (
+    <View style={st.chips}>
+      {r.mine ? <Slab size="chip" kind="outline" icon="tick" label="In" /> : r.isOut ? <Slab size="chip" kind="ghost" label="Out" /> : <Slab size="chip" label="I'm in" disabled={r.busy} onPress={r.imIn} accessibilityLabel={`I'm in: sign up for ${e.title}`} />}
+      {r.isOut ? <Slab size="chip" label="I'm in" disabled={r.busy} onPress={r.imIn} accessibilityLabel={`I'm in after all: ${e.title}`} /> : <Slab size="chip" kind="ghost" label="I'm out" disabled={r.busy} onPress={r.imOut} accessibilityLabel={`I'm out: not coming to ${e.title}`} />}
+    </View>
+  );
+  return (
+    <>
+      <Line title={e.title} line={line} lines={2} last={last && !r.err} onPress={() => openEvent(e.id)} label={`${e.title}, ${line}`} lead={<DayBlock date={e.start} now={now} />} right={chips} />
+      {r.err ? <Text style={[st.err, { textAlign: 'left', marginBottom: 8 }]}>{r.err}</Text> : null}
+    </>
+  );
+}
 
 // The three newest posts (pinned first): a title and one line each.
 const FromRabbi = React.memo(function FromRabbi() {
@@ -581,6 +599,7 @@ const st = StyleSheet.create({
   headText: { ...display(30), flexShrink: 1 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 18 },
   rowRule: { borderBottomWidth: 1, borderBottomColor: C.line },
+  rowLast: { paddingBottom: 4 },
   lineText: { flex: 1, minWidth: 0 },
   lineTitle: { ...display(22) },
   lineSub: { fontSize: 15, lineHeight: 21, color: C.sub, marginTop: 4 },
@@ -617,7 +636,12 @@ const st = StyleSheet.create({
   line: { fontSize: 15, lineHeight: 20, fontWeight: '500', color: C.sub, marginTop: 6 },
   small: { marginTop: 7 },
   btn: { marginTop: 18, marginBottom: 0 },
-  panel: { flex: 1, marginTop: 14, marginBottom: 14, borderRadius: R.photo, overflow: 'hidden', backgroundColor: C.raised },
+  btnRow: { flexDirection: 'row', gap: 10 },
+  btnMain: { flex: 1 },
+  btnSide: { minWidth: 112 },
+  chips: { gap: 6, alignItems: 'stretch' },
+  zone: { flex: 1, marginTop: 14, marginBottom: 14, alignItems: 'center', justifyContent: 'center' },
+  panel: { borderRadius: R.photo, overflow: 'hidden', backgroundColor: C.raised, alignItems: 'center', justifyContent: 'center' },
   panelType: { backgroundColor: C.raised },
   panelEdge: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, borderRadius: R.photo, borderWidth: 1, borderColor: C.printEdge },
   fill: { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' },

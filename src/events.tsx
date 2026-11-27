@@ -3,7 +3,7 @@ import { useFocusEffect } from 'expo-router';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { C, R, SP, T, display, numeral } from './theme';
 import { Icon } from './icons';
-import { calendarUrl, challengeFits, countdown, dateLabel, open, repeatLabel, upcoming, useStore, type EventItem } from './store';
+import { calendarUrl, challengeFits, countdown, dateLabel, goingKey, open, repeatLabel, upcoming, useRsvp, useStore, type EventItem } from './store';
 import { parseDay } from './when';
 import { audienceLabel, Card, Chips, Empty, EventCard, SaveHeart } from './ui';
 import { BrushTag, GalleryBars, Hairline, Label, Photo, Slab, eventPicture, useAspect, whenTag } from './look';
@@ -163,41 +163,41 @@ function EventPicture({ e }: { e: EventItem }) {
 // Great Neck events: RSVP right here in one tap (your name comes from your profile); the rabbi
 // sees the list, everyone sees how many are going.
 function InAppSignup({ e }: { e: EventItem }) {
-  const { going, name, signup, goingCount, goingNames } = useStore();
+  const { name } = useStore();
+  const r = useRsvp(e);
   const [ask, setAsk] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const [declined, setDeclined] = useState(false);
-  const mine = going.includes(e.id);
-  const count = e.showGoing ? goingCount[e.id] ?? 0 : 0;
-  const names = e.showGoing ? goingNames[e.id] ?? [] : [];
-  const run = async (on: boolean) => {
-    setBusy(true); setErr(null);
-    setErr(await signup(e.id, on));
-    setBusy(false);
-  };
-  useEffect(() => { setAsk(false); setErr(null); setDeclined(false); }, [e.id]);
-  if (ask) return <Card><NameGate title="Who's going?" cta="I'm going" onDone={() => { setAsk(false); run(true); }} /></Card>;
-  const others = Math.max(0, count - (mine ? 1 : 0));
+  useEffect(() => { setAsk(false); }, [e.id]);
+  if (ask) return <Card><NameGate title="Who's going?" cta="I'm going" onDone={() => { setAsk(false); r.imInNamed(); }} /></Card>;
+  const count = e.showGoing ? r.count : 0;
+  const names = e.showGoing ? r.names : [];
+  const others = Math.max(0, count - (r.mine ? 1 : 0));
   const note = !e.showGoing
-    ? (mine ? 'Rabbi Zevy has you on the list. We’ll remind you before it starts.' : 'Tap I’m in and Rabbi Zevy saves you a spot.')
-    : mine ? `Rabbi Zevy has you on the list.${others > 0 ? ` You and ${others} other${others === 1 ? '' : 's'} are going.` : ''}`
-    : declined ? 'Maybe next time.' : count > 0 ? `${count} from Great Neck ${count === 1 ? 'is' : 'are'} going so far.` : 'Be the first to RSVP.';
+    ? (r.mine ? 'Rabbi Zevy has you on the list. We’ll remind you before it starts.' : r.isOut ? 'Changed your mind? Tap I’m in.' : 'Tap I’m in and Rabbi Zevy saves you a spot.')
+    : r.mine ? `Rabbi Zevy has you on the list.${others > 0 ? ` You and ${others} other${others === 1 ? '' : 's'} are going.` : ''}`
+    : r.isOut ? 'Changed your mind? Tap I’m in.' : count > 0 ? `${count} from Great Neck ${count === 1 ? 'is' : 'are'} going so far.` : 'Be the first to RSVP.';
+  const join = () => (name ? r.imIn() : setAsk(true));
+  // a weekly event: say which week this sign-up is for
+  const week = e.repeat === 'weekly' ? parseDay(e.start).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }) : '';
   return (
     <View>
+      {week ? <Text style={st.week}>For {week}</Text> : null}
       <View style={st.btnRow}>
-        {mine ? (
+        {r.mine ? (
           <Slab kind="outline" icon="tick" label="You're in" height={56} style={st.btnMain} accessibilityLabel={`You're in: signed up for ${e.title}`} />
+        ) : r.isOut ? (
+          <Slab kind="ghost" label="You're out" height={56} style={st.btnMain} accessibilityLabel={`You're out of ${e.title}`} />
         ) : (
-          <Slab label={busy ? 'Saving…' : "I'm in"} height={56} disabled={busy} style={st.btnMain}
-            onPress={() => { setDeclined(false); name ? run(true) : setAsk(true); }} accessibilityLabel={`I'm in: sign up for ${e.title}`} />
+          <Slab label={r.busy ? 'Saving…' : "I'm in"} height={56} disabled={r.busy} style={st.btnMain} onPress={join} accessibilityLabel={`I'm in: sign up for ${e.title}`} />
         )}
-        <Slab kind="ghost" label="Can't go" height={56} disabled={busy} style={st.btnSide} accessibilityState={{ selected: declined && !mine }}
-          onPress={() => { setDeclined(true); if (mine) run(false); }} accessibilityLabel={`Can't go to ${e.title}`} />
+        {r.isOut ? (
+          <Slab label="I'm in" height={56} disabled={r.busy} style={st.btnSide} onPress={join} accessibilityLabel={`I'm in after all: sign up for ${e.title}`} />
+        ) : (
+          <Slab kind="ghost" label="I'm out" height={56} disabled={r.busy} style={st.btnSide} onPress={r.imOut} accessibilityLabel={`I'm out: not coming to ${e.title}`} />
+        )}
       </View>
       {names.length ? <Text style={st.names} numberOfLines={2}>{names.slice(0, 4).join(', ')}{names.length > 4 ? ` and ${names.length - 4} more` : ''}</Text> : null}
       <Text style={st.note}>{note}</Text>
-      {err ? <Text style={st.err} accessibilityLiveRegion="polite">{err}</Text> : null}
+      {r.err ? <Text style={st.err} accessibilityLiveRegion="polite">{r.err}</Text> : null}
     </View>
   );
 }
@@ -225,7 +225,7 @@ function Action({ icon, label, onPress, last }: { icon: string; label: string; o
 
 function TicketAction({ e }: { e: EventItem }) {
   const { going } = useStore();
-  return <Action icon="ticket" label={going.includes(e.id) ? 'Next: get your ticket' : 'Ticket info'} onPress={() => open(e.payUrl!)} last />;
+  return <Action icon="ticket" label={going.includes(goingKey(e)) ? 'Next: get your ticket' : 'Ticket info'} onPress={() => open(e.payUrl!)} last />;
 }
 
 function Para({ title, body }: { title: string; body: string }) {
@@ -256,6 +256,7 @@ const st = StyleSheet.create({
   btnRow: { flexDirection: 'row', gap: 10 },
   btnMain: { flex: 1 },
   btnSide: { minWidth: 130 },
+  week: { fontSize: 15, lineHeight: 21, fontWeight: '600', color: C.ink, marginBottom: 12 },
   names: { fontSize: 15, lineHeight: 21, fontWeight: '600', color: C.ink, marginTop: 16 },
   note: { fontSize: 15, lineHeight: 21, color: C.sub, marginTop: 12 },
   err: { color: C.red, fontWeight: '700', fontSize: 14, marginTop: 10 },

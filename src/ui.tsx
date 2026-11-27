@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import { Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
 import { C, F, HUES, R, SP, T, display, shadow } from './theme';
 import { Icon, challengeIcon } from './icons';
-import { IMAGES, dateLabel, repeatLabel, useStore, type ColorKey, type EventItem } from './store';
+import { IMAGES, dateLabel, goingKey, repeatLabel, useStore, type ColorKey, type EventItem } from './store';
 import { CloseButton, CountChip, DayBlock, Label, Photo, PosterStage, Slab, TextTabs, eventPicture, galleryCount, whenTag } from './look';
 
 export { SectionHead } from './look';
@@ -125,7 +125,7 @@ export function audienceLabel(e: EventItem) {
 
 export function EventMeta({ e }: { e: EventItem }) {
   const { going } = useStore();
-  const mine = going.includes(e.id);
+  const mine = going.includes(goingKey(e));
   return (
     <Text style={s.meta} numberOfLines={1}>
       <Text style={{ color: mine ? C.blue : C.sub }}>{mine ? "You're signed up" : repeatLabel(e) || dateLabel(e)}</Text>
@@ -140,8 +140,8 @@ export function EventMeta({ e }: { e: EventItem }) {
 // label, the title, a meta line, who is going, the save heart and the RSVP / IN chip.
 export function EventCard({ e, width }: { e: EventItem; width?: number }) {
   const { openEvent, goingCount, going } = useStore();
-  const n = e.signup === 'app' ? goingCount[e.id] ?? 0 : 0;
-  const mine = going.includes(e.id);
+  const n = e.signup === 'app' ? goingCount[goingKey(e)] ?? 0 : 0;
+  const mine = going.includes(goingKey(e));
   const picture = eventPicture(e);
   const meta = [repeatLabel(e), e.place, e.price, audienceLabel(e)].filter(Boolean).join(' · ');
   const goingLine = mine ? `You're in${n > 1 ? ` · ${n} going` : ''}` : n > 0 ? `${n} going` : '';
