@@ -296,7 +296,7 @@ export function InviteForm({ onDone }: { onDone: (msg: string) => void }) {
 
 const st = StyleSheet.create({
   h: { ...T.h2 },
-  sub: { fontSize: 14, lineHeight: 20, color: C.sub, marginTop: 4 },
+  sub: { fontSize: 15, lineHeight: 21, color: C.sub, marginTop: 4 },
   switch: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12, padding: 14, borderRadius: R.card, backgroundColor: C.card },
   switchTitle: { fontSize: 15.5, fontWeight: '600', color: C.ink },
   err: { color: C.red, marginTop: 12, fontSize: 14, fontWeight: '700' },

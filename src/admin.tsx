@@ -4,7 +4,7 @@ import { AiPlanner, EventForm, InviteForm, PosterForm } from './leaderEvents';
 import { ChallengeEditor, FoodForm, MinyanEditor, PhotoPicker, PopupEditor, WhatsAppImport, publishPhotos } from './leaderTools';
 import type { Snap } from './photo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { C, R, SP, T } from './theme';
+import { C, R, SP, T, display } from './theme';
 import { EVENT_ICONS, Icon } from './icons';
 import { dateLabel, todayIso, upcoming, useStore, type Content, type Person, type PhotoRow, type Question, type SignupRow, type Target } from './store';
 import { Button, Card, Chips, Field, IconTile, Toggle, s as u } from './ui';
@@ -352,7 +352,7 @@ export function AdminPanel() {
         setEditing(null);
       };
       return (
-        <Card>
+        <Card style={FLAT}>
           <Text style={T.h2}>{editing.id ? `Edit ${cfg.one}` : `New ${cfg.one}`}</Text>
           <Form list={specs(cfg.key, content, !editing.id)} draft={d} set={(draft) => setEditing({ ...editing, draft })} />
           {cfg.key === 'events' ? (
@@ -389,24 +389,24 @@ export function AdminPanel() {
       );
     }
     return (
-      <View style={{ gap: 10 }}>
+      <View>
         <Button icon="plus" label={`New ${cfg.one}`} onPress={() => { setNote(null); setConfirmDel(false); setEditing({ id: null, draft: { ...BLANK[cfg.key] } }); }} />
-        {cfg.key === 'challenges' ? <Text style={T.small}>Flip a switch to turn a challenge on. Every live challenge shows as a banner on Home.</Text> : null}
+        {cfg.key === 'challenges' ? <Text style={[T.small, { marginTop: 14 }]}>Flip a switch to turn a challenge on. Every live challenge shows as a banner on Home.</Text> : null}
+        <View style={{ height: 8 }} />
         {items.map((x) => (
-          <Card key={x.id} style={st.item}>
+          <View key={x.id} style={st.item}>
             <Pressable style={st.itemMain} onPress={() => { setNote(null); setConfirmDel(false); setEditing({ id: x.id, draft: toDraft(cfg.key, x) }); }} accessibilityRole="button" accessibilityLabel={`Edit ${x.title}`}>
-              <IconTile icon={x.icon || (cfg.key === 'posts' ? (x.pinned ? 'pinned' : 'chat') : 'star')} color={x.color} size={40} />
               <View style={{ flex: 1 }}>
-                <Text style={T.h3} numberOfLines={1}>{x.title}</Text>
-                <Text style={T.small} numberOfLines={1}>
+                <Text style={st.pTitle} numberOfLines={2}>{x.title}</Text>
+                <Text style={st.pSub} numberOfLines={1}>
                   {cfg.key === 'events' ? `${x.scope === 'gn' ? 'Great Neck' : 'International'} · ${dateLabel(x)}` : cfg.key === 'challenges' ? `${x.active ? 'Live' : 'Off'} · goal ${x.goal} · tap to edit` : cfg.key === 'posts' ? `${x.kind} · ${x.at}` : x.body}
                 </Text>
               </View>
             </Pressable>
             {cfg.key === 'challenges' ? (
               <Toggle value={!!x.active} label={`${x.title} is live`} onChange={(v) => save({ ...content, challenges: content.challenges.map((c) => (c.id === x.id ? { ...c, active: v } : c)) }, v ? `${x.title} is live. Teens see the banner on Home.` : `${x.title} is off.`)} />
-            ) : <Icon name="right" size={17} color={C.faint} stroke={2.4} />}
-          </Card>
+            ) : <Icon name="right" size={16} color={C.faint} stroke={2.4} />}
+          </View>
         ))}
         {items.length === 0 ? <Text style={[T.small, { textAlign: 'center', marginTop: 10 }]}>Nothing here yet.</Text> : null}
       </View>
@@ -468,30 +468,47 @@ function Home({ onCreate, onManage, onMinyan, onCompose }: { onCreate: (t: Task)
   const [busy, setBusy] = useState<string | null>(null);
   const alertOn = content.alert?.on && (!content.alert.until || content.alert.until > new Date().toISOString()) ? content.alert : null;
   const popupOn = content.popup?.on && (content.popup.title || content.popup.image) ? content.popup : null;
-  const create: { k: Task | 'compose'; icon: string; color: TileColor; title: string }[] = [
-    { k: 'compose', icon: 'camera', color: 'blue', title: 'New post' },
-    { k: 'event', icon: 'calendar', color: 'orange', title: 'Event' },
-    { k: 'invite', icon: 'send', color: 'orange', title: 'Invitation' },
-    { k: 'poster', icon: 'ticket', color: 'pink', title: 'Poster' },
-    { k: 'notify', icon: 'bell', color: 'blue', title: 'Notification' },
-    { k: 'alert', icon: 'megaphone', color: 'pink', title: 'Live banner' },
-    ...(content.challenges.some((c) => c.active) ? [{ k: 'remind' as const, icon: 'clock', color: 'green' as const, title: 'Challenge reminder' }] : []),
-    { k: 'food', icon: 'food', color: 'yellow', title: 'Food' },
-    { k: 'popup', icon: 'star', color: 'purple', title: 'Pop-up' },
-    { k: 'ai', icon: 'star', color: 'purple', title: 'AI planner' },
-    { k: 'whatsapp', icon: 'send', color: 'green', title: 'From WhatsApp' },
+  type Item = { k: Task | 'compose'; icon: string; title: string; sub: string };
+  const groups: { head: string; items: Item[] }[] = [
+    { head: 'Post', items: [
+      { k: 'compose', icon: 'camera', title: 'New post', sub: 'Photos and words in the Feed' },
+      { k: 'event', icon: 'calendar', title: 'Event', sub: 'Put it on the calendar' },
+      { k: 'invite', icon: 'send', title: 'Invitation', sub: "A personal invite on everyone's Home" },
+      { k: 'poster', icon: 'ticket', title: 'Poster', sub: 'A flyer that pops up when the app opens' },
+      { k: 'food', icon: 'food', title: 'Food', sub: "What's on the menu" },
+    ] },
+    { head: 'Announce', items: [
+      { k: 'notify', icon: 'bell', title: 'Notification', sub: 'A message to every phone' },
+      { k: 'alert', icon: 'megaphone', title: 'Live banner', sub: 'A banner across the top of the app' },
+      { k: 'popup', icon: 'star', title: 'Pop-up', sub: 'The poster everyone sees on opening' },
+      ...(content.challenges.some((c) => c.active) ? [{ k: 'remind' as const, icon: 'clock', title: 'Challenge reminder', sub: 'A nudge for people in a challenge' }] : []),
+    ] },
+    { head: 'Run', items: [
+      { k: 'ai', icon: 'star', title: 'AI planner', sub: 'Let AI draft an event and a post' },
+      { k: 'whatsapp', icon: 'send', title: 'From WhatsApp', sub: 'Turn a message into a Feed post' },
+    ] },
   ];
-  const manage: { icon: string; title: string; go: () => void }[] = [
-    { icon: 'users', title: "Who's coming", go: () => onManage('Sign-ups') },
-    { icon: 'camera', title: 'Tefillin photos', go: () => onManage('Photos') },
-    { icon: 'chat', title: 'Feed posts', go: () => onManage('Posts') },
-    { icon: 'calendar', title: 'Events', go: () => onManage('Events') },
-    { icon: 'tefillin', title: 'Challenges & rules', go: () => onManage('Challenges') },
-    { icon: 'compass', title: 'Chapter info', go: () => onManage('Info') },
-    { icon: 'clock', title: 'Minyan times', go: onMinyan },
-    { icon: 'question', title: 'Questions from teens', go: () => onManage('Inbox') },
-    { icon: 'user', title: 'People & leaders', go: () => onManage('People') },
+  const manage: { icon: string; title: string; sub: string; go: () => void }[] = [
+    { icon: 'users', title: "Who's coming", sub: 'Sign-ups for each event', go: () => onManage('Sign-ups') },
+    { icon: 'camera', title: 'Tefillin photos', sub: 'Review the check-in photos', go: () => onManage('Photos') },
+    { icon: 'chat', title: 'Feed posts', sub: 'Edit, pin or delete', go: () => onManage('Posts') },
+    { icon: 'calendar', title: 'Events', sub: 'Edit or delete', go: () => onManage('Events') },
+    { icon: 'tefillin', title: 'Challenges & rules', sub: 'Turn on, edit, set prizes', go: () => onManage('Challenges') },
+    { icon: 'compass', title: 'Chapter info', sub: 'The About CTeen items', go: () => onManage('Info') },
+    { icon: 'clock', title: 'Minyan times', sub: 'Weekdays, Shabbat and specials', go: onMinyan },
+    { icon: 'question', title: 'Questions from teens', sub: 'What people asked Rabbi Zevy', go: () => onManage('Inbox') },
+    { icon: 'user', title: 'People & leaders', sub: 'Who can use this panel', go: () => onManage('People') },
   ];
+  const row = (x: { icon: string; title: string; sub: string }, onPress: () => void, last: boolean) => (
+    <Pressable key={x.title} onPress={onPress} style={({ pressed }) => [st.pRow, !last && st.pRule, pressed && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel={x.title}>
+      <View style={st.pIcon}><Icon name={x.icon} size={20} color={C.ink} stroke={1.9} /></View>
+      <View style={{ flex: 1 }}>
+        <Text style={st.pTitle}>{x.title}</Text>
+        <Text style={st.pSub} numberOfLines={2}>{x.sub}</Text>
+      </View>
+      <Icon name="right" size={16} color={C.faint} stroke={2.4} />
+    </Pressable>
+  );
   return (
     <View>
       <Text style={st.hiLine}>Hi{leader && !leader.startsWith('acct:') ? ' Rabbi Zevy' : ''}. What do you want to share?</Text>
@@ -501,47 +518,42 @@ function Home({ onCreate, onManage, onMinyan, onCompose }: { onCreate: (t: Task)
           <Text style={st.liveBoxHead}>Live now</Text>
           {alertOn ? (
             <View style={st.liveRow}>
-              <View style={[st.liveDot, { backgroundColor: C.red }]} />
-              <Text style={st.liveRowText} numberOfLines={1}>Banner: {alertOn.title}</Text>
-              <Pressable disabled={busy === 'alert'} onPress={async () => { setBusy('alert'); await sendAlert(null); setBusy(null); }} hitSlop={8} accessibilityRole="button"><Text style={st.turnOff}>{busy === 'alert' ? '…' : 'Turn off'}</Text></Pressable>
+              <View style={{ flex: 1 }}>
+                <Text style={st.liveKind}>Banner · on</Text>
+                <Text style={st.liveRowText} numberOfLines={2}>{alertOn.title}</Text>
+              </View>
+              <Pressable disabled={busy === 'alert'} onPress={async () => { setBusy('alert'); await sendAlert(null); setBusy(null); }} hitSlop={8} accessibilityRole="button" accessibilityLabel="Turn off the live banner"><Text style={st.turnOff}>{busy === 'alert' ? '…' : 'Turn off'}</Text></Pressable>
             </View>
           ) : null}
           {popupOn ? (
             <View style={st.liveRow}>
-              <View style={[st.liveDot, { backgroundColor: C.blue }]} />
-              <Text style={st.liveRowText} numberOfLines={1}>Pop-up: {popupOn.title || 'Poster'}</Text>
-              <Pressable disabled={busy === 'popup'} onPress={async () => { setBusy('popup'); await saveContent({ ...content, popup: { ...popupOn, on: false } }); setBusy(null); }} hitSlop={8} accessibilityRole="button"><Text style={st.turnOff}>{busy === 'popup' ? '…' : 'Turn off'}</Text></Pressable>
+              <View style={{ flex: 1 }}>
+                <Text style={st.liveKind}>Pop-up · on</Text>
+                <Text style={st.liveRowText} numberOfLines={2}>{popupOn.title || 'Poster'}</Text>
+              </View>
+              <Pressable disabled={busy === 'popup'} onPress={async () => { setBusy('popup'); await saveContent({ ...content, popup: { ...popupOn, on: false } }); setBusy(null); }} hitSlop={8} accessibilityRole="button" accessibilityLabel="Turn off the pop-up"><Text style={st.turnOff}>{busy === 'popup' ? '…' : 'Turn off'}</Text></Pressable>
             </View>
           ) : null}
         </View>
       ) : null}
 
-      <Text style={st.groupHead}>Create</Text>
-      <View style={st.grid}>
-        {create.map((x) => (
-          <Pressable key={x.k} onPress={() => (x.k === 'compose' ? onCompose() : onCreate(x.k))} style={({ pressed }) => [st.tile, pressed && { transform: [{ scale: 0.97 }], opacity: 0.9 }]} accessibilityRole="button" accessibilityLabel={x.title}>
-            <View style={st.tileCard}>
-              <IconTile icon={x.icon} color={x.color} size={40} />
-              <Text style={st.tileTitle}>{x.title}</Text>
-            </View>
-          </Pressable>
-        ))}
-      </View>
+      {groups.map((g) => (
+        <View key={g.head} style={st.pGroup}>
+          <Text style={st.groupHead} accessibilityRole="header">{g.head}</Text>
+          {g.items.map((x, i) => row(x, () => (x.k === 'compose' ? onCompose() : onCreate(x.k)), i === g.items.length - 1))}
+        </View>
+      ))}
 
-      <Text style={st.groupHead}>Manage</Text>
-      <View style={st.manage}>
-        {manage.map((x, i) => (
-          <Pressable key={x.title} onPress={x.go} style={({ pressed }) => [st.manageRow, i > 0 && st.manageRule, pressed && { backgroundColor: C.raised }]} accessibilityRole="button">
-            <Icon name={x.icon} size={19} color={C.sub} stroke={2} />
-            <Text style={st.manageText}>{x.title}</Text>
-            <Icon name="right" size={16} color={C.faint} stroke={2.4} />
-          </Pressable>
-        ))}
+      <View style={st.pGroup}>
+        <Text style={st.groupHead} accessibilityRole="header">Manage</Text>
+        {manage.map((x, i) => row(x, x.go, i === manage.length - 1))}
       </View>
     </View>
   );
 }
 
+// forms sit straight on the page (no box around them)
+const FLAT = { padding: 0, backgroundColor: 'transparent', shadowOpacity: 0, elevation: 0, borderRadius: 0 } as const;
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 function nextDays() {
   const out: { l: string; v: string }[] = [];
@@ -607,7 +619,7 @@ function SimpleForm({ kind, onDone, link }: { kind: 'post' | 'event' | 'alert' |
   };
   const heading = kind === 'post' ? 'Post an update' : kind === 'event' ? 'Add an event' : kind === 'notify' ? (link ? 'Challenge reminder' : 'Send a notification') : 'Live banner';
   return (
-    <Card style={{ padding: 20 }}>
+    <Card style={FLAT}>
       <Text style={st.simpleHello}>{heading}</Text>
       {kind === 'notify' ? <Text style={[T.small, { marginTop: 4 }]}>{link ? 'A nudge for the people in the challenge. Tapping it opens the challenge.' : 'Goes straight to every phone. No banner, no post.'}</Text> : kind === 'alert' ? <Text style={[T.small, { marginTop: 4 }]}>A banner at the top of the app for 24 hours. Link it to an event to promote it.</Text> : null}
       <Field label={kind === 'event' ? 'Event name' : kind === 'notify' ? 'Title' : 'Headline'} value={title} onChange={setTitle} placeholder={kind === 'event' ? 'Pizza and Torah night' : kind === 'alert' ? 'Tonight is moved to 8 PM' : kind === 'notify' ? 'See you at 7 tonight' : 'Great turnout at the Shabbaton'} />
@@ -764,14 +776,21 @@ function PhotoReview() {
 }
 
 const st = StyleSheet.create({
-  hiLine: { fontSize: 17, lineHeight: 23, fontWeight: '600', color: C.ink },
-  liveBox: { marginTop: 16, padding: 14, borderRadius: R.card, backgroundColor: C.card, gap: 10 },
-  liveBoxHead: { ...T.eyebrow, color: C.orangeText },
+  hiLine: { fontSize: 17, lineHeight: 23, color: C.sub },
+  liveBox: { marginTop: 28, padding: 18, borderRadius: R.btnSm, backgroundColor: C.band, borderWidth: 1, borderColor: C.line, gap: 16 },
+  liveKind: { fontSize: 14, lineHeight: 18, fontWeight: '700', color: C.blue },
+  liveBoxHead: { ...display(24) },
   liveRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   liveDot: { width: 8, height: 8, borderRadius: 4 },
-  liveRowText: { flex: 1, fontSize: 14, fontWeight: '700', color: C.ink },
-  turnOff: { fontSize: 14, fontWeight: '700', color: C.red },
-  groupHead: { ...T.eyebrow, marginTop: 26, marginBottom: 10 },
+  liveRowText: { fontSize: 17, lineHeight: 22, fontWeight: '600', color: C.ink, marginTop: 2 },
+  turnOff: { fontSize: 16, fontWeight: '700', color: C.red },
+  groupHead: { ...display(28), marginBottom: 4 },
+  pGroup: { marginTop: 40 },
+  pRow: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingVertical: 16, minHeight: 64 },
+  pRule: { borderBottomWidth: 1, borderBottomColor: C.line },
+  pIcon: { width: 40, height: 40, borderRadius: R.chip, borderWidth: 1, borderColor: C.lineStrong, alignItems: 'center', justifyContent: 'center' },
+  pTitle: { ...display(22) },
+  pSub: { fontSize: 15, lineHeight: 21, color: C.sub, marginTop: 2 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -5 },
   tile: { width: '50%', padding: 5 },
   tileCard: { padding: 14, borderRadius: R.card, backgroundColor: C.card, minHeight: 104, justifyContent: 'space-between' },
@@ -785,8 +804,8 @@ const st = StyleSheet.create({
   personAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: C.avatar, alignItems: 'center', justifyContent: 'center' },
   personInitial: { fontSize: 15, fontWeight: '700', color: C.white },
   simpleHello: { ...T.h2 },
-  backRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 },
-  backText: { fontSize: 16, fontWeight: '800', color: C.blueDeep },
+  backRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 24, minHeight: 44 },
+  backText: { fontSize: 17, fontWeight: '700', color: C.blue },
   cRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
   photo: { width: '100%', aspectRatio: 3 / 4, borderRadius: R.photo, marginTop: 12, backgroundColor: C.raised },
   root: { flex: 1, backgroundColor: C.bg },
@@ -796,7 +815,7 @@ const st = StyleSheet.create({
   toggle: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 16, minHeight: 44 },
   coverRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 10 },
   coverThumb: { width: 96, height: 64, borderRadius: R.print, backgroundColor: C.raised },
-  item: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 },
+  item: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: C.line },
   itemMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
   signRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderTopWidth: 1, borderTopColor: C.line, marginTop: 10 },
 });
