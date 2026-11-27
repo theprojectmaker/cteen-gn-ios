@@ -61,6 +61,7 @@ function specs(key: ListKey, c: Content, isNew: boolean): Spec[] {
     { k: 'maxAge', label: 'Oldest age (optional)', t: 'text', ph: '18' },
     { k: 'who', label: "Who it's for (optional)", t: 'text' },
     { k: 'about', label: 'Details', t: 'long' },
+    { k: 'photos', label: 'More photos (links, one per line, up to 10)', t: 'lines', hint: 'Or add photos from your phone below. They show as a swipe gallery on the event page.' },
     { k: 'priority', label: 'Featured event (shown first in the Home carousel, and stands out)', t: 'bool' },
   ];
   if (key === 'challenges') return [
@@ -84,7 +85,7 @@ function specs(key: ListKey, c: Content, isNew: boolean): Spec[] {
 
 const BLANK: Record<ListKey, Draft> = {
   posts: { title: '', body: '', kind: 'News', pinned: false, eventId: '', challengeId: '', photos: '', linkLabel: '', linkUrl: '', _notify: false },
-  events: { title: '', scope: 'gn', signup: 'app', url: '', payUrl: '', start: '', end: '', time: '', place: '', price: '', icon: 'star', color: 'blue', who: '', about: '', image: '', gender: 'all', minAge: '', maxAge: '', repeat: 'none', repeatUntil: '', priority: false, fullPoster: false, cover: '', poster: '', _notify: false },
+  events: { title: '', scope: 'gn', signup: 'app', url: '', payUrl: '', start: '', end: '', time: '', place: '', price: '', icon: 'star', color: 'blue', who: '', about: '', image: '', gender: 'all', minAge: '', maxAge: '', repeat: 'none', repeatUntil: '', priority: false, fullPoster: false, cover: '', poster: '', photos: '', _notify: false },
   challenges: { title: '', icon: 'trophy', color: 'purple', every: 'day', goal: '30', about: '', rewards: '', active: true, photo: false, _notify: false },
   info: { icon: 'star', title: '', body: '' },
 };
@@ -109,6 +110,7 @@ function fromDraft(key: ListKey, d: Draft): any {
   }
   if (key === 'events') {
     out.end = d.end || d.start;
+    out.photos = String(d.photos || '').split(String.fromCharCode(10)).map((x) => x.trim()).filter(Boolean).slice(0, 10);
     out.minAge = String(d.minAge).trim() ? Number(d.minAge) : null;
     out.maxAge = String(d.maxAge).trim() ? Number(d.maxAge) : null;
   }
@@ -174,9 +176,10 @@ export function AdminPanel() {
   const [signups, setSignups] = useState<{ signups: Record<string, SignupRow[]>; phones: number } | null>(null);
   const [inbox, setInbox] = useState<Question[] | null>(null);
   const [coverPick, setCoverPick] = useState<Snap[]>([]);
+  const [morePick, setMorePick] = useState<Snap[]>([]);
 
   useEffect(() => { setEditing(null); setNote(null); setConfirmDel(false); }, [inSection, task, adminOpen]);
-  useEffect(() => { setCoverPick([]); }, [editing?.id, inSection, adminOpen]);
+  useEffect(() => { setCoverPick([]); setMorePick([]); }, [editing?.id, inSection, adminOpen]);
   // Every task opens at its top, not wherever the list was scrolled to.
   const scroller = useRef<ScrollView>(null);
   useEffect(() => { scroller.current?.scrollTo({ y: 0, animated: false }); }, [task, inSection, editing?.id]);
@@ -329,7 +332,15 @@ export function AdminPanel() {
           if (typeof urls === 'string') return setNote(urls);
           cover = urls[0] || cover;
         }
-        const item = fromDraft(cfg.key, { ...d, ...(cfg.key === 'events' ? { cover } : {}), id: editing.id ?? cfg.prefix + '-' + Date.now().toString(36) });
+        let photosText = String(d.photos || '');
+        if (cfg.key === 'events' && morePick.length) {
+          setBusy(true);
+          const more = await publishPhotos(morePick, store.uploadPhoto);
+          setBusy(false);
+          if (typeof more === 'string') return setNote(more);
+          photosText = [photosText, ...more].filter(Boolean).join(String.fromCharCode(10));
+        }
+        const item = fromDraft(cfg.key, { ...d, ...(cfg.key === 'events' ? { cover, photos: photosText } : {}), id: editing.id ?? cfg.prefix + '-' + Date.now().toString(36) });
         const nextList = editing.id ? items.map((x) => (x.id === editing.id ? item : x)) : [item, ...items];
         const auto = !editing.id && (cfg.key === 'posts' || cfg.key === 'events');
         if (!(await save({ ...content, [cfg.key]: nextList }, editing.id ? 'Saved.' : auto ? 'Live for everyone. Every phone got a notification.' : 'Live for everyone.'))) return;
@@ -354,6 +365,8 @@ export function AdminPanel() {
                 </View>
               ) : null}
               <PhotoPicker photos={coverPick} onChange={(p) => setCoverPick(p.slice(-1))} />
+              <Text style={[u.fieldLabel, { marginTop: 14 }]}>More photos (swipe gallery on the event page)</Text>
+              <PhotoPicker photos={morePick} onChange={setMorePick} max={10} label={`Add photos (${morePick.length} of 10)`} />
               {d.cover || coverPick.length ? (
                 <View style={st.toggle}>
                   <Text style={[T.strong, { flex: 1 }]}>This cover is a full poster (show it whole, no text over it)</Text>

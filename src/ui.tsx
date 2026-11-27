@@ -6,7 +6,7 @@ import { Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextIn
 import { C, F, HUES, R, SP, T, display, shadow } from './theme';
 import { Icon, challengeIcon } from './icons';
 import { IMAGES, dateLabel, repeatLabel, useStore, type ColorKey, type EventItem } from './store';
-import { CloseButton, DayBlock, Label, Photo, PosterStage, Slab, TextTabs, eventPicture, whenTag } from './look';
+import { CloseButton, CountChip, DayBlock, Label, Photo, PosterStage, Slab, TextTabs, eventPicture, galleryCount, whenTag } from './look';
 
 export { SectionHead } from './look';
 
@@ -165,6 +165,7 @@ export function EventCard({ e, width }: { e: EventItem; width?: number }) {
         {picture ? (
           <View style={{ marginTop: 16 }}>
             {picture.kind === 'poster' ? <PosterStage source={picture.source} maxHeight={300} /> : <Photo source={picture.source} />}
+            <CountChip n={galleryCount(e)} />
           </View>
         ) : null}
       </Pressable>

@@ -127,28 +127,32 @@ export function MinyanEditor({ onDone }: { onDone: (msg: string) => void }) {
 
 // ── Photos on posts ──
 // Uploads each photo and returns their links, or an error message.
-export async function publishPhotos(photos: Snap[], upload: (b64: string) => Promise<string | { error: string }>): Promise<string[] | string> {
+// One at a time, in order (so a long list never floods the phone's connection); each gets one retry.
+export async function publishPhotos(photos: Snap[], upload: (b64: string) => Promise<string | { error: string }>, onProgress?: (done: number, total: number) => void): Promise<string[] | string> {
   const urls: string[] = [];
   for (const p of photos) {
-    const r = await upload(p.base64);
+    onProgress?.(urls.length, photos.length);
+    let r = await upload(p.base64);
+    if (typeof r !== 'string') r = await upload(p.base64);
     if (typeof r !== 'string') return r.error;
     urls.push(r);
   }
+  onProgress?.(photos.length, photos.length);
   return urls;
 }
 
-export function PhotoPicker({ photos, onChange }: { photos: Snap[]; onChange: (p: Snap[]) => void }) {
+export function PhotoPicker({ photos, onChange, max = 4, label }: { photos: Snap[]; onChange: (p: Snap[]) => void; max?: number; label?: string }) {
   const [err, setErr] = useState<string | null>(null);
   const add = async () => {
     setErr(null);
-    const r = await pickPhotos(4 - photos.length);
+    const r = await pickPhotos(max - photos.length);
     if (!r) return;
     if ('error' in r) return setErr(r.error);
-    onChange([...photos, ...r].slice(0, 4));
+    onChange([...photos, ...r].slice(0, max));
   };
   return (
     <View style={{ marginTop: 14 }}>
-      <Text style={st.label}>Photos (up to 4)</Text>
+      <Text style={st.label}>{label ?? `Photos (up to ${max})`}</Text>
       <View style={st.thumbs}>
         {photos.map((p, i) => (
           <View key={p.uri + i} style={st.thumb}>
@@ -158,7 +162,7 @@ export function PhotoPicker({ photos, onChange }: { photos: Snap[]; onChange: (p
             </Pressable>
           </View>
         ))}
-        {photos.length < 4 ? (
+        {photos.length < max ? (
           <Pressable onPress={add} style={({ pressed }) => [st.thumb, st.thumbAdd, pressed && { opacity: 0.7 }]} accessibilityRole="button" accessibilityLabel="Add photos">
             <Icon name="camera" size={22} color={C.blueDeep} stroke={2} />
             <Text style={st.thumbAddText}>Add</Text>

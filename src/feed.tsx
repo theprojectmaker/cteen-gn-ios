@@ -181,7 +181,7 @@ export function PostCard({ post, full, compact, isNew }: { post: Post; full?: bo
             <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} onMomentumScrollEnd={(e) => w && setPage(Math.round(e.nativeEvent.contentOffset.x / w))} scrollEventThrottle={16}>
               {photos!.map((uri) => (
                 <Pressable key={uri} onPress={() => onMediaPress(openPost)} style={{ width: w || 1, height: '100%' }} accessibilityLabel="Photo. Double tap to like.">
-                  <Image source={{ uri }} style={u.fill} resizeMode="cover" />
+                  <Image source={{ uri }} style={u.fill} resizeMode="contain" />
                 </Pressable>
               ))}
             </ScrollView>
@@ -362,9 +362,9 @@ const st = StyleSheet.create({
   soonGo: { ...T.eyebrow, color: C.blue },
   mediaChipTitle: { ...T.h3 },
   bigHeart: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
-  dots: { position: 'absolute', bottom: 12, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 6 },
-  dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.5)' },
-  dotOn: { backgroundColor: C.white },
+  dots: { position: 'absolute', bottom: 12, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 4 },
+  dot: { width: 10, height: 6, borderRadius: 1.5, backgroundColor: 'rgba(255,255,255,0.4)', transform: [{ skewX: '-16deg' }] },
+  dotOn: { width: 18, backgroundColor: C.white },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 18, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 6 },
   action: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   actionCount: { fontSize: 15, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },

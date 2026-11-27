@@ -644,6 +644,32 @@ export function eventPicture(e: Pick<EventItem, 'image' | 'poster' | 'cover' | '
   return null;
 }
 
+/** How many pictures an event has: its main one plus the extra gallery photos. */
+export function galleryCount(e: Pick<EventItem, 'image' | 'poster' | 'cover' | 'fullPoster' | 'photos'>): number {
+  return (eventPicture(e) ? 1 : 0) + (e.photos?.length ?? 0);
+}
+
+/** Page marker for a gallery: slanted bars, the current one wide. */
+export function GalleryBars({ count, index, onDark, style }: { count: number; index: number; onDark?: boolean; style?: StyleProp<ViewStyle> }) {
+  return (
+    <View style={[{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 }, style]} accessible accessibilityLabel={`Photo ${index + 1} of ${count}`}>
+      {Array.from({ length: count }, (_, i) => (
+        <View key={i} style={{ width: i === index ? 18 : 10, height: 6, borderRadius: 1.5, backgroundColor: i === index ? (onDark ? C.white : C.blue) : onDark ? 'rgba(255,255,255,0.4)' : C.tick, transform: [{ skewX: '-16deg' }] }} />
+      ))}
+    </View>
+  );
+}
+
+/** "1/4": a small count over a picture that has more pictures behind it. */
+export function CountChip({ n, style }: { n: number; style?: StyleProp<ViewStyle> }) {
+  if (n < 2) return null;
+  return (
+    <View pointerEvents="none" style={[{ position: 'absolute', top: 10, right: 10, paddingHorizontal: 8, height: 24, borderRadius: 6, backgroundColor: 'rgba(11,18,32,0.72)', justifyContent: 'center' }, style]}>
+      <Text style={{ fontFamily: F.bold, fontSize: 12, lineHeight: 15, letterSpacing: 1.2, color: C.white }}>1/{n}</Text>
+    </View>
+  );
+}
+
 // The size of a print. A poster always keeps its own shape (it is never cropped); a photograph
 // (`crop`) may be trimmed to fit.
 //   by width (the default: 128, or 150 for a picture wider than tall): as tall as the picture's

@@ -90,6 +90,7 @@ export function EventForm({ onDone, initial }: { onDone: (msg: string) => void; 
   const [alsoPost, setAlsoPost] = useState(!!initial?.post);
   const [poster, setPoster] = useState<Snap[]>([]);
   const [cover, setCover] = useState<Snap[]>([]);
+  const [more, setMore] = useState<Snap[]>([]);
   const [repeat, setRepeat] = useState<'Once' | 'Every week'>('Once');
   const [fullPoster, setFullPoster] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -102,11 +103,13 @@ export function EventForm({ onDone, initial }: { onDone: (msg: string) => void; 
     if (typeof urls === 'string') { setBusy(false); return setErr(urls); }
     const coverUrls = await publishPhotos(cover, uploadPhoto);
     if (typeof coverUrls === 'string') { setBusy(false); return setErr(coverUrls); }
+    const moreUrls = await publishPhotos(more, uploadPhoto);
+    if (typeof moreUrls === 'string') { setBusy(false); return setErr(moreUrls); }
     const ev: EventItem = {
       id: 'e-' + Date.now().toString(36), title: title.trim(), icon: 'star', color: 'blue', scope: 'gn', start: day, end: day,
       time: time.trim(), place: place.trim(), price: price.trim(), who: initial?.who ?? '', about: about.trim(),
       signup: rsvp ? 'app' : 'link', url: '', payUrl: '', gender: who === 'Boys' ? 'boys' : who === 'Girls' ? 'girls' : 'all', minAge: null, maxAge: null,
-      cover: coverUrls[0] || '', poster: urls[0] || '', showGoing,
+      cover: coverUrls[0] || '', poster: urls[0] || '', photos: moreUrls, showGoing,
       repeat: repeat === 'Every week' ? 'weekly' : 'none', repeatUntil: '', fullPoster,
     };
     const posts = alsoPost ? [{ id: 'p-' + Date.now().toString(36), kind: 'Events' as const, pinned: false, title: initial?.post?.title || title.trim(), body: initial?.post?.body || about.trim(), eventId: ev.id, challengeId: '', photos: urls, linkLabel: '', linkUrl: '', at: new Date().toISOString() }, ...content.posts] : content.posts;
@@ -150,6 +153,8 @@ export function EventForm({ onDone, initial }: { onDone: (msg: string) => void; 
       {cover.length ? <Switch title="This cover is a full poster" sub="Show the whole poster, fit (not cropped), with no title or date over it." value={fullPoster} onChange={setFullPoster} /> : null}
       <Text style={[u.fieldLabel, { marginTop: 14 }]}>Poster (flyer for the pop-up, optional)</Text>
       <PhotoPicker photos={poster} onChange={(p) => setPoster(p.slice(-1))} />
+      <Text style={[u.fieldLabel, { marginTop: 14 }]}>More photos (up to 10, people swipe through them on the event page)</Text>
+      <PhotoPicker photos={more} onChange={setMore} max={10} label={`More photos (${more.length} of 10)`} />
       <Switch title="RSVP in the app" sub="Teens tap Going, you see the list" value={rsvp} onChange={setRsvp} />
       <Switch title="Show who's going" sub="Off: teens only see their own RSVP. On: they see first names and how many." value={showGoing} onChange={setShowGoing} />
       <Switch title="Also post it to the Feed" value={alsoPost} onChange={setAlsoPost} />

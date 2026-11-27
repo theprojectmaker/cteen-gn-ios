@@ -20,6 +20,8 @@ export type EventItem = {
   signup: 'app' | 'link'; url?: string; payUrl?: string;
   gender?: 'all' | 'boys' | 'girls'; minAge?: number | null; maxAge?: number | null;
   poster?: string; cover?: string; showGoing?: boolean;
+  /** extra gallery photos (up to 10), shown after the cover / poster on the event page */
+  photos?: string[];
   repeat?: 'none' | 'weekly'; repeatUntil?: string; priority?: boolean; fullPoster?: boolean;
 };
 export type Challenge = { id: string; title: string; icon: string; color: ColorKey; every: 'day' | 'week'; goal: number; about: string; active: boolean; photo?: boolean; starts?: string; rules?: string[]; image?: string; rewards: { at: number; prize: string }[] };

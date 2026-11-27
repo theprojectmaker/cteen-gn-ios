@@ -9,6 +9,7 @@ import { publishPhotos } from './leaderTools';
 
 // Instagram-style "New post" for leaders: photos first, a headline and a caption, Share.
 // Every new post sends everyone a notification (the server writes it: "New announcement: ...").
+const MAX_PHOTOS = 10;
 const KINDS: { k: Post['kind']; l: string }[] = [
   { k: 'News', l: 'Announcement' },
   { k: 'Photos', l: 'Photos' },
@@ -26,6 +27,7 @@ export function Composer() {
   const [kind, setKind] = useState<Post['kind']>('News');
   const [eventId, setEventId] = useState('');
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState('');
   const [err, setErr] = useState<string | null>(null);
   if (!leader) return null;
   const reset = () => { setPhotos([]); setMain(0); setTitle(''); setCaption(''); setKind('News'); setEventId(''); setErr(null); };
@@ -33,17 +35,18 @@ export function Composer() {
   const close = () => { if (!busy) { setComposerOpen(false); reset(); } };
   const add = async () => {
     setErr(null);
-    const r = await pickPhotos(4 - photos.length);
+    const r = await pickPhotos(MAX_PHOTOS - photos.length);
     if (!r) return;
     if ('error' in r) return setErr(r.error);
-    setPhotos((p) => [...p, ...r].slice(0, 4));
+    setPhotos((p) => [...p, ...r].slice(0, MAX_PHOTOS));
     if (kind === 'News' && !caption && !title) setKind('Photos');
   };
   const share = async () => {
     const head = title.trim() || caption.trim().split(/[.!?\n]/)[0].slice(0, 80);
     if (head.length < 2) return setErr('Write a headline or a caption.');
     setBusy(true); setErr(null);
-    const urls = await publishPhotos(photos, uploadPhoto);
+    const urls = await publishPhotos(photos, uploadPhoto, (d, t) => setProgress(t > 1 ? `Uploading photo ${Math.min(d + 1, t)} of ${t}…` : ''));
+    setProgress('');
     if (typeof urls === 'string') { setBusy(false); return setErr(urls); }
     const p: Post = { id: 'p-' + Date.now().toString(36), kind, pinned: false, title: head, body: title.trim() ? caption.trim() : caption.trim().slice(head.length).replace(/^[.!?\s]+/, ''), eventId, challengeId: '', photos: urls, linkLabel: '', linkUrl: '', at: new Date().toISOString() };
     const e = await saveContent({ ...content, posts: [p, ...content.posts] });
@@ -60,7 +63,7 @@ export function Composer() {
         <View style={st.bar}>
           <Pressable onPress={close} hitSlop={10} accessibilityRole="button"><Text style={st.cancel}>Cancel</Text></Pressable>
           <Text style={st.barTitle}>New post</Text>
-          <Pressable onPress={share} disabled={!canShare} hitSlop={10} accessibilityRole="button"><Text style={[st.share, !canShare && { opacity: 0.35 }]}>{busy ? 'Sharing…' : 'Share'}</Text></Pressable>
+          <Pressable onPress={share} disabled={!canShare} hitSlop={10} accessibilityRole="button"><Text style={[st.share, !canShare && { opacity: 0.35 }]}>{busy ? (progress || 'Sharing…') : 'Share'}</Text></Pressable>
         </View>
         <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + 30 }}>
           {photos.length ? (
@@ -75,18 +78,26 @@ export function Composer() {
                     </Pressable>
                   </Pressable>
                 ))}
-                {photos.length < 4 ? (
+                {photos.length < MAX_PHOTOS ? (
                   <Pressable onPress={add} style={[st.thumb, st.thumbAdd]} accessibilityRole="button" accessibilityLabel="Add more photos">
                     <Icon name="plus" size={22} color={C.blueDeep} stroke={2.4} />
                   </Pressable>
                 ) : null}
               </ScrollView>
+              {photos.length > 1 ? (
+                <View style={st.orderRow}>
+                  <Text style={st.orderText}>Photo {Math.min(main, photos.length - 1) + 1} of {photos.length}</Text>
+                  {main > 0 ? (
+                    <Pressable onPress={() => { setPhotos((x) => { const c = x.slice(); const [m] = c.splice(main, 1); c.unshift(m); return c; }); setMain(0); }} hitSlop={8} accessibilityRole="button" accessibilityLabel="Make this the first photo"><Text style={st.orderBtn}>Make it the first photo</Text></Pressable>
+                  ) : <Text style={st.orderText}>First photo</Text>}
+                </View>
+              ) : null}
             </View>
           ) : (
             <Pressable onPress={add} style={({ pressed }) => [st.empty, pressed && { opacity: 0.8 }]} accessibilityRole="button" accessibilityLabel="Add photos">
               <View style={st.emptyIcon}><Icon name="camera" size={28} color={C.ink} stroke={1.9} /></View>
               <Text style={st.emptyTitle}>Add photos</Text>
-              <Text style={T.small}>Optional. Up to 4.</Text>
+              <Text style={T.small}>Optional. Up to 10, people swipe through them.</Text>
             </Pressable>
           )}
           <View style={{ paddingHorizontal: 18 }}>
@@ -131,6 +142,9 @@ const st = StyleSheet.create({
   cancel: { fontSize: 16, color: C.ink },
   share: { fontSize: 16, fontWeight: '700', color: C.blue },
   preview: { width: '100%', aspectRatio: 1, backgroundColor: C.raised },
+  orderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingBottom: 6 },
+  orderText: { fontSize: 14, color: C.sub },
+  orderBtn: { fontSize: 14, fontWeight: '700', color: C.blue },
   thumbs: { gap: 8, paddingHorizontal: 18, paddingVertical: 12 },
   thumb: { width: 60, height: 60, borderRadius: R.print, overflow: 'hidden', backgroundColor: C.raised },
   thumbOn: { borderWidth: 2.5, borderColor: C.blue },

@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, F, PREFS, R, SP, T, display, numeral } from './theme';
 import { Icon } from './icons';
 import { challengeFits, sortPosts, upcoming, useShabbat, useStore, type Challenge, type EventItem } from './store';
-import { Band, BrushTag, DayBlock, Hairline, Label, Row, Slab, Ticks, eventPicture, hebrewDate, heroType, useAspect } from './look';
+import { Band, BrushTag, CountChip, DayBlock, Hairline, Label, Row, Slab, Ticks, eventPicture, galleryCount, hebrewDate, heroType, useAspect } from './look';
 import { useChallengeCard } from './rewards';
 import { InviteCards, useMyInvites } from './invites';
 import { MINYAN_FALLBACK, minyanTime } from './minyan';
@@ -208,6 +208,7 @@ function EventPage({ e, tag, now, width, height }: { e: EventItem; tag: string; 
             <View style={st.typeBar} />
           </View>
         )}
+        <CountChip n={galleryCount(e)} />
         <View pointerEvents="none" style={st.panelEdge} />
       </Pressable>
       <Pressable onPress={open} accessible={false} style={({ pressed }) => pressed && st.dim}>

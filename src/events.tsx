@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
-import { Image, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { C, R, SP, T, display, numeral } from './theme';
 import { Icon } from './icons';
 import { calendarUrl, challengeFits, countdown, dateLabel, open, repeatLabel, upcoming, useStore, type EventItem } from './store';
 import { parseDay } from './when';
 import { audienceLabel, Card, Chips, Empty, EventCard, SaveHeart } from './ui';
-import { BrushTag, Hairline, Label, Photo, Slab, eventPicture, useAspect, whenTag } from './look';
+import { BrushTag, GalleryBars, Hairline, Label, Photo, Slab, eventPicture, useAspect, whenTag } from './look';
 import { NameGate } from './rewards';
 import { InviteCards } from './invites';
 
@@ -102,29 +102,60 @@ export function EventDetails({ e }: { e: EventItem }) {
   );
 }
 
-// The picture, whole, on a flat panel: a poster at its own shape, a photograph full width, or (no picture) the date.
+// The picture area: one picture shown whole (a poster at its own shape on a flat panel, a photograph
+// full width, or the date), or, when the event has more photos, a gallery you swipe through with the
+// cover or poster first and slanted bars under it.
 function EventPicture({ e }: { e: EventItem }) {
   const win = useWindowDimensions();
   const picture = eventPicture(e);
   const ratio = useAspect(picture?.source, 0.77);
   const col = Math.min(win.width, 600) - SP.gutter * 2;
-  if (picture && picture.kind === 'photo') return <Photo source={picture.source} accessibilityLabel={e.title} />;
-  if (picture) {
+  const extra = e.photos ?? [];
+  const [page, setPage] = useState(0);
+  // the height of every page: what the main picture needs
+  let h = 0;
+  let main: React.ReactNode;
+  if (picture && picture.kind === 'photo') {
+    h = Math.round(col / 1.6);
+    main = <Image source={picture.source} style={{ width: col, height: h, borderRadius: R.photo }} resizeMode="cover" accessibilityLabel={e.title} />;
+  } else if (picture) {
     const maxH = Math.min(440, Math.round(win.height * 0.52));
     const w = Math.min(col - 32, (maxH - 32) * ratio);
     const bare = w > col * 0.9;
     const pw = bare ? col : Math.round(w), ph = Math.round(pw / ratio);
-    return (
-      <View style={[st.panel, bare ? st.panelBare : { height: ph + 32 }]}>
+    h = ph + (bare ? 0 : 32);
+    main = (
+      <View style={[st.panel, bare ? st.panelBare : null, { width: col, height: h }]}>
         <Image source={picture.source} style={{ width: pw, height: ph }} resizeMode="contain" accessibilityLabel={e.title} />
       </View>
     );
+  } else if (!extra.length) {
+    const d = parseDay(e.start);
+    return (
+      <View style={[st.panel, st.dateBox]} accessible accessibilityLabel={dateLabel(e)}>
+        <Label tone="blue" size={13}>{['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][d.getDay()]} · {['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'][d.getMonth()]}</Label>
+        <Text style={st.dateNum}>{d.getDate()}</Text>
+      </View>
+    );
+  } else {
+    h = Math.round(col / 1.6);
   }
-  const d = parseDay(e.start);
+  if (!extra.length) return <View>{main}</View>;
+  const pages = [...(main ? [main] : []), ...extra.map((uri, i) => (
+    <View key={uri + i} style={[st.panel, { width: col, height: h }]}>
+      <Image source={{ uri }} style={{ width: col, height: h }} resizeMode="contain" accessibilityLabel={`${e.title}, photo ${(main ? 2 : 1) + i}`} />
+    </View>
+  ))];
+  const onScroll = (ev: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const i = Math.max(0, Math.min(pages.length - 1, Math.round(ev.nativeEvent.contentOffset.x / col)));
+    if (i !== page) setPage(i);
+  };
   return (
-    <View style={[st.panel, st.dateBox]} accessible accessibilityLabel={dateLabel(e)}>
-      <Label tone="blue" size={13}>{['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][d.getDay()]} · {['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'][d.getMonth()]}</Label>
-      <Text style={st.dateNum}>{d.getDate()}</Text>
+    <View>
+      <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} scrollEventThrottle={16} onScroll={onScroll} style={{ width: col }} accessibilityLabel="Photo gallery. Swipe for more.">
+        {pages.map((p, i) => <View key={i} style={{ width: col }}>{p}</View>)}
+      </ScrollView>
+      <GalleryBars count={pages.length} index={page} style={{ marginTop: 14 }} />
     </View>
   );
 }
